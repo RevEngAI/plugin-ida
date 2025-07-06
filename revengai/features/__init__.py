@@ -107,15 +107,18 @@ class BaseDialog(QDialog):
             if selector_match != -1:
                 # Extract the value after the selector
                 start = selector_match + len(selector_pattern)
-                end = query.find(' ', start)
+                # Skip any spaces after the colon
+                while start < len(query) and query[start] == ' ':
+                    start += 1
 
-                # If no space found, take till the end of string
-                if end == -1:
-                    end = len(query)
+                # Find the end of the value (next space or end of string)
+                end = start
+                while end < len(query) and query[end] != ' ':
+                    end += 1
 
                 # Extract the value and the full selector part
                 value = query[start:end].strip()
-                full_selector_part = query[selector_match:end].strip()
+                full_selector_part = query[selector_match:end]
 
                 return value, full_selector_part
 
@@ -124,15 +127,18 @@ class BaseDialog(QDialog):
         # Process tags first (can be multiple)
         def process_tags(query):
             tags = []
+            processed_query = query
             while True:
-                tag_value, tag_part = extract_selector_value(query, 'tag')
+                tag_value, tag_part = extract_selector_value(
+                    processed_query, 'tag')
                 if not tag_value:
                     break
-                tags.append(tag_value)
-                query = query.replace(tag_part, '').strip()
+                tags.extend(tag_value.strip().split(','))
+                processed_query = processed_query.replace(
+                    tag_part, '', 1).strip()
             if len(tags) == 0:
                 tags = None
-            return tags, query
+            return tags, processed_query
 
         # Process tags
         result['tags'], query = process_tags(query)
@@ -155,7 +161,7 @@ class BaseDialog(QDialog):
         if query:
             # If query is not empty after removing selectors
             if any(result[selector] is not None for selector in
-                   single_selectors):
+                    single_selectors):
                 raise ValueError(
                     "Selector cannot be used with additional text.")
             # If no other selectors, treat as raw query
