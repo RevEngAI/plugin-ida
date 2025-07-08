@@ -13,6 +13,10 @@ from pygments.token import Token, _TokenType
 from pygments.formatter import Formatter
 from pygments import highlight
 
+import ida_funcs
+
+from revengai.manager import RevEngState
+
 logger = logging.getLogger("REAI")
 
 
@@ -563,17 +567,65 @@ class SwitchToCppAction(ida_kernwin.action_handler_t):
         return ida_kernwin.AST_ENABLE_ALWAYS
 
 
+class ViewHooks(ida_kernwin.UI_Hooks):
+    """Hooks for the custom viewer to handle popup menu"""
+
+    def __init__(self, viewer: "AICodeViewer"):
+        ida_kernwin.UI_Hooks.__init__(self)
+        self.viewer = viewer
+        self.last_func = None
+
+    def screen_ea_changed(self, ea, _):
+        """Called when the cursor moves to a different address"""
+        logger.debug(f"Screen EA changed to: {ea:#x}")
+        current_func = ida_funcs.get_func(ea)
+        if self.last_func is None or current_func.start_ea != self.last_func.start_ea:
+            self.last_func = current_func
+            self.viewer.on_function_changed(current_func)
+
+    def get_ea_hint(self, ea):
+        """Alternative hook point - called when getting EA hints"""
+        logger.debug(f"EA hint requested for: {ea:#x}")
+        current_func = ida_funcs.get_func(ea)
+        if self.last_func is None or current_func.start_ea != self.last_func.start_ea:
+            self.last_func = current_func
+            self.viewer.on_function_changed(current_func)
+        return ""
+
+    def populating_widget_popup(self, widget, popup):
+        """Called when a popup menu is about to be shown"""
+        if self.viewer.GetWidget() == widget:
+            # Add our actions to the popup menu
+            ida_kernwin.attach_action_to_popup(
+                widget,
+                popup,
+                self.viewer.c_action_name,
+                "Language/"
+            )
+            ida_kernwin.attach_action_to_popup(
+                widget,
+                popup,
+                self.viewer.cpp_action_name,
+                "Language/"
+            )
+            return 1
+        return 0
+
+
 class AICodeViewer(idaapi.simplecustviewer_t):
     """
     A custom viewer that provides syntax highlighting for both C and C++ code
     """
 
-    def __init__(self):
+    def __init__(self, state: RevEngState, ai_decompile_fnc: callable = None):
         idaapi.simplecustviewer_t.__init__(self)
         self.raw_lines = []
         self.highlighter = TreeSitterCodeHighlighter()
         self.language = None  # Will be auto-detected
         self.current_code = ""
+        self.state = state  # Reference to the main state object
+        self.ai_decompile_fnc = ai_decompile_fnc
+        self.hook = None  # Will be set when the view is created
 
     def Create(self, title):
         """Create the custom view with the given title"""
@@ -584,7 +636,7 @@ class AICodeViewer(idaapi.simplecustviewer_t):
         self.register_actions()
 
         # Attach popup menu to the viewer
-        self.hook = self.ViewHooks(self)
+        self.hook = ViewHooks(self)
         self.hook.hook()
 
         return True
@@ -625,6 +677,15 @@ class AICodeViewer(idaapi.simplecustviewer_t):
         self.language = language
         if self.current_code:
             self.set_code(self.current_code, self.language)
+
+    def on_function_changed(self, _):
+        """
+        Called when the cursor moves to a different function
+        This can be used to update the view with the current function's code
+        """
+        # call the action
+        logger.info("Function changed, triggering AI decompilation")
+        self.ai_decompile_fnc(self.state)
 
     def set_code(self, code: str, summary: str, language=None):
         """
@@ -692,30 +753,6 @@ class AICodeViewer(idaapi.simplecustviewer_t):
         self.unregister_actions()
         if hasattr(self, 'hook') and self.hook:
             self.hook.unhook()
+        # set decom_ai_view to None in the GUI
+        self.state.gui.decomp_ai_view = None
         return True
-
-    class ViewHooks(ida_kernwin.UI_Hooks):
-        """Hooks for the custom viewer to handle popup menu"""
-
-        def __init__(self, viewer):
-            ida_kernwin.UI_Hooks.__init__(self)
-            self.viewer = viewer
-
-        def populating_widget_popup(self, widget, popup):
-            """Called when a popup menu is about to be shown"""
-            if self.viewer.GetWidget() == widget:
-                # Add our actions to the popup menu
-                ida_kernwin.attach_action_to_popup(
-                    widget,
-                    popup,
-                    self.viewer.c_action_name,
-                    "Language/"
-                )
-                ida_kernwin.attach_action_to_popup(
-                    widget,
-                    popup,
-                    self.viewer.cpp_action_name,
-                    "Language/"
-                )
-                return 1
-            return 0

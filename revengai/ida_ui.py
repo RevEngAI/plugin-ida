@@ -33,6 +33,8 @@ from revengai.actions import load_recent_analyses, setup_wizard
 from revengai.manager import RevEngState
 from revengai.misc.utils import IDAUtils
 
+from revengai.ai_decompilation_view import AICodeViewer
+
 MENU = "RevEng.AI/"
 
 
@@ -115,8 +117,9 @@ class Hooks(UI_Hooks):
                     if action.get("enabled", True):
                         if self.state.config.is_valid():
                             if (
-                                    action["id"] in ("reai:wizard", "reai:auto_unstrip", "reai:auto_analyze")
-                                   
+                                    action["id"] in (
+                                        "reai:wizard", "reai:auto_unstrip", "reai:auto_analyze")
+
                                     or (
                                     action["id"]
                                     in (
@@ -148,7 +151,6 @@ class Hooks(UI_Hooks):
                             attach_action_to_popup(
                                 form, popup, action["id"], MENU, SETMENU_APP
                             )
-
 
 
 class RevEngConfigForm_t(PluginForm):
@@ -283,6 +285,7 @@ class RevEngGUI(object):
     def __init__(self, state: RevEngState):
         self.state = state
         self.config_form = RevEngConfigForm_t(self.state)
+        self.decomp_ai_view: AICodeViewer = None
 
         set_dock_pos(MENU[:-1], "IDA View-A", DP_TAB)
 
