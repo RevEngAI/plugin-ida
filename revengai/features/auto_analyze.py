@@ -459,7 +459,7 @@ class AutoAnalysisDialog(BaseDialog):
         self.ui.fetchDataTypesButton.setEnabled(True)
 
     @wait_box_decorator(
-        "HIDECANCEL\nGetting data types for function…"
+        "NODELAY\nGetting data types for function…"
     )
     def _function_get_datatypes(
             self,

@@ -22,6 +22,7 @@ from revengai.misc.utils import IDAUtils
 import idaapi
 import logging
 import time
+from idaapi import user_cancelled
 
 logger = logging.getLogger("REAI")
 
@@ -284,6 +285,11 @@ def fetch_data_types(
             progress_cb(percentage)
 
         while total_count != total_data_types or not completed:
+            if user_cancelled():
+                logger.info("User cancelled the data types fetching.")
+                if progress_cb is not None and callable(progress_cb):
+                    progress_cb(100)
+                return []
             time.sleep(0.1)
             res = RE_functions_data_types_poll(
                 function_ids=function_ids,
