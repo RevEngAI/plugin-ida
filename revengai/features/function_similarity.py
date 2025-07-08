@@ -497,6 +497,8 @@ class FunctionSimilarityDialog(BaseDialog):
             self.ui.confidenceSlider.hide()
             self.ui.progressBar.hide()
             self.ui.description.setVisible(False)
+            self.ui.fetchDataTypesButton.setEnabled(True)
+            self.ui.renameButton.setEnabled(True)
 
     def _search_collection(self, query: dict = {}) -> None:
         def parse_date(date: str) -> str:
