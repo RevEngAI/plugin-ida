@@ -364,12 +364,12 @@ class FunctionSimilarityDialog(BaseDialog):
                         [{"function_id": function_id, "function_name": nnfn}]
                     ).json()["data"]
                     confidence = name_score[0]["box_plot"]["average"]
-                    if confidence < (100 - (distance * 100)):
-                        logger.info(
-                            f"Skipping {nnfn} because it's not similar"
-                            f" enough to {nnfn}"
-                        )
-                        continue
+                    # if confidence < (100 - (distance * 100)):
+                    #     logger.info(
+                    #         f"Skipping {nnfn} because it's not similar"
+                    #         f" enough to {nnfn}"
+                    #     )
+                    #     continue
                 except Exception as e:
                     confidence = 0
                     logger.error(f"Error: {e}")
@@ -402,7 +402,7 @@ class FunctionSimilarityDialog(BaseDialog):
                     "No matches found. Try a different confidence value."
                 )
                 logger.error(
-                    "No similar functions found for: %s with confidence: %d",
+                    "No similar functions found for: %s with similarity: %d",
                     inmain(IDAUtils.get_demangled_func_name, inmain(idc.here)),
                     (1 - distance) * 100,
                 )
@@ -490,7 +490,7 @@ class FunctionSimilarityDialog(BaseDialog):
             self.ui.fetchDataTypesButton.setEnabled(False)
             self.ui.confidenceSlider.show()
             self.ui.description.setText(
-                f"Confidence: {self.ui.confidenceSlider.sliderPosition():#02d}"
+                f"Similarity: {self.ui.confidenceSlider.sliderPosition():#02d}"
             )
             self.ui.progressBar.show()
         else:
@@ -736,7 +736,7 @@ class FunctionSimilarityDialog(BaseDialog):
         }
 
     def _confidence(self, value: int) -> None:
-        self.ui.description.setText(f"Confidence: {value:#02d}")
+        self.ui.description.setText(f"Similarity: {value:#02d}")
 
     def _filter_collections(self):
         query = self.ui.searchQuery.text().lower()

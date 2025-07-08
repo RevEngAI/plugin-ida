@@ -34,7 +34,7 @@ from reait.api import (
     RE_recent_analysis_v2,
     RE_models,
     RE_get_analysis_id_from_binary_id,
-    RE_get_functions_from_analysis, 
+    RE_get_functions_from_analysis,
 )
 
 from revengai import __version__
@@ -181,7 +181,7 @@ def upload_binary(state: RevEngState) -> None:
                     resp = e.response.json()
                     errors = resp.get("errors", [])
                     err_msg = (
-                        errors[0]["msg"]
+                        errors[0]["message"]
                         if len(errors) > 0
                         else "An unexpected error occurred. Sorry for the"
                         " inconvenience."
@@ -1438,7 +1438,15 @@ def ai_decompile(state: RevEngState) -> None:
             try:
                 if isinstance(decomp_data, tuple):
                     c_code, summary = decomp_data
-                    sv.set_code(c_code, summary)
+                    if c_code is None:
+                        sv.set_code(c_code, summary)
+                    else:
+                        # show the error and close the view
+                        Dialog.showError(
+                            "AI Decompilation Error",
+                            "An error occurred during AI decompilation. "
+                        )
+                        sv.Close()
             except Exception as e:
                 logger.info(f"Error: {e} \n{tb.format_exc()}")
         else:
@@ -1691,7 +1699,7 @@ def is_file_supported(state: RevEngState, fpath: str) -> bool:
             )
         ):
             return True
-        
+
         idc.warning(
             f"{file_format} file format is not currently supported by "
             "RevEng.AI"
@@ -1809,7 +1817,8 @@ def toolbar(state: RevEngState) -> None:
     form = RevEngConfigForm_t(state)
     form.register_actions(False)
     del form
-    
+
+
 def view_function_in_portal(state: RevEngState):
     try:
         fpath = idc.get_input_file_path()
@@ -1817,13 +1826,16 @@ def view_function_in_portal(state: RevEngState):
         res: Response = RE_search(fpath)
         binaries = res.json()["query_results"]
         for binary in binaries:
-            analysis = RE_get_analysis_id_from_binary_id(binary["binary_id"]).json()
-            functions = RE_get_functions_from_analysis(analysis["analysis_id"]).json()["data"]["functions"]
+            analysis = RE_get_analysis_id_from_binary_id(
+                binary["binary_id"]).json()
+            functions = RE_get_functions_from_analysis(analysis["analysis_id"]).json()[
+                "data"]["functions"]
             found = False
             for function in functions:
                 if function["function_vaddr"] == ida_funcs.get_func(idc.get_screen_ea()).start_ea - base_addr:
                     found = True
-                    inmain(idaapi.open_url, f"{state.config.PORTAL}/function/{function['function_id']}")
+                    inmain(
+                        idaapi.open_url, f"{state.config.PORTAL}/function/{function['function_id']}")
                     break
             if found:
                 break

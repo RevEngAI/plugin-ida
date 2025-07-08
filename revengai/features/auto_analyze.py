@@ -660,11 +660,11 @@ class AutoAnalysisDialog(BaseDialog):
                                     match["real_confidence"] = function[
                                         "box_plot"
                                     ]["average"]
-                                    if match["real_confidence"] < (
-                                            100 - (distance * 100)
-                                    ):
-                                        matches.remove(match)
-                                        break
+                                    # if match["real_confidence"] < (
+                                    #         100 - (distance * 100)
+                                    # ):
+                                    #     matches.remove(match)
+                                    #     break
 
                         if not matches:
                             logger.warning(
@@ -985,7 +985,7 @@ class AutoAnalysisDialog(BaseDialog):
 
     def _confidence(self, value: int) -> None:
         if self.ui.tabWidget.currentIndex() == 0:
-            self.ui.description.setText(f"Confidence: {value:#02d}")
+            self.ui.description.setText(f"Similarity: {value:#02d}")
 
     def _tab_changed(self, index: int) -> None:
         if index == 0:
@@ -994,7 +994,7 @@ class AutoAnalysisDialog(BaseDialog):
             self.ui.fetchDataTypesButton.setEnabled(False)
             self.ui.confidenceSlider.show()
             self.ui.description.setText(
-                f"Confidence: {self.ui.confidenceSlider.sliderPosition():#02d}"
+                f"Similarity: {self.ui.confidenceSlider.sliderPosition():#02d}"
             )
             self.ui.progressBar.show()
         else:
