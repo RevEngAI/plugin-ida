@@ -14,6 +14,7 @@ from revengai.misc.datatypes import (
     import_data_types,
 )
 from revengai.ai_decompilation_view import AICodeViewer
+from idaapi import user_cancelled
 
 import traceback as tb
 
@@ -1261,7 +1262,13 @@ def apply_function_data_types(state: RevEngState) -> None:
         Dialog.showInfo("Function Types", "Unable to process function types")
 
 
+@wait_box_decorator_noclazz(
+    "NODELAY\nApplying data types to functions…",
+)
 def ai_decompile(state: RevEngState) -> None:
+    """
+    Function to handle AI decompilation of the current function.
+    """
     def error_and_close_view(cb: callable, error: str) -> None:
         Dialog.showError(
             "Error during AI decompilation",
@@ -1338,10 +1345,15 @@ def ai_decompile(state: RevEngState) -> None:
 
             uninitialised_count = 0
 
-            for _ in range(5):
+            while True:
                 # wait for the decompilation to complete
                 logger.info("Waiting for AI decompliation to start/complete")
-                sleep(1)
+                sleep(0.2)
+                if user_cancelled():
+                    logger.info("User cancelled AI decompilation")
+                    return error_and_close_view(
+                        callback, "AI Decompilation cancelled by user"
+                    )
 
                 # poll again the status
                 res = RE_poll_ai_decompilation(
@@ -1447,19 +1459,30 @@ def ai_decompile(state: RevEngState) -> None:
                             "AI Decompilation Error",
                             "An error occurred during AI decompilation. "
                         )
-                        state.gui.decomp_ai_view.Close()
+                        state.gui.decomp_ai_view.ClearLines()
+                        state.gui.decomp_ai_view.AddLine(
+                            "An error occurred during AI decompilation. "
+                        )
+                        # state.gui.decomp_ai_view.Close()
                 else:
                     # show the error and close the view
                     Dialog.showError(
                         "AI Decompilation Error",
                         "An error occurred during AI decompilation. "
                     )
-                    state.gui.decomp_ai_view.Close()
+                    state.gui.decomp_ai_view.ClearLines()
+                    state.gui.decomp_ai_view.AddLine(
+                        "An error occurred during AI decompilation. "
+                    )
+                    # state.gui.decomp_ai_view.Close()
             except Exception as e:
                 logger.info(f"Error: {e} \n{tb.format_exc()}")
         else:
             # An error happened, destroy the view
-            state.gui.decomp_ai_view.Close()
+            state.gui.decomp_ai_view.ClearLines()
+            state.gui.decomp_ai_view.AddLine(
+                "An error occurred during AI decompilation. "
+            )
 
     fpath = idc.get_input_file_path()
     if is_condition_met(state, fpath):
