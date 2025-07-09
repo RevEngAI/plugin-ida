@@ -1348,7 +1348,7 @@ def ai_decompile(state: RevEngState) -> None:
             while True:
                 # wait for the decompilation to complete
                 logger.info("Waiting for AI decompliation to start/complete")
-                sleep(0.2)
+                sleep(0.5)
                 if user_cancelled():
                     logger.info("User cancelled AI decompilation")
                     return error_and_close_view(
@@ -1450,19 +1450,22 @@ def ai_decompile(state: RevEngState) -> None:
             try:
                 if isinstance(decomp_data, tuple):
                     c_code, summary = decomp_data
-                    logger.info(c_code)
                     if c_code is not None:
-                        state.gui.decomp_ai_view.set_code(c_code, summary)
+                        if state.gui.decomp_ai_view is not None:
+                            state.gui.decomp_ai_view.set_code(c_code, summary)
+                            # give focus to the view
+                            state.gui.decomp_ai_view.Show()
                     else:
                         # show the error and close the view
                         Dialog.showError(
                             "AI Decompilation Error",
                             "An error occurred during AI decompilation. "
                         )
-                        state.gui.decomp_ai_view.ClearLines()
-                        state.gui.decomp_ai_view.AddLine(
-                            "An error occurred during AI decompilation. "
-                        )
+                        if state.gui.decomp_ai_view is not None:
+                            state.gui.decomp_ai_view.ClearLines()
+                            state.gui.decomp_ai_view.AddLine(
+                                "An error occurred during AI decompilation. "
+                            )
                         # state.gui.decomp_ai_view.Close()
                 else:
                     # show the error and close the view
@@ -1470,19 +1473,21 @@ def ai_decompile(state: RevEngState) -> None:
                         "AI Decompilation Error",
                         "An error occurred during AI decompilation. "
                     )
-                    state.gui.decomp_ai_view.ClearLines()
-                    state.gui.decomp_ai_view.AddLine(
-                        "An error occurred during AI decompilation. "
-                    )
+                    if state.gui.decomp_ai_view is not None:
+                        state.gui.decomp_ai_view.ClearLines()
+                        state.gui.decomp_ai_view.AddLine(
+                            "An error occurred during AI decompilation. "
+                        )
                     # state.gui.decomp_ai_view.Close()
             except Exception as e:
                 logger.info(f"Error: {e} \n{tb.format_exc()}")
         else:
             # An error happened, destroy the view
-            state.gui.decomp_ai_view.ClearLines()
-            state.gui.decomp_ai_view.AddLine(
-                "An error occurred during AI decompilation. "
-            )
+            if state.gui.decomp_ai_view is not None:
+                state.gui.decomp_ai_view.ClearLines()
+                state.gui.decomp_ai_view.AddLine(
+                    "An error occurred during AI decompilation. "
+                )
 
     fpath = idc.get_input_file_path()
     if is_condition_met(state, fpath):
@@ -1503,12 +1508,13 @@ def ai_decompile(state: RevEngState) -> None:
                     state.gui.decomp_ai_view = AICodeViewer(
                         state, ai_decompile
                     )
-                if state.gui.decomp_ai_view.Create(f"AI Decompilation of {func_name}"):
-                    state.gui.decomp_ai_view.ClearLines()
-                    state.gui.decomp_ai_view.AddLine(
-                        "Please wait while the function is decompiled"
-                    )
+                    state.gui.decomp_ai_view.Create("RevEng.AI Decompilation")
                     state.gui.decomp_ai_view.Show()
+                state.gui.decomp_ai_view.title += f" - {func_name}"
+                state.gui.decomp_ai_view.ClearLines()
+                state.gui.decomp_ai_view.AddLine(
+                    "Please wait while the function is decompiled"
+                )
             except Exception as e:
                 print(f"Error: {e}")
             inthread(bg_task, start_addr, handle_ai_decomp)
