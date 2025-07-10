@@ -651,20 +651,21 @@ class AutoAnalysisDialog(BaseDialog):
                                 ],
                             })
 
-                        response = RE_name_score(functions).json()["data"]
-                        for function in response:
-                            for match in matches:
-                                if match["origin_function_id"] == function[
-                                    "function_id"
-                                ]:
-                                    match["real_confidence"] = function[
-                                        "box_plot"
-                                    ]["average"]
-                                    # if match["real_confidence"] < (
-                                    #         100 - (distance * 100)
-                                    # ):
-                                    #     matches.remove(match)
-                                    #     break
+                        if len(functions) > 0:
+                            response = RE_name_score(functions).json()["data"]
+                            for function in response:
+                                for match in matches:
+                                    if match["origin_function_id"] == function[
+                                        "function_id"
+                                    ]:
+                                        match["real_confidence"] = function[
+                                            "box_plot"
+                                        ]["average"]
+                                        # if match["real_confidence"] < (
+                                        #         100 - (distance * 100)
+                                        # ):
+                                        #     matches.remove(match)
+                                        #     break
 
                         if not matches:
                             logger.warning(
