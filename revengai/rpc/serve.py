@@ -6,20 +6,25 @@ from fastapi import FastAPI
 
 from revengai.actions import generate_function_data_types
 from revengai.features.auto_unstrip import AutoUnstrip
-from revengai.misc.qtutils import inmain
+from revengai.misc.qtutils import inmain, inthread
+from revengai.rpc.hmac import HMACMiddleware
 from revengai.rpc.models import UnstripResponse, UnstripResponseSuccess, ApplyDataTypesResponse
 from revengai.rpc.state import get_global_state
 
 app = FastAPI(
     title="RevEngAI IDA JSON-RPC server",
-    description="This server allows you to directly interact with the IDA plugin over an RPC channel, by default, it listens on 127.0.0.1:7331")
+    description="This server allows you to directly interact with the IDA plugin over an RPC channel, by default, it listens on localhost:7331",
+    # middleware=[HMACMiddleware]
+)
 
 logger = logging.getLogger("REAI-RPC")
+
 
 @app.get("/init")
 def init():
     # TODO: upload binary, create analysis with default options
     pass
+
 
 @app.get("/auto-unstrip")
 def auto_unstrip():
@@ -31,7 +36,7 @@ def auto_unstrip():
 
     logger.info("Received command to auto-unstrip..")
 
-    numb_renamed = inmain(_handle())
+    numb_renamed = inthread(inmain(_handle))
     if numb_renamed == 0:
         return UnstripResponse(data=None, success=False)
 
@@ -45,8 +50,11 @@ def auto_unstrip():
 
 @app.get("/apply-data-types")
 def apply_data_types():
+    def _handle() -> None:
+        generate_function_data_types(get_global_state(), ui=False)
+
     logger.info("Received command to apply data types..")
-    generate_function_data_types(get_global_state())
+    inmain(_handle)
 
     return ApplyDataTypesResponse(message="completed task for applying data types")
 

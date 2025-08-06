@@ -6,6 +6,9 @@ import logging
 from revengai.misc.utils import IDAUtils
 from idautils import Functions
 from idaapi import get_imagebase
+import ida_name
+import idaapi
+
 from revengai.misc.qtutils import inmain
 from revengai.manager import RevEngState
 
@@ -173,11 +176,27 @@ class AutoUnstrip:
         for res in result:
             addr = self.base_addr + res["target_func_addr"]
             new_name = res["new_name_str"]
+            if new_name is None:
+                continue
+            
             logger.info(
                 "Renaming function at 0x%X to %s",
                 addr,
                 new_name,
             )
+
+            ea = ida_name.get_name_ea(idaapi.BADADDR, new_name)
+            if ea != idaapi.BADADDR:
+                continue
+
+            banned = [
+                '<',
+                '>',
+                '`',
+                '/'
+            ]
+            if any(b in new_name for b in banned):
+                continue
 
             inmain(idc.set_name, addr, new_name)
             inmain(idc.set_func_flags, addr, idc.FUNC_LIB)

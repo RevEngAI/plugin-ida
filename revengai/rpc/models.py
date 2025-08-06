@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 class UnstripResponseSuccess(BaseModel):
     message: str
-    n_renamed: int
 
 
 class UnstripResponse(BaseModel):

@@ -1125,7 +1125,7 @@ def function_breakdown(state: RevEngState, function_id: int = 0) -> None:
         )
 
 
-def generate_function_data_types(state: RevEngState) -> None:
+def generate_function_data_types(state: RevEngState, ui: bool = True) -> None:
     fpath = idc.get_input_file_path()
 
     if is_condition_met(state, fpath):
@@ -1168,16 +1168,18 @@ def generate_function_data_types(state: RevEngState) -> None:
                             " data types"
                         )
 
-                        Dialog.showInfo(
-                            "Function Types",
-                            "Successfully started the generation of functions"
-                            " data types",
-                        )
+                        if ui:
+                            Dialog.showInfo(
+                                "Function Types",
+                                "Successfully started the generation of functions"
+                                " data types",
+                            )
                     else:
-                        Dialog.showInfo(
-                            "Function Types",
-                            "Failed to generate function data types"
-                        )
+                        if ui:
+                            Dialog.showInfo(
+                                "Function Types",
+                                "Failed to generate function data types"
+                            )
 
                 except HTTPError as e:
                     resp = e.response.json()
@@ -1189,16 +1191,19 @@ def generate_function_data_types(state: RevEngState) -> None:
                     logger.error(
                         f"Failed to generate function data types: {error}"
                     )
+
+                    if ui:
+                        Dialog.showError(
+                            "Function Types",
+                            f"Failed to generate function data types: {error}",
+                        )
+            else:
+                if ui:
                     Dialog.showError(
                         "Function Types",
-                        f"Failed to generate function data types: {error}",
+                        "Unable to complete your request at this time."
+                        " Binary analysis is not yet complete.",
                     )
-            else:
-                Dialog.showError(
-                    "Function Types",
-                    "Unable to complete your request at this time."
-                    " Binary analysis is not yet complete.",
-                )
 
         inthread(bg_task)
 
