@@ -4,11 +4,15 @@ import threading
 import uvicorn
 from fastapi import FastAPI
 
-from revengai.actions import generate_function_data_types
+from revengai.actions import generate_function_data_types, upload_binary
 from revengai.features.auto_unstrip import AutoUnstrip
 from revengai.misc.qtutils import inmain, inthread
 from revengai.rpc.hmac import HMACMiddleware
-from revengai.rpc.models import UnstripResponse, UnstripResponseSuccess, ApplyDataTypesResponse
+from revengai.rpc.models import (
+    UnstripResponse,
+    UnstripResponseSuccess,
+    ApplyDataTypesResponse,
+)
 from revengai.rpc.state import get_global_state
 
 app = FastAPI(
@@ -22,8 +26,9 @@ logger = logging.getLogger("REAI-RPC")
 
 @app.get("/init")
 def init():
-    # TODO: upload binary, create analysis with default options
-    pass
+    logging.info("Uploading binary..")
+    inmain(upload_binary)
+    return {"message": "uploaded binary successfully", "success": True}
 
 
 @app.get("/auto-unstrip")
@@ -44,7 +49,7 @@ def auto_unstrip():
         data=UnstripResponseSuccess(
             message="unstripped binary successfully",
         ),
-        success=True
+        success=True,
     )
 
 
