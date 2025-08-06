@@ -29,7 +29,7 @@ from idautils import (
 )
 
 from revengai.actions import is_condition_met, is_analysis_complete
-from revengai.misc.qtutils import inthread
+from revengai.misc.qtutils import inthread, inmain
 
 from revengai.manager import RevEngState
 import urllib3
@@ -54,6 +54,8 @@ from revengai.actions import (
 
 from genericpath import isfile
 
+from revengai.rpc.serve import run_server
+from revengai.rpc.state import set_global_state
 
 logger = logging.getLogger("REAI")
 
@@ -298,6 +300,10 @@ class RevEngPlugin(plugin_t):
         self.state.start_plugin()
         # NOTE: the second call actually invokes the creation of the GUI
         self.state.start_plugin()
+
+        # NOTE: set the state for RPC calls and run the server
+        set_global_state(self.state)
+        run_server()
 
         self.initialized = True
         return True
