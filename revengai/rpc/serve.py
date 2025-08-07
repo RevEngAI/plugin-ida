@@ -18,7 +18,7 @@ from revengai.rpc.state import get_global_state
 app = FastAPI(
     title="RevEngAI IDA JSON-RPC server",
     description="This server allows you to directly interact with the IDA plugin over an RPC channel, by default, it listens on localhost:7331",
-    # middleware=[HMACMiddleware]
+    middleware=[HMACMiddleware]
 )
 
 logger = logging.getLogger("REAI-RPC")
