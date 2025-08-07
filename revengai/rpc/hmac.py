@@ -9,9 +9,12 @@ from starlette.responses import JSONResponse
 
 class HMACMiddleware(BaseHTTPMiddleware):
     HMAC_HEADER_NAME = "X-HMAC-SIGNATURE"
-    HMAC_SECRET = "test"
 
     async def dispatch(self, request: Request, call_next):
+        hmac_secret = env.get("HMAC_SECRET", "")
+        if not hmac_secret:
+            return JSONResponse(status_code=401, 
+                                content={"error": "HMAC secret is not set in environment variables"})
         if request.url.path == "/rpc":
             body = await request.body()
             received_signature = request.headers.get(self.HMAC_HEADER_NAME)
