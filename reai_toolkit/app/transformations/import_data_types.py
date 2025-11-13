@@ -40,49 +40,29 @@ class ImportDataTypes:
         self.deci = DecompilerInterface.discover(force_decompiler="ida")
 
         # TODO: PLU-192 If we already have debug symbols, do we want to skip this? I think we should!
-        function: FunctionDataTypesListItem
-
         lookup: dict[str, TaggedDependency] = {}
-        for function in functions.items:
-            # Skip if data types are still being extracted.
-            if function.completed is False:
-                logger.warning(
-                    f"extracting data types for {function.function_id} is still in progress..."
-                )
-                continue
 
-            data_types = function.data_types
-            if data_types is None:
-                continue
-
-            # Build the lookup, this will allow us to check if we have processed a dependency before and stop us clobbering existing types and breaking xrefs.
-            for dependency in data_types.func_deps:
-                lookup[dependency.actual_instance.name] = TaggedDependency(
-                    dependency.actual_instance
-                )
-
-        logger.debug("processing function dependencies")
         for function in functions.items:
             data_types: FunctionInfoOutput = function.data_types
 
-            # No additional type information to import so we can skip.
             if data_types is None:
                 continue
+            
+            # Track processed dependencies to prevent duplicate imports.
+            # Without this:
+            # - Shared dependencies get re-processed, breaking references (shows as invalid ordinals in IDA)
+            # - Cannot resolve subdependencies (e.g. struct fields that reference other imported types)
+            lookup |= {dep.actual_instance.name: TaggedDependency(dep.actual_instance) for dep in data_types.func_deps if dep.actual_instance.name not in lookup}
 
-            # Enumerate function dependencies and check we have imported the associated type information.
             dependency: FunctionInfoInputFuncDepsInner
             for dependency in data_types.func_deps:
                 tagged_dependency = lookup.get(dependency.actual_instance.name)
                 self.process_dependency(tagged_dependency, lookup)
 
-        logger.debug(f"processing {len(functions.items)} functions")
-        for function in functions.items:
-            data_types: FunctionInfoOutput = function.data_types
+            func: FunctionTypeOutput | None = data_types.func_types
+            if func:
+                self.update_function(func)
 
-            if data_types:
-                func: FunctionTypeOutput | None = data_types.func_types
-                if func:
-                    self.update_function(func)
 
     def process_dependency(
         self, tagged_dependency: TaggedDependency, lookup: dict[str, TaggedDependency]
