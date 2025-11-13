@@ -1,0 +1,56 @@
+[project]
+name = "reai_toolkit"
+version = "0.1.0"
+description = "RevEng.AI Toolkit plugin for IDA"
+requires-python = ">=3.10"
+
+# Runtime deps only — IDA ships idaapi/Qt; don't add them here.
+dependencies = [
+  "requests>=2.32",
+  "loguru>=0.7",
+  "pydantic",
+  "revengai>=2.11.0",
+]
+
+# -------------------------------
+# Astral uv configuration
+# -------------------------------
+[tool.uv]
+# dev deps go here (this key exists; 'dependency-groups' does not)
+dev-dependencies = [
+  "pytest>=8.3",
+  "black>=24.8",
+  "isort>=5.13",
+  "mypy>=1.12",
+  "types-requests",
+  "pyqt5-stubs",
+  "idapro>=0.0.5",
+  "pyqt5",
+  "pyqt6-stubs",
+  "pyqt6",
+  "PySide6"
+]
+
+# If you *do* want to install a stub package for IDA later, you can use a sources entry:
+# [tool.uv.sources]
+# idapython-stubs = { git = "https://example.com/your-idapython-stubs.git", rev = "main" }
+# and then add "idapython-stubs" to the dev-dependencies list above.
+
+[tool.black]
+line-length = 100
+target-version = ["py310"]
+
+[tool.isort]
+profile = "black"
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+strict = false
+
+# Point mypy to a local stubs folder (no install needed).
+# Put your IDA API .pyi files under ./stubs/ida/
+mypy_path = ["stubs"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
