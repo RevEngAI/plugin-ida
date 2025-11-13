@@ -115,14 +115,6 @@ jobs:
           body: |
             RevEng.AI IDA Plugin
 
-            Each ZIP contains:
-            ```
-            reai_toolkit/
-              vendor/ (all vendor dependencies)
-              app/
-            reai_toolkit_entry.py
-            ```
-
             Extract into your IDA plugins folder.
           files: dist/**/*.zip
         env:
