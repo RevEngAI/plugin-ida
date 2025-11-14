@@ -25,6 +25,7 @@ from reai_toolkit.app.services.matching.schema import (
     SummaryEvent,
     ValidFunction,
 )
+from reai_toolkit.app.services.data_types.data_types_service import ImportDataTypesService
 from reai_toolkit.app.services.rename.rename_service import RenameService
 from reai_toolkit.app.services.rename.schema import RenameInput
 
@@ -47,9 +48,10 @@ class MatchingWorker(QtCore.QObject):
     finished = Signal()  # always emitted on exit
     errored = Signal(str)
 
-    def __init__(self, match_service, gen_kwargs: dict):
+    def __init__(self, match_service, data_types_service, gen_kwargs: dict):
         super().__init__()
         self._match_service = match_service
+        self._data_types_service = data_types_service
         self._gen_kwargs = gen_kwargs
         self._stop = False
 
@@ -88,6 +90,7 @@ class MatchingDialog(DialogBase):
         func_map: dict[str, int],
         matching_service: MatchingService,
         rename_service: RenameService,
+        data_types_service: ImportDataTypesService,
         parent: QtWidgets.QWidget | None = None,
     ):
         super().__init__(parent=parent)
@@ -96,7 +99,11 @@ class MatchingDialog(DialogBase):
 
         self.matching_service = matching_service
         self.rename_service = rename_service
+        self.data_types_service = data_types_service
         self._func_map = func_map
+
+        # Used for looking up which function we matched to for a given function id.
+        self.current_to_matched_func: dict[int, MatchedFunction] = {}
 
         self.ui = Ui_MatchingPanel()
         self.setWindowTitle("RevEng.AI — Function matching")
@@ -208,6 +215,7 @@ class MatchingDialog(DialogBase):
 
         if hasattr(self.ui, "okRenameButton"):
             self.ui.okRenameButton.clicked.connect(self.enqueue_renames)
+            self.ui.okRenameButton.clicked.connect(self.import_data_types)
 
         # ----------------- Util buttons -----------------
         self.ui.btnClearSelection.clicked.connect(
@@ -718,7 +726,7 @@ class MatchingDialog(DialogBase):
         self.stop_ann()  # ensure previous worker is cleaned up
 
         self._matching_thread = QtCore.QThread(self)
-        self._matching_worker = MatchingWorker(self.matching_service, gen_kwargs)
+        self._matching_worker = MatchingWorker(self.matching_service, self.data_types_service, gen_kwargs)
         self._matching_worker.moveToThread(self._matching_thread)
 
         # connections
@@ -1037,6 +1045,7 @@ class MatchingDialog(DialogBase):
 
         filtered_funcs: List[FunctionMatchingResultWithBestMatch] = []
 
+
         for r in self.matching_results.results:
             if query:
                 matched_function = (
@@ -1092,6 +1101,8 @@ class MatchingDialog(DialogBase):
             matched_function: MatchedFunction = (
                 r.matched_functions[0] if r.matched_functions else None
             )
+
+            self.current_to_matched_func[r.function_id] = matched_function
 
             # Column 3: Similarity
             table.setItem(
@@ -1186,6 +1197,11 @@ class MatchingDialog(DialogBase):
 
         except Exception as e:
             print(f"Failed to enqueue renames: {e}")
+    
+    def import_data_types(self):
+        print("importing data types...")
+        # TODO: PLU-192 Pass correct arguments here
+        # self.data_types_service.import_data_types()
 
     # =====================================================================
     # (Optional) page-switch helpers

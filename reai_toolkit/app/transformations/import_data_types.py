@@ -8,13 +8,11 @@ from revengai import (
     Argument,
     Enumeration,
     FunctionDataTypesList,
-    FunctionDataTypesListItem,
     FunctionHeader,
     FunctionInfoInputFuncDepsInner,
     FunctionInfoOutput,
     FunctionTypeOutput,
     GlobalVariable,
-    StackVariable,
     Structure,
     TypeDefinition,
 )
@@ -36,10 +34,7 @@ class ImportDataTypes:
 
     @execute_ui
     def execute(self, functions: FunctionDataTypesList):
-        # TODO: PLU-192 do we even need a class here? Could arguably pass the decompiler around
         self.deci = DecompilerInterface.discover(force_decompiler="ida")
-
-        # TODO: PLU-192 If we already have debug symbols, do we want to skip this? I think we should!
         lookup: dict[str, TaggedDependency] = {}
 
         for function in functions.items:
@@ -109,6 +104,8 @@ class ImportDataTypes:
             name=imported_typedef.name, type_=normalized_type
         )
 
+    # TODO: PLU-192 Do we want to think about how these are used? What happens in the case where we match a function from a library that's been
+    # statically linked into a completely different binary?
     def update_global_var(self, imported_global_var: GlobalVariable, lookup: dict[str, TaggedDependency]) -> None:
         subdependency = lookup.get(imported_global_var.type)
         if subdependency:
@@ -131,34 +128,11 @@ class ImportDataTypes:
         target_func.size = func.size
         target_func.type = func.type
 
-        # Check if we extracted stack variable data and import if so.
-        if func.stack_vars:
-            self.update_stack_variables(func.stack_vars, target_func)
-
         # Check the target function has a header.
         if target_func.header:
             self.update_header(func.header, target_func)
 
         self.deci.functions[rva] = target_func
-
-    def update_stack_variables(
-        self,
-        imported_stack_variables: dict[str, StackVariable],
-        target_function: libbs.artifacts.Function,
-    ) -> None:
-        # TODO: PLU-192 What do we want to do if a stack variable does not exist at the specified offset?
-        stack_var: StackVariable
-        for stack_var in imported_stack_variables.values():
-            target_stack_var: libbs.artifacts.StackVariable | None = target_function.stack_vars.get(
-                stack_var.offset
-            )
-
-            if target_stack_var is None:
-                continue
-
-            target_stack_var.name = stack_var.name
-            target_stack_var.type = self.normalise_type(stack_var.type)
-            target_stack_var.size = stack_var.size
 
     def update_header(
         self, imported_header: FunctionHeader, target_function: libbs.artifacts.Function
@@ -177,13 +151,12 @@ class ImportDataTypes:
 
     @staticmethod
     def normalise_type(type: str) -> str:
-        # TODO: Do we need namespace information here? Observing discrepancies where sometimes namespace is used, and other times it isn't.
-        # I think we will have problems with C++ demangled symbol names using this approach. Needs investigating...
+        # TODO: PLU-192 There are inconsistencies with how types are presented, sometimes with a namespace and sometimes without.
+        # Need to investigate further as we need to retain namespace information otherwise potential for symbols clashing.
         split_type: list[str] = type.split("::")
         normalized: str = split_type[-1]
 
-        # It would appear this is a Ghidra-ism and IDA is unaware of this type.
-        # TODO: Auto add Ghidra typedef for primitives so we don't need to bother doing this...
+        # TODO: Add IDA typedefs for Ghidra primitives so we don't need to bother doing this...
         if normalized == "uchar":
             normalized = "unsigned char"
         elif normalized == "qword":
