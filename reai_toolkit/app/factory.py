@@ -70,6 +70,7 @@ class DialogFactory:
             func_map=func_map,
             matching_service=self.app.matching_service,
             rename_service=self.app.rename_service,
+            data_types_service=self.app.data_types_service,
             parent=self.parent,
         )
 
