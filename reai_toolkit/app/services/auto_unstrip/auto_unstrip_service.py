@@ -77,7 +77,7 @@ class AutoUnstripService(IThreadService):
             result = functions_api.auto_unstrip(
                 analysis_id=analysis_id,
                 auto_unstrip_request=AutoUnstripRequest(
-                    min_similarity=0.1,
+                    min_similarity=0.9,
                     apply=True,  # Will not let the users pick names if enabled.
                 ),
             )
