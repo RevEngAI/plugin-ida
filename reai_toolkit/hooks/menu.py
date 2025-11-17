@@ -1,3 +1,5 @@
+from importlib.metadata import version
+
 import ida_kernwin
 
 from reai_toolkit.app.coordinator import Coordinator
@@ -34,7 +36,9 @@ class VersionH(ida_kernwin.action_handler_t):
         self.version = version
 
     def activate(self, ctx):
-        ida_kernwin.info(f"RevEng.AI Toolkit Version: {self.version}")
+        ida_kernwin.info(
+            f"RevEng.AI Toolkit Version: {self.version}\nRevEng.AI SDK Version: {version('revengai')}"
+        )
         return 1
 
     def update(self, ctx):
@@ -91,9 +95,7 @@ class SyncH(ida_kernwin.action_handler_t):
 
     def update(self, ctx):
         is_authed = self.coordinator.app.auth_service.is_authenticated()
-        analysis_id = (
-            self.coordinator.app.analysis_sync_service.safe_get_analysis_id_local()
-        )
+        analysis_id = self.coordinator.app.analysis_sync_service.safe_get_analysis_id_local()
 
         if not is_authed or analysis_id is None:
             return ida_kernwin.AST_DISABLE
@@ -112,9 +114,7 @@ class DetachAnalysisH(ida_kernwin.action_handler_t):
         return 1
 
     def update(self, ctx):
-        analysis_id = (
-            self.coordinator.app.analysis_sync_service.safe_get_analysis_id_local()
-        )
+        analysis_id = self.coordinator.app.analysis_sync_service.safe_get_analysis_id_local()
 
         if analysis_id is None:
             return ida_kernwin.AST_DISABLE
@@ -133,9 +133,7 @@ class ViewAnalysisH(ida_kernwin.action_handler_t):
         return 1
 
     def update(self, ctx):
-        binary_id = (
-            self.coordinator.app.analysis_sync_service.safe_get_binary_id_local()
-        )
+        binary_id = self.coordinator.app.analysis_sync_service.safe_get_binary_id_local()
         if binary_id is None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
@@ -246,16 +244,12 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         _safe_unregister(aid)
 
     # Register actions
-    ida_kernwin.register_action(
-        ida_kernwin.action_desc_t("reai:ping", "Ping", _handlers["ping"])
-    )
+    ida_kernwin.register_action(ida_kernwin.action_desc_t("reai:ping", "Ping", _handlers["ping"]))
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t("reai:about", "About", _handlers["about"])
     )
 
-    ida_kernwin.register_action(
-        ida_kernwin.action_desc_t("reai:help", "Help", _handlers["help"])
-    )
+    ida_kernwin.register_action(ida_kernwin.action_desc_t("reai:help", "Help", _handlers["help"]))
 
     # Auth action registration
     ida_kernwin.register_action(
@@ -278,16 +272,12 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     #
     # Analyse action registration
     ida_kernwin.register_action(
-        ida_kernwin.action_desc_t(
-            "reai:detatch_analysis", "Detach", _handlers["detatch_analysis"]
-        )
+        ida_kernwin.action_desc_t("reai:detatch_analysis", "Detach", _handlers["detatch_analysis"])
     )
     #
     # Sync & Poll Analysis action registration
     ida_kernwin.register_action(
-        ida_kernwin.action_desc_t(
-            "reai:sync_and_poll", "Check status", _handlers["sync_and_poll"]
-        )
+        ida_kernwin.action_desc_t("reai:sync_and_poll", "Check status", _handlers["sync_and_poll"])
     )
     #
     # View portal action registration
@@ -299,9 +289,7 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
 
     # Auto Unstrip action registration
     ida_kernwin.register_action(
-        ida_kernwin.action_desc_t(
-            "reai:autounstrip", "Auto Unstrip", _handlers["autounstrip"]
-        )
+        ida_kernwin.action_desc_t("reai:autounstrip", "Auto Unstrip", _handlers["autounstrip"])
     )
 
     # Auto Unstrip action registration
@@ -354,14 +342,8 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     #     MENU_ROOT, "reai:separator", ida_kernwin.SETMENU_APP
     # )
 
-    ida_kernwin.attach_action_to_menu(
-        MENU_ROOT + "Configure", "reai:auth", ida_kernwin.SETMENU_APP
-    )
-    ida_kernwin.attach_action_to_menu(
-        MENU_ROOT + "Help", "reai:help", ida_kernwin.SETMENU_APP
-    )
-    ida_kernwin.attach_action_to_menu(
-        MENU_ROOT + "About", "reai:about", ida_kernwin.SETMENU_APP
-    )
+    ida_kernwin.attach_action_to_menu(MENU_ROOT + "Configure", "reai:auth", ida_kernwin.SETMENU_APP)
+    ida_kernwin.attach_action_to_menu(MENU_ROOT + "Help", "reai:help", ida_kernwin.SETMENU_APP)
+    ida_kernwin.attach_action_to_menu(MENU_ROOT + "About", "reai:about", ida_kernwin.SETMENU_APP)
     ida_kernwin.refresh_idaview_anyway()
     return _handlers
