@@ -12,7 +12,7 @@ from revengai.models import (
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
-from reai_toolkit.app.core.utils import get_function_boundaries_hash, sha256_file
+from reai_toolkit.app.core.utils import sha256_file
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 
 
@@ -52,7 +52,6 @@ class ExistingAnalysesService(IThreadService):
         file_path = Path(file_path)
 
         binary_sha256 = sha256_file(file_path)
-        boundary_hash = get_function_boundaries_hash()
 
         response = self.api_request_returning(
             lambda: self._fetch_analysis_records(binary_sha256)
@@ -61,16 +60,7 @@ class ExistingAnalysesService(IThreadService):
         if not response.success:
             return response
 
-        data: List[AnalysisRecord] = response.data
-
-        # Filter analyses by boundary hash
-        filtered_analyses = [
-            analysis
-            for analysis in data
-            if analysis.function_boundaries_hash == boundary_hash
-        ]
-
         return GenericApiReturn(
             success=True,
-            data=filtered_analyses,
+            data=response.data,
         )
