@@ -1200,8 +1200,7 @@ class MatchingDialog(DialogBase):
     
     def import_data_types(self):
         print("importing data types...")
-        # TODO: PLU-192 Pass correct arguments here
-        # self.data_types_service.import_data_types()
+        self.data_types_service.import_data_types(self.current_to_matched_func)
 
     # =====================================================================
     # (Optional) page-switch helpers
