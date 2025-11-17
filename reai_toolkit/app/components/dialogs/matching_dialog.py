@@ -125,9 +125,7 @@ class MatchingDialog(DialogBase):
             pass
 
         # Default to first page if present
-        if hasattr(self.ui, "stack") and isinstance(
-            self.ui.stack, QtWidgets.QStackedWidget
-        ):
+        if hasattr(self.ui, "stack") and isinstance(self.ui.stack, QtWidgets.QStackedWidget):
             self.ui.stack.setCurrentIndex(0)
 
         # ----------------- Cancel Buttons -----------------
@@ -161,9 +159,7 @@ class MatchingDialog(DialogBase):
 
         # Treat collections popup as child sub-widget
         self.ui.collectionsPopup.setParent(self)
-        self.ui.collectionsPopup.setWindowFlags(
-            QtCore.Qt.FramelessWindowHint | QtCore.Qt.SubWindow
-        )
+        self.ui.collectionsPopup.setWindowFlags(QtCore.Qt.FramelessWindowHint | QtCore.Qt.SubWindow)
         self.ui.collectionsPopup.setAttribute(QtCore.Qt.WA_StyledBackground, True)
         self.ui.collectionsPopup.setFocusPolicy(QtCore.Qt.NoFocus)
         self.ui.collectionsPopupView.setFocusPolicy(QtCore.Qt.StrongFocus)
@@ -210,9 +206,7 @@ class MatchingDialog(DialogBase):
         if hasattr(self.ui, "okRunButton"):
             self.ui.okRunButton.clicked.connect(self.start_ann)
 
-        self._progress_bar = (
-            self.ui.loadingBar if hasattr(self.ui, "loadingBar") else None
-        )
+        self._progress_bar = self.ui.loadingBar if hasattr(self.ui, "loadingBar") else None
         if self._progress_bar is not None:
             print("[AnnDialog] Progress bar found")
             self._progress_bar.setMinimum(0)
@@ -225,16 +219,12 @@ class MatchingDialog(DialogBase):
         self.ui.btnClearSelection.clicked.connect(
             lambda: self.function_update_state(check_all=False)
         )
-        self.ui.btnSelectAll.clicked.connect(
-            lambda: self.function_update_state(check_all=True)
-        )
+        self.ui.btnSelectAll.clicked.connect(lambda: self.function_update_state(check_all=True))
         self.ui.btnResetFilters.clicked.connect(self.reset_all)
 
         # ----------------- Rename function search -----------------
         if hasattr(self.ui, "resultFunctionSearch"):
-            self.ui.resultFunctionSearch.textEdited.connect(
-                self.display_matching_results
-            )
+            self.ui.resultFunctionSearch.textEdited.connect(self.display_matching_results)
 
     # =====================================================================
     # Update functions table
@@ -286,9 +276,7 @@ class MatchingDialog(DialogBase):
             return
 
         query = (
-            self.ui.searchFunctions.text().strip()
-            if hasattr(self.ui, "searchFunctions")
-            else ""
+            self.ui.searchFunctions.text().strip() if hasattr(self.ui, "searchFunctions") else ""
         )
         view = self.ui.tableFunctions
 
@@ -308,10 +296,7 @@ class MatchingDialog(DialogBase):
         filtered = []
         for func in self._valid_functions:
             # If single_function_id is set, only include that function
-            if (
-                self.single_function_id is not None
-                and func.function_id != self.single_function_id
-            ):
+            if self.single_function_id is not None and func.function_id != self.single_function_id:
                 continue
 
             # If accept_all is set, include all, or limit by query
@@ -339,9 +324,7 @@ class MatchingDialog(DialogBase):
                 | QtCore.Qt.ItemIsEnabled
             )
             c0.setCheckState(
-                QtCore.Qt.Checked
-                if key in self._selected_functions
-                else QtCore.Qt.Unchecked
+                QtCore.Qt.Checked if key in self._selected_functions else QtCore.Qt.Unchecked
             )
             # Stash data for handler
             c0.setData(QtCore.Qt.UserRole, func)
@@ -469,9 +452,7 @@ class MatchingDialog(DialogBase):
             )
             it.setCheckState(
                 0,
-                QtCore.Qt.Checked
-                if key in self._selected_collections
-                else QtCore.Qt.Unchecked,
+                QtCore.Qt.Checked if key in self._selected_collections else QtCore.Qt.Unchecked,
             )
             it.setData(0, QtCore.Qt.UserRole, tup)
             it.setData(0, QtCore.Qt.UserRole + 1, key)
@@ -503,9 +484,7 @@ class MatchingDialog(DialogBase):
     # Binaries popup
     # =====================================================================
     def _showBinariesPopup(self):
-        if not hasattr(self.ui, "editBinaries") or not hasattr(
-            self.ui, "binariesPopup"
-        ):
+        if not hasattr(self.ui, "editBinaries") or not hasattr(self.ui, "binariesPopup"):
             return
         edit = self.ui.editBinaries
         popup = self.ui.binariesPopup
@@ -645,9 +624,7 @@ class MatchingDialog(DialogBase):
             )
             item.setCheckState(
                 0,
-                QtCore.Qt.Checked
-                if key in self._selected_binaries
-                else QtCore.Qt.Unchecked,
+                QtCore.Qt.Checked if key in self._selected_binaries else QtCore.Qt.Unchecked,
             )
             item.setData(0, QtCore.Qt.UserRole, tup)
             item.setData(0, QtCore.Qt.UserRole + 1, key)
@@ -685,9 +662,7 @@ class MatchingDialog(DialogBase):
         """
         Collect selected inputs and start the ANN generator in a worker thread.
         """
-        function_ids = (
-            sorted(self._selected_functions) if self._selected_functions else []
-        )
+        function_ids = sorted(self._selected_functions) if self._selected_functions else []
         if self.single_function_id is not None and not function_ids:
             function_ids = [self.single_function_id]
 
@@ -928,11 +903,7 @@ class MatchingDialog(DialogBase):
                 row,
                 MatchColumns.VIRTUAL_ADDRESS.value,
                 QtWidgets.QTableWidgetItem(
-                    hex(
-                        self._func_map[
-                            str(self.matching_results.results[0].function_id)
-                        ]
-                    )
+                    hex(self._func_map[str(self.matching_results.results[0].function_id)])
                 ),
             )
 
@@ -948,26 +919,53 @@ class MatchingDialog(DialogBase):
             )
 
             # Column 3: Matched Name
-            table.setItem(row, MatchColumns.MATCHED_NAME.value, QtWidgets.QTableWidgetItem(r.function_name))
+            table.setItem(
+                row, MatchColumns.MATCHED_NAME.value, QtWidgets.QTableWidgetItem(r.function_name)
+            )
 
             # Column 4: Similarity
-            table.setItem(row, MatchColumns.SIMILARITY.value, QtWidgets.QTableWidgetItem(f"{r.similarity:.2f}"))
+            table.setItem(
+                row,
+                MatchColumns.SIMILARITY.value,
+                QtWidgets.QTableWidgetItem(f"{r.similarity:.2f}"),
+            )
 
             # Column 5: Confidence
-            table.setItem(row, MatchColumns.CONFIDENCE.value, QtWidgets.QTableWidgetItem(f"{r.confidence:.2f}"))
+            table.setItem(
+                row,
+                MatchColumns.CONFIDENCE.value,
+                QtWidgets.QTableWidgetItem(f"{r.confidence:.2f}"),
+            )
 
             # Column 6: Matched Hash
-            table.setItem(row, MatchColumns.MATCHED_BINARY_HASH.value, QtWidgets.QTableWidgetItem(r.sha_256_hash))
+            table.setItem(
+                row,
+                MatchColumns.MATCHED_BINARY_HASH.value,
+                QtWidgets.QTableWidgetItem(r.sha_256_hash),
+            )
 
             # Column 7: Matched Binary
-            table.setItem(row, MatchColumns.MATCHED_BINARY_NAME.value, QtWidgets.QTableWidgetItem(r.binary_name))
-
+            table.setItem(
+                row,
+                MatchColumns.MATCHED_BINARY_NAME.value,
+                QtWidgets.QTableWidgetItem(r.binary_name),
+            )
 
         # Select, Vaddr, Similarity, Confidence, SHA-256
-        for col in [MatchColumns.SELECT.value, MatchColumns.VIRTUAL_ADDRESS.value, MatchColumns.SIMILARITY.value, MatchColumns.CONFIDENCE.value, MatchColumns.MATCHED_BINARY_HASH.value]:
+        for col in [
+            MatchColumns.SELECT.value,
+            MatchColumns.VIRTUAL_ADDRESS.value,
+            MatchColumns.SIMILARITY.value,
+            MatchColumns.CONFIDENCE.value,
+            MatchColumns.MATCHED_BINARY_HASH.value,
+        ]:
             table.resizeColumnToContents(col)
         # Current Name, Matched Func Name, Matched Binary Name
-        for col in [MatchColumns.FUNC_NAME.value, MatchColumns.MATCHED_NAME.value, MatchColumns.MATCHED_BINARY_NAME.value]:
+        for col in [
+            MatchColumns.FUNC_NAME.value,
+            MatchColumns.MATCHED_NAME.value,
+            MatchColumns.MATCHED_BINARY_NAME.value,
+        ]:
             table.setColumnWidth(col, 250)
         # allow these to word wrap
         table.setWordWrap(True)
@@ -1035,12 +1033,8 @@ class MatchingDialog(DialogBase):
 
         for r in self.matching_results.results:
             if query:
-                matched_function = (
-                    r.matched_functions[0] if r.matched_functions else None
-                )
-                if query in self.matching_service.function_id_to_local_name(
-                    r.function_id
-                ) or (
+                matched_function = r.matched_functions[0] if r.matched_functions else None
+                if query in self.matching_service.function_id_to_local_name(r.function_id) or (
                     matched_function
                     and (
                         query in matched_function.function_name
@@ -1091,32 +1085,52 @@ class MatchingDialog(DialogBase):
 
             # Column 3: Matched Name
             table.setItem(
-                row, MatchColumns.MATCHED_NAME.value, QtWidgets.QTableWidgetItem(matched_function.function_name)
+                row,
+                MatchColumns.MATCHED_NAME.value,
+                QtWidgets.QTableWidgetItem(matched_function.function_name),
             )
 
             # Column 4: Similarity
             table.setItem(
-                row, MatchColumns.SIMILARITY.value, QtWidgets.QTableWidgetItem(f"{matched_function.similarity:.2f}")
+                row,
+                MatchColumns.SIMILARITY.value,
+                QtWidgets.QTableWidgetItem(f"{matched_function.similarity:.2f}"),
             )
             # Column 5: Confidence
             table.setItem(
-                row, MatchColumns.CONFIDENCE.value, QtWidgets.QTableWidgetItem(f"{matched_function.confidence:.2f}")
+                row,
+                MatchColumns.CONFIDENCE.value,
+                QtWidgets.QTableWidgetItem(f"{matched_function.confidence:.2f}"),
             )
 
             # Column 7: Matched Hash
             table.setItem(
-                row, MatchColumns.MATCHED_BINARY_HASH.value, QtWidgets.QTableWidgetItem(matched_function.sha_256_hash)
+                row,
+                MatchColumns.MATCHED_BINARY_HASH.value,
+                QtWidgets.QTableWidgetItem(matched_function.sha_256_hash),
             )
 
             # Column 6: Matched Binary
             table.setItem(
-                row, MatchColumns.MATCHED_BINARY_NAME.value, QtWidgets.QTableWidgetItem(matched_function.binary_name)
+                row,
+                MatchColumns.MATCHED_BINARY_NAME.value,
+                QtWidgets.QTableWidgetItem(matched_function.binary_name),
             )
 
-        for col in [MatchColumns.SELECT.value, MatchColumns.VIRTUAL_ADDRESS.value, MatchColumns.SIMILARITY.value, MatchColumns.CONFIDENCE.value, MatchColumns.MATCHED_BINARY_HASH.value]:
+        for col in [
+            MatchColumns.SELECT.value,
+            MatchColumns.VIRTUAL_ADDRESS.value,
+            MatchColumns.SIMILARITY.value,
+            MatchColumns.CONFIDENCE.value,
+            MatchColumns.MATCHED_BINARY_HASH.value,
+        ]:
             table.resizeColumnToContents(col)
 
-        for col in [MatchColumns.FUNC_NAME.value, MatchColumns.MATCHED_NAME.value, MatchColumns.MATCHED_BINARY_NAME.value]:
+        for col in [
+            MatchColumns.FUNC_NAME.value,
+            MatchColumns.MATCHED_NAME.value,
+            MatchColumns.MATCHED_BINARY_NAME.value,
+        ]:
             table.setColumnWidth(col, 250)
 
         # allow these to word wrap
@@ -1156,9 +1170,7 @@ class MatchingDialog(DialogBase):
                     function_id = item.data(QtCore.Qt.UserRole)
                     matched_item = table.item(r, MatchColumns.MATCHED_NAME.value).text()
                     vaddr = self.rename_service.function_id_to_vaddr(function_id)
-                    print(
-                        f"RENAME: Function ID {function_id} -> {matched_item}"
-                    )
+                    print(f"RENAME: Function ID {function_id} -> {matched_item}")
                     rename_list.append(
                         RenameInput(
                             function_id=function_id,
