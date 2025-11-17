@@ -59,7 +59,7 @@ class AnalysisSyncService(IThreadService):
             model_name = analysis_details.data.model_name
             self.safe_put_model_name_local(model_name=model_name)
 
-            if analysis_details.data.base_address:
+            if analysis_details.data and analysis_details.data.base_address is not None:
                 self._rebase_program(analysis_details.data.base_address)
 
             return model_id
