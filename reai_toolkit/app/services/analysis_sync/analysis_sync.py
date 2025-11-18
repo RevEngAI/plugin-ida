@@ -3,13 +3,17 @@ from typing import Any, Callable
 
 import ida_kernwin
 import idautils
+import idaapi
+
 from loguru import logger
 from revengai import AnalysesCoreApi, Configuration, FunctionMapping
+from libbs.decompilers.ida.compat import execute_write
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
+from revengai import BaseResponseBasic
 
 
 class AnalysisSyncService(IThreadService):
@@ -47,14 +51,22 @@ class AnalysisSyncService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            analysis_details = analyses_client.get_analysis_basic_info(
+            analysis_details: BaseResponseBasic = analyses_client.get_analysis_basic_info(
                 analysis_id=analysis_id
             )
             model_id = analysis_details.data.model_id
             self.safe_put_model_id(model_id=model_id)
             model_name = analysis_details.data.model_name
             self.safe_put_model_name_local(model_name=model_name)
+
+            if analysis_details.data and analysis_details.data.base_address is not None:
+                self._rebase_program(analysis_details.data.base_address)
+
             return model_id
+
+    @execute_write
+    def _rebase_program(self, base_address: int) -> None:
+        idaapi.rebase_program(base_address, idaapi.MSF_FIXONCE)
 
     def _fetch_function_map(self, analysis_id: int) -> FunctionMapping:
         """
