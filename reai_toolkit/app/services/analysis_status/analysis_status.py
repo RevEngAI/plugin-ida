@@ -1,9 +1,10 @@
+import re
 import threading
 import time
 from typing import Any, Callable
 
 from loguru import logger
-from revengai import AnalysesCoreApi, Configuration, StatusOutput
+from revengai import AnalysesCoreApi, Configuration, Logs, StatusOutput
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -19,9 +20,7 @@ class AnalysisStatusService(IThreadService):
     def call_callback(self, generic_return: GenericApiReturn) -> None:
         self._thread_callback(generic_return)
 
-    def start_polling(
-        self, analysis_id: str, thread_callback: Callable[..., Any]
-    ) -> None:
+    def start_polling(self, analysis_id: str, thread_callback: Callable[..., Any]) -> None:
         """
         Starts polling the analysis status as a background job.
         """
@@ -33,7 +32,7 @@ class AnalysisStatusService(IThreadService):
             args=(analysis_id,),
         )
 
-    def _api_get_status(self, analysis_id: int) -> StatusOutput:
+    def _api_get_status(self, analysis_id: int) -> StatusOutput | None:
         """
         Calls the API to get the analysis status.
         Returns GenericApiReturn with status string on success.
@@ -41,51 +40,59 @@ class AnalysisStatusService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            analysis_status = analyses_client.get_analysis_status(
-                analysis_id=analysis_id
-            )
+            analysis_status = analyses_client.get_analysis_status(analysis_id=analysis_id)
             status = analysis_status.data
             self.safe_put_analysis_status(status=status.analysis_status)
             return analysis_status.data
 
-    def _poll_analysis_status(
-        self, stop_event: threading.Event, analysis_id: int
-    ) -> None:
+    def _api_get_logs(self, analysis_id: int) -> Logs | None:
+        with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+            analyses_client = AnalysesCoreApi(api_client)
+            response = analyses_client.get_analysis_logs(analysis_id)
+            return response.data
+
+    def _poll_analysis_status(self, stop_event: threading.Event, analysis_id: int) -> None:
         """
         Polls the analysis status until completion or failure.
         """
         while not stop_event.is_set():
-            # Sleep between polls without blocking IDA’s UI
-            for _ in range(50):  # 50 * 0.1s = 5s; allows quicker cancellation
-                if stop_event.is_set():
-                    return
-                time.sleep(10)
+            while True:
+                # Sleep between polls without blocking IDA’s UI
+                time.sleep(5)
 
-                response = self.api_request_returning(
+                get_status_response = self.api_request_returning(
                     fn=lambda: self._api_get_status(analysis_id)
                 )
 
-                if not response.success:
-                    self.call_callback(generic_return=response)
+                if not get_status_response.success:
+                    self.call_callback(generic_return=get_status_response)
                     return
 
-                data: StatusOutput = response.data
-                status = data.analysis_status
-                logger.info(f"RevEng.AI: Analysis Status - {status}")
+                get_logs_response = self.api_request_returning(
+                    fn=lambda: self._api_get_logs(analysis_id)
+                )
 
-                if status == "Complete":
-                    self.call_callback(
-                        generic_return=GenericApiReturn(
-                            success=True,
-                            data=analysis_id,
+                logs: Logs | None
+                if get_logs_response.success and (logs := get_logs_response.data):
+                    for line in logs.logs.splitlines():
+                        line_without_timestamp = re.sub(r"^[\d\-]+ [\d:]+ - ", "", line)
+                        logger.debug(f"RevEng.AI Remote Analysis - {line_without_timestamp}")
+
+                if get_status_response.data and (status := get_status_response.data.analysis_status):
+                    logger.info(f"RevEng.AI: Status - {status}")
+                    if status == "Complete":
+                        self.call_callback(
+                            generic_return=GenericApiReturn(
+                                success=True,
+                                data=analysis_id,
+                            )
                         )
-                    )
-                    return
-                elif status == "Error":
-                    self.call_callback(
-                        generic_return=GenericApiReturn(
-                            success=False,
-                            error_message="RevEng analysis failed! Please retry the analysis.",
+                        return
+                    elif status == "Error":
+                        self.call_callback(
+                            generic_return=GenericApiReturn(
+                                success=False,
+                                error_message="RevEng analysis failed! Please retry the analysis.",
+                            )
                         )
-                    )
-                    return
+                        return
