@@ -58,12 +58,6 @@ jobs:
           rm -rf reai_toolkit/vendor/reai_toolkit-*.dist-info
         shell: bash
 
-      - name: Verify vendor folder contents
-        run: |
-          echo "Listing vendor packages:"
-          find reai_toolkit/vendor -maxdepth 2 -type d -print | head -n 5
-        shell: bash
-
       - name: Package plugin for release (cross-platform)
         run: |
           python - <<'PY'
