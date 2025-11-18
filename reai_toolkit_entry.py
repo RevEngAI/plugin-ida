@@ -41,7 +41,8 @@ from reai_toolkit.hooks.reactive import FuncChangeHooks
 
 # flake8: noqa: E402
 
-__PLUGIN_VERSION__ = "0.1.0"
+# TODO: Obtain this from package metadata or ship pyproject.toml with plugin.
+__PLUGIN_VERSION__ = "3.0.1"
 __IDA_VERSION__ = idaapi.get_kernel_version()
 
 
