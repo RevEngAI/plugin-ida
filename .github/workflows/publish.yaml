@@ -10,27 +10,24 @@ concurrency:
 
 jobs:
   build:
-    name: Build Plugin (${{ matrix.os }}, py${{ matrix.python }}, ${{ matrix.arch }})
-    runs-on: ${{ matrix.os }}
+    name: Build Plugin (${{ matrix.platform.os }}, py${{ matrix.python }}, ${{ matrix.platform.arch }})
+    runs-on: ${{ matrix.platform.os }}
 
     strategy:
       fail-fast: false
       matrix:
-        include:
+        python: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        platform:
           - os: ubuntu-latest
-            python: "3.10"
             arch: x86_64
             package-name: linux_x86_64
           - os: macos-latest
-            python: "3.10"
             arch: arm64
             package-name: macos_arm64
           - os: macos-15-intel
-            python: "3.10"
             arch: x86_64
             package-name: macos_x86_64
           - os: windows-latest
-            python: "3.10"
             arch: x86_64
             package-name: windows_x86_64
 
@@ -63,10 +60,10 @@ jobs:
           python - <<'PY'
           import zipfile, os
           from pathlib import Path
-          
+
           os.makedirs("dist", exist_ok=True)
-          zip_path = f"dist/reveng_ida_plugin_${{ matrix.package-name }}.zip"
-          
+          zip_path = f"dist/reveng_ida_plugin_${{ matrix.platform.package-name }}_py${{ matrix.python }}.zip"
+
           with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
               # Add the entry file to root
               zf.write("reai_toolkit_entry.py", "reai_toolkit_entry.py")
@@ -84,7 +81,7 @@ jobs:
       - name: Upload plugin artifact
         uses: actions/upload-artifact@v4
         with:
-          name: reveng_ida_plugin_${{ matrix.package-name }}
+          name: reveng_ida_plugin_${{ matrix.platform.package-name }}_py${{ matrix.python }}
           path: dist/*.zip
 
   attach:
