@@ -44,11 +44,11 @@ The builds for latest stable version of the RevEng.AI IDA plugin can be download
 
 ### Supported IDA versions
 
-We support the following IDA versions and platforms: `8.5`, `9.0`, `9.1`, `9.2`.
+We support the following IDA versions and platforms: `8.5`, `9.0`, `9.1`, `9.2` and Python version from `3.10` to `3.14`.
 
 ### Setup
 
-1. **Download** the plugin code for your platform from the [Releases](https://github.com/revengai/plugin-ida/releases/latest) page.
+1. **Download** the plugin code for your platform and Python version from the [Releases](https://github.com/revengai/plugin-ida/releases/latest) page.
 2. **Extract** the archive contents into your IDA user plugin directory.
 
     **macOS / Linux**
@@ -62,7 +62,7 @@ We support the following IDA versions and platforms: `8.5`, `9.0`, `9.1`, `9.2`.
     ```
     Then run the following commands in your terminal or command prompt, adjusting for your platform and architecture as appropriate:
     ```bash
-    unzip reveng_ida_plugin_<platform>_<architecture>.zip  -d ~/Downloads/
+    unzip reveng_ida_plugin_<platform>_<architecture>_py<python-version>.zip  -d ~/Downloads/
     mv ~/Downloads/reai_toolkit_entry.py ~/.idapro/plugins/
     mv ~/Downloads/reai_toolkit ~/.idapro/plugins/
     ```
