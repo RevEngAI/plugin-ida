@@ -7,7 +7,7 @@ import idaapi
 
 from loguru import logger
 from revengai import AnalysesCoreApi, Configuration, FunctionMapping
-from libbs.decompilers.ida.compat import execute_write
+from libbs.decompilers.ida.compat import execute_write, execute_read
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -59,14 +59,24 @@ class AnalysisSyncService(IThreadService):
             model_name = analysis_details.data.model_name
             self.safe_put_model_name_local(model_name=model_name)
 
+            local_base_address: int = self._get_current_base_address()
+
             if analysis_details.data and analysis_details.data.base_address is not None:
-                self._rebase_program(analysis_details.data.base_address)
+                remote_base_address: int = analysis_details.data.base_address
+
+                if local_base_address != remote_base_address:
+                    base_address_delta: int = remote_base_address - local_base_address
+                    self._rebase_program(base_address_delta)
 
             return model_id
 
+    @execute_read
+    def _get_current_base_address(self) -> int:
+        return idaapi.get_imagebase()
+
     @execute_write
-    def _rebase_program(self, base_address: int) -> None:
-        idaapi.rebase_program(base_address, idaapi.MSF_FIXONCE)
+    def _rebase_program(self, base_address_delta: int) -> None:
+        idaapi.rebase_program(base_address_delta, idaapi.MSF_FIXONCE)
 
     def _fetch_function_map(self, analysis_id: int) -> FunctionMapping:
         """
