@@ -110,21 +110,17 @@ class AnalysisSyncService(IThreadService):
 
         # Track local functions matched
         local_function_vaddrs_matched = set()
-        # print(inverse_function_map)
-        # FUN COUNT
         fun_count = 0
         for key, value in func_map.name_map.items():
             if "FUN_" in value:
                 fun_count += 1
 
-        # print(f"Function count with 'FUN_': {fun_count}")
-        # print(f"Inverse function map: {inverse_function_map}")
         for start_ea in idautils.Functions():
             if str(start_ea) in inverse_function_map:
                 new_name: str | None = func_map.name_map.get(str(start_ea), None)
                 if new_name is None:
-                    return False
-                # logger.info(f"RevEng.AI: Renaming function at {start_ea} to {new_name}")
+                    continue
+                
                 self.safe_set_name(start_ea, new_name, check_user_flags=True)
                 matched_functions.append(
                     (int(inverse_function_map[str(start_ea)]), start_ea)

@@ -189,9 +189,11 @@ class BaseService:
                     pass
 
             # Prefer setting sync names as AUTO so users can easily override them later.
+            # https://python.docs.hex-rays.com/ida_name/index.html#ida_name.set_name
             # SN_CHECK: check for validity
             # SN_AUTO:   mark as auto-generated name
-            flags = ida_name.SN_CHECK | ida_name.SN_AUTO
+            # SN_NODUMMY: Prevents warning "can't rename byte as '<func_name>' because the name has a reserved prefix".
+            flags = ida_name.SN_CHECK | ida_name.SN_AUTO | ida_name.SN_NODUMMY
             result["ok"] = bool(ida_name.set_name(ea, new_name, flags))
 
         # hop to UI thread, make it a write transaction
