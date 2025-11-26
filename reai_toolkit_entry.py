@@ -126,7 +126,6 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
 
 
 def PLUGIN_ENTRY():
-    idaapi.auto_wait()
     # return a singleton instance (extra safety)
     if not hasattr(PLUGIN_ENTRY, "_inst"):
         PLUGIN_ENTRY._inst = ReaiToolkitPlugin()
