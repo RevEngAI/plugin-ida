@@ -7,7 +7,7 @@ import idaapi
 
 from loguru import logger
 from revengai import AnalysesCoreApi, Configuration, FunctionMapping
-from libbs.decompilers.ida.compat import execute_write
+from libbs.decompilers.ida.compat import execute_write, execute_read
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -59,14 +59,24 @@ class AnalysisSyncService(IThreadService):
             model_name = analysis_details.data.model_name
             self.safe_put_model_name_local(model_name=model_name)
 
+            local_base_address: int = self._get_current_base_address()
+
             if analysis_details.data and analysis_details.data.base_address is not None:
-                self._rebase_program(analysis_details.data.base_address)
+                remote_base_address: int = analysis_details.data.base_address
+
+                if local_base_address != remote_base_address:
+                    base_address_delta: int = remote_base_address - local_base_address
+                    self._rebase_program(base_address_delta)
 
             return model_id
 
+    @execute_read
+    def _get_current_base_address(self) -> int:
+        return idaapi.get_imagebase()
+
     @execute_write
-    def _rebase_program(self, base_address: int) -> None:
-        idaapi.rebase_program(base_address, idaapi.MSF_FIXONCE)
+    def _rebase_program(self, base_address_delta: int) -> None:
+        idaapi.rebase_program(base_address_delta, idaapi.MSF_FIXONCE)
 
     def _fetch_function_map(self, analysis_id: int) -> FunctionMapping:
         """
@@ -100,21 +110,17 @@ class AnalysisSyncService(IThreadService):
 
         # Track local functions matched
         local_function_vaddrs_matched = set()
-        # print(inverse_function_map)
-        # FUN COUNT
         fun_count = 0
         for key, value in func_map.name_map.items():
             if "FUN_" in value:
                 fun_count += 1
 
-        # print(f"Function count with 'FUN_': {fun_count}")
-        # print(f"Inverse function map: {inverse_function_map}")
         for start_ea in idautils.Functions():
             if str(start_ea) in inverse_function_map:
                 new_name: str | None = func_map.name_map.get(str(start_ea), None)
                 if new_name is None:
-                    return False
-                # logger.info(f"RevEng.AI: Renaming function at {start_ea} to {new_name}")
+                    continue
+                
                 self.safe_set_name(start_ea, new_name, check_user_flags=True)
                 matched_functions.append(
                     (int(inverse_function_map[str(start_ea)]), start_ea)
