@@ -12,9 +12,9 @@ from revengai import (
     CollectionSearchResult,
     Configuration,
     FunctionMapping,
-    FunctionMatchingBatchResponse,
+    FunctionMatchingResponse,
     FunctionMatchingFilters,
-    FunctionMatchingResultWithBestMatch,
+    FunctionMatch,
     FunctionsCoreApi,
     SearchApi,
 )
@@ -235,7 +235,7 @@ class MatchingService(IThreadService):
         debug_flags: Optional[List[str]] = None,
         page: int = 1,
         page_size: int = 1000,
-    ) -> FunctionMatchingBatchResponse:
+    ) -> FunctionMatchingResponse:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             functions_client = FunctionsCoreApi(api_client)
 
@@ -282,7 +282,7 @@ class MatchingService(IThreadService):
         yield StartEvent(total=total)
 
         while True:
-            response: GenericApiReturn[FunctionMatchingBatchResponse] = (
+            response: GenericApiReturn[FunctionMatchingResponse] = (
                 self.api_request_returning(
                     lambda: self._match_request(
                         nns=nns,
@@ -325,11 +325,11 @@ class MatchingService(IThreadService):
                 errors.append(response.error_message)
                 break
 
-        matches: List[FunctionMatchingResultWithBestMatch] = []
+        matches: List[FunctionMatch] = []
         if analysis_func_count >= 1000:
             for page in range(1, (analysis_func_count // 1000) + 2):
                 print(f"Fetching matching results page {page}...")
-                paged_response: GenericApiReturn[FunctionMatchingBatchResponse] = (
+                paged_response: GenericApiReturn[FunctionMatchingResponse] = (
                     self.api_request_returning(
                         lambda: self._match_request(
                             nns=nns,
@@ -355,7 +355,7 @@ class MatchingService(IThreadService):
             matches = response.data.matches if response.success else []
 
         # Reduce final results - based on iput function list
-        final_results: List[FunctionMatchingResultWithBestMatch] = [
+        final_results: List[FunctionMatch] = [
             match for match in matches if match.function_id in function_ids
         ]
 

@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel
-from revengai.models import FunctionMatchingResultWithBestMatch
+from revengai.models import FunctionMatch
 
 
 class ValidFunction(BaseModel):
@@ -50,7 +50,7 @@ class SummaryEvent(BaseModel):
     completed: int
     total: int
     errors: List[str]
-    results: List[FunctionMatchingResultWithBestMatch]
+    results: List[FunctionMatch]
 
 
 MatchEvent = StartEvent | BatchDoneEvent | SummaryEvent
