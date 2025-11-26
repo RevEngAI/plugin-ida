@@ -4,7 +4,7 @@ from typing import List, Optional
 from revengai.models import (
     BinarySearchResult,
     CollectionSearchResult,
-    FunctionMatchingResultWithBestMatch,
+    FunctionMatch,
     MatchedFunction,
 )
 
@@ -1029,7 +1029,7 @@ class MatchingDialog(DialogBase):
         table.setWordWrap(True)
         table.horizontalHeader().setVisible(True)
 
-        filtered_funcs: List[FunctionMatchingResultWithBestMatch] = []
+        filtered_funcs: List[FunctionMatch] = []
 
         for r in self.matching_results.results:
             if query:
