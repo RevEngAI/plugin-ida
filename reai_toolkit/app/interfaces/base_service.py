@@ -217,6 +217,7 @@ class BaseService:
         api_client = ApiClient(configuration=sdk_config)
         if hasattr(sdk_config, "user_agent"):
             api_client.user_agent = sdk_config.user_agent
+            api_client.default_headers["X-RevEng-Application"] = sdk_config.user_agent
         yield api_client
 
     @staticmethod
