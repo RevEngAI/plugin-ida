@@ -32,7 +32,7 @@ class ImportDataTypes:
         self.deci: DecompilerInterface
 
     @execute_ui
-    def execute(self, functions: FunctionDataTypesList) -> None:
+    def execute(self, functions: FunctionDataTypesList, matched_function_mapping: dict[int, int] = {}) -> None:
         self.deci = DecompilerInterface.discover(force_decompiler="ida") # type: ignore
         lookup: dict[str, TaggedDependency] = {}
 
@@ -66,7 +66,13 @@ class ImportDataTypes:
 
             func: FunctionTypeOutput | None = data_types.func_types
             if func:
-                self.update_function(func)
+                # If we obtained data types from a matched function, we need to make sure we map it to the original effective address.
+                if matched_function_mapping:
+                    ea: int = matched_function_mapping[function.function_id]
+                else:
+                    ea: int = func.addr
+
+                self.update_function(func, ea)
 
 
     def process_dependency(
@@ -115,9 +121,9 @@ class ImportDataTypes:
             name=imported_typedef.name, type_=normalized_type
         )
 
-    def update_function(self, func: FunctionTypeOutput) -> None:
+    def update_function(self, func: FunctionTypeOutput, ea: int) -> None:
         base_address: int = self.deci.binary_base_addr
-        rva: int = func.addr - base_address
+        rva: int = ea - base_address
 
         target_func: libbs.artifacts.Function | None = self.deci.functions.get(rva) # type: ignore
         if target_func is None:
