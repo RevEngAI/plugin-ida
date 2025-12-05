@@ -2,9 +2,7 @@ import threading
 from typing import Any, Callable
 
 import ida_kernwin
-from libbs.api import DecompilerInterface
-import libbs.artifacts
-from libbs.decompilers.ida.compat import execute_ui, execute_write, execute_read
+from libbs.decompilers.ida.compat import execute_write, execute_read
 
 import idautils
 import idaapi
@@ -18,13 +16,17 @@ from revengai import (
     FunctionDataTypesList,
     FunctionsDataTypesApi,
     BaseResponseFunctionDataTypesList,
+    Structure,
+    Enumeration,
+    TypeDefinition,
+    GlobalVariable
 )
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
-from revengai import BaseResponseBasic
+from reai_toolkit.app.transformations.import_data_types import ImportDataTypes
 
 
 class TaggedDependency:
@@ -105,7 +107,7 @@ class AnalysisSyncService(IThreadService):
             analyses_client = AnalysesCoreApi(api_client)
 
             function_map = analyses_client.get_analysis_function_map(analysis_id=analysis_id)
-            func_map = function_map.data.function_maps
+            func_map: FunctionMapping = function_map.data.function_maps
             self.safe_put_function_mapping(func_map=func_map)
             return func_map
 
@@ -213,7 +215,7 @@ class AnalysisSyncService(IThreadService):
             self.call_callback(generic_return=response)
             return
 
-        function_mapping: FunctionMapping = response.data
+        function_mapping: FunctionMapping | None = response.data
 
         response = self._safe_match_functions(func_map=function_mapping)
         if not response.success:

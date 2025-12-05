@@ -1,10 +1,11 @@
 import debugpy
 
-from revengai import (
-    Configuration,
-)
+from revengai import Configuration
+from revengai.exceptions import NotFoundException
 
-from revengai.models import MatchedFunction
+from loguru import logger
+
+from revengai.models.matched_function import MatchedFunction
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from revengai import (
     FunctionsDataTypesApi,
@@ -18,9 +19,7 @@ from reai_toolkit.app.transformations.import_data_types import ImportDataTypes
 def wait_for_debugger():
     # Start debug server
     debugpy.listen(60000, in_process_debug_adapter=True)
-    print("Waiting for debugger attach...")
     debugpy.wait_for_client()  # Pause until debugger connects
-    print("Debugger attached!")
 
 
 class ImportDataTypesService(IThreadService):
@@ -28,7 +27,7 @@ class ImportDataTypesService(IThreadService):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
 
     def import_data_types(self, matches: dict[int, MatchedFunction]):
-        wait_for_debugger()
+        # wait_for_debugger()
         idt : ImportDataTypes = ImportDataTypes()
 
         # Overwrite the matched effective address with the original effective address.
@@ -46,15 +45,19 @@ class ImportDataTypesService(IThreadService):
 
         # Attempt to retrieve the data types from the API and apply them to our analysis.
         for analysis_id, function_ids in funcs_by_analysis_id.items():
-            response = self._get_data_types(analysis_id, function_ids)
-            if response:
-                idt.execute(response)
+            try:
+                response: FunctionDataTypesList | None = self._get_data_types(analysis_id, function_ids)
+            except NotFoundException as e:
+                logger.warning(f"failed to apply data types for {function_ids} due to: {e}")
+            else:
+                if response:
+                    idt.execute(response)
 
     def _get_data_types(self, analysis_id: int, function_ids: list[int] | None = None) -> FunctionDataTypesList | None:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             client = FunctionsDataTypesApi(api_client=api_client)
             response: BaseResponseFunctionDataTypesList = (
-                client.list_function_data_types_for_analysis(analysis_id, function_ids=function_ids)
+                client.list_function_data_types_for_analysis(analysis_id, function_ids=function_ids) # type: ignore
             )
             if response.status:
                 return response.data
