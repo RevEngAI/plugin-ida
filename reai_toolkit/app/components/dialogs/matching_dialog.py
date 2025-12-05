@@ -1092,6 +1092,8 @@ class MatchingDialog(DialogBase):
                 r.matched_functions[0] if r.matched_functions else None
             )
 
+            self.current_to_matched_func[r.function_id] = matched_function
+
             # Column 3: Matched Name
             table.setItem(
                 row,

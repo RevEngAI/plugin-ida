@@ -29,7 +29,8 @@ dev-dependencies = [
   "pyqt5",
   "pyqt6-stubs",
   "pyqt6",
-  "PySide6"
+  "PySide6",
+  "debugpy>=1.8.17",
 ]
 
 # If you *do* want to install a stub package for IDA later, you can use a sources entry:

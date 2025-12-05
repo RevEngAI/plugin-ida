@@ -19,7 +19,7 @@ from revengai import (
 
 
 class TaggedDependency:
-    def __init__(self, dependency: Structure | Enumeration | TypeDefinition | GlobalVariable):
+    def __init__(self, dependency: Structure | Enumeration | TypeDefinition | GlobalVariable) -> None:
         self.dependency: Structure | Enumeration | TypeDefinition | GlobalVariable = dependency
         self.processed: bool = False
         self.name: str = self.dependency.name
@@ -34,25 +34,36 @@ class ImportDataTypes:
 
     @execute_ui
     def execute(self, functions: FunctionDataTypesList):
-        self.deci = DecompilerInterface.discover(force_decompiler="ida")
+        self.deci = DecompilerInterface.discover(force_decompiler="ida") # type: ignore
         lookup: dict[str, TaggedDependency] = {}
 
         for function in functions.items:
-            data_types: FunctionInfoOutput = function.data_types
+            logger.debug(f"importing data types for {function.function_id}")
+            data_types: FunctionInfoOutput | None = function.data_types
 
             if data_types is None:
+                logger.warning(f"skipping {function.function_id} as there are no available data types")
                 continue
             
             # Track processed dependencies to prevent duplicate imports.
             # Without this:
             # - Shared dependencies get re-processed, breaking references (shows as invalid ordinals in IDA)
             # - Cannot resolve subdependencies (e.g. struct fields that reference other imported types)
-            lookup |= {dep.actual_instance.name: TaggedDependency(dep.actual_instance) for dep in data_types.func_deps if dep.actual_instance.name not in lookup}
+            for dep in data_types.func_deps:
+                if dep.actual_instance is None:
+                    continue
+
+                if dep.actual_instance.name not in lookup:
+                    lookup.update({dep.actual_instance.name: TaggedDependency(dep.actual_instance)})
 
             dependency: FunctionInfoInputFuncDepsInner
             for dependency in data_types.func_deps:
-                tagged_dependency = lookup.get(dependency.actual_instance.name)
-                self.process_dependency(tagged_dependency, lookup)
+                if dependency.actual_instance is None:
+                    continue
+
+                tagged_dependency: TaggedDependency | None = lookup.get(dependency.actual_instance.name)
+                if tagged_dependency:
+                    self.process_dependency(tagged_dependency, lookup)
 
             func: FunctionTypeOutput | None = data_types.func_types
             if func:
@@ -64,6 +75,8 @@ class ImportDataTypes:
     ) -> None:
         if tagged_dependency.processed:
             return
+        
+        logger.debug(f"processing dependency: {tagged_dependency.name}")
 
         dependency = tagged_dependency.dependency
         match dependency:
@@ -81,6 +94,9 @@ class ImportDataTypes:
         tagged_dependency.processed = True
 
     def update_struct(self, imported_struct: Structure, lookup: dict[str, TaggedDependency]) -> None:
+        if imported_struct.size is None:
+            return
+        
         for member in imported_struct.members.values():
             subdependency = lookup.get(member.type)
             if subdependency:
@@ -88,7 +104,7 @@ class ImportDataTypes:
             member.type = self.normalise_type(member.type)
 
         self.deci.structs[imported_struct.name] = libbs.artifacts.Struct(
-            name=imported_struct.name, size=imported_struct.size, members={v.offset: v for v in imported_struct.members.values()}
+            name=imported_struct.name, size=imported_struct.size, members={v.offset: v for v in imported_struct.members.values()} # type: ignore
         )
 
     def update_enum(self, imported_enum: Enumeration) -> None:
@@ -120,7 +136,7 @@ class ImportDataTypes:
         base_address: int = self.deci.binary_base_addr
         rva: int = func.addr - base_address
 
-        target_func: libbs.artifacts.Function | None = self.deci.functions.get(rva)
+        target_func: libbs.artifacts.Function | None = self.deci.functions.get(rva) # type: ignore
         if target_func is None:
             return
 
@@ -137,6 +153,9 @@ class ImportDataTypes:
     def update_header(
         self, imported_header: FunctionHeader, target_function: libbs.artifacts.Function
     ) -> None:
+        if target_function.header is None:
+            return
+        
         target_function.header.name = imported_header.name
         target_function.header.type = self.normalise_type(imported_header.type)
         self.update_function_arguments(imported_header.args, target_function)
@@ -144,6 +163,9 @@ class ImportDataTypes:
     def update_function_arguments(
         self, imported_args: dict[str, Argument], target_function: libbs.artifacts.Function
     ) -> None:
+        if target_function.header is None:
+            return
+
         for arg in imported_args.values():
             arg.type = self.normalise_type(arg.type)
 
