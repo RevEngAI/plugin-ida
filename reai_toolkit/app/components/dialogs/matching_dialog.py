@@ -1039,7 +1039,6 @@ class MatchingDialog(DialogBase):
 
         filtered_funcs: List[FunctionMatch] = []
 
-
         for r in self.matching_results.results:
             if query:
                 matched_function = r.matched_functions[0] if r.matched_functions else None

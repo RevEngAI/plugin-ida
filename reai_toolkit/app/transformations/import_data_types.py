@@ -12,39 +12,38 @@ from revengai import (
     FunctionInfoInputFuncDepsInner,
     FunctionInfoOutput,
     FunctionTypeOutput,
-    GlobalVariable,
     Structure,
     TypeDefinition,
 )
 
 
 class TaggedDependency:
-    def __init__(self, dependency: Structure | Enumeration | TypeDefinition | GlobalVariable) -> None:
-        self.dependency: Structure | Enumeration | TypeDefinition | GlobalVariable = dependency
+    def __init__(self, dependency: Structure | Enumeration | TypeDefinition) -> None:
+        self.dependency: Structure | Enumeration | TypeDefinition = dependency
         self.processed: bool = False
         self.name: str = self.dependency.name
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return self.dependency.__repr__()
 
 
 class ImportDataTypes:
-    def __init__(self):
+    def __init__(self) -> None:
         self.deci: DecompilerInterface
 
     @execute_ui
-    def execute(self, functions: FunctionDataTypesList):
+    def execute(self, functions: FunctionDataTypesList) -> None:
         self.deci = DecompilerInterface.discover(force_decompiler="ida") # type: ignore
         lookup: dict[str, TaggedDependency] = {}
 
         for function in functions.items:
-            logger.debug(f"importing data types for {function.function_id}")
             data_types: FunctionInfoOutput | None = function.data_types
 
             if data_types is None:
-                logger.warning(f"skipping {function.function_id} as there are no available data types")
                 continue
             
+            logger.debug(f"importing data types for {function.function_id}")
+
             # Track processed dependencies to prevent duplicate imports.
             # Without this:
             # - Shared dependencies get re-processed, breaking references (shows as invalid ordinals in IDA)
@@ -54,7 +53,7 @@ class ImportDataTypes:
                     continue
 
                 if dep.actual_instance.name not in lookup:
-                    lookup.update({dep.actual_instance.name: TaggedDependency(dep.actual_instance)})
+                    lookup.update({dep.actual_instance.name: TaggedDependency(dep.actual_instance)}) # type: ignore
 
             dependency: FunctionInfoInputFuncDepsInner
             for dependency in data_types.func_deps:
@@ -76,9 +75,7 @@ class ImportDataTypes:
         if tagged_dependency.processed:
             return
         
-        logger.debug(f"processing dependency: {tagged_dependency.name}")
-
-        dependency = tagged_dependency.dependency
+        dependency: Structure | Enumeration | TypeDefinition = tagged_dependency.dependency
         match dependency:
             case Structure():
                 self.update_struct(cast(Structure, dependency), lookup)
@@ -86,10 +83,8 @@ class ImportDataTypes:
                 self.update_enum(cast(Enumeration, dependency))
             case TypeDefinition():
                 self.update_typedef(cast(TypeDefinition, dependency), lookup)
-            case GlobalVariable():
-                self.update_global_var(cast(GlobalVariable, dependency), lookup)
             case _:
-                logger.warning(f"unrecognised dependency type: {dependency}")
+                logger.warning(f"unsupported dependency type: {dependency}")
 
         tagged_dependency.processed = True
 
@@ -98,7 +93,7 @@ class ImportDataTypes:
             return
         
         for member in imported_struct.members.values():
-            subdependency = lookup.get(member.type)
+            subdependency: TaggedDependency | None = lookup.get(member.type)
             if subdependency:
                 self.process_dependency(subdependency, lookup)
             member.type = self.normalise_type(member.type)
@@ -111,25 +106,13 @@ class ImportDataTypes:
         self.deci.enums[imported_enum.name] = libbs.artifacts.Enum(name=imported_enum.name, members=imported_enum.members)
 
     def update_typedef(self, imported_typedef: TypeDefinition, lookup: dict[str, TaggedDependency]) -> None:
-        subdependency = lookup.get(imported_typedef.type)
+        subdependency: TaggedDependency | None = lookup.get(imported_typedef.type)
         if subdependency:
             self.process_dependency(subdependency, lookup)
 
         normalized_type: str = self.normalise_type(imported_typedef.type)
         self.deci.typedefs[imported_typedef.name] = libbs.artifacts.Typedef(
             name=imported_typedef.name, type_=normalized_type
-        )
-
-    # TODO: PLU-192 Do we want to think about how these are used? What happens in the case where we match a function from a library that's been
-    # statically linked into a completely different binary?
-    def update_global_var(self, imported_global_var: GlobalVariable, lookup: dict[str, TaggedDependency]) -> None:
-        subdependency = lookup.get(imported_global_var.type)
-        if subdependency:
-            self.process_dependency(subdependency, lookup)
-
-        normalized_type = self.normalise_type(imported_global_var.type)
-        self.deci.global_vars[imported_global_var.addr] = libbs.artifacts.GlobalVariable(
-            addr=imported_global_var.addr, name=imported_global_var.name, type_=normalized_type, size=imported_global_var.size
         )
 
     def update_function(self, func: FunctionTypeOutput) -> None:
@@ -173,12 +156,12 @@ class ImportDataTypes:
 
     @staticmethod
     def normalise_type(type: str) -> str:
-        # TODO: PLU-192 There are inconsistencies with how types are presented, sometimes with a namespace and sometimes without.
+        # TODO: PLU-214 There are inconsistencies with how types are presented, sometimes with a namespace and sometimes without.
         # Need to investigate further as we need to retain namespace information otherwise potential for symbols clashing.
         split_type: list[str] = type.split("::")
         normalized: str = split_type[-1]
 
-        # TODO: Add IDA typedefs for Ghidra primitives so we don't need to bother doing this...
+        # TODO: PLU-213 Add IDA typedefs for Ghidra primitives so we don't need to bother doing this...
         if normalized == "uchar":
             normalized = "unsigned char"
         elif normalized == "qword":
