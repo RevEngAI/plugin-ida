@@ -1,5 +1,3 @@
-import debugpy
-
 from revengai import Configuration
 from revengai.exceptions import NotFoundException
 
@@ -16,18 +14,12 @@ from revengai import (
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.transformations.import_data_types import ImportDataTypes
 
-def wait_for_debugger():
-    # Start debug server
-    debugpy.listen(60000, in_process_debug_adapter=True)
-    debugpy.wait_for_client()  # Pause until debugger connects
-
 
 class ImportDataTypesService(IThreadService):
-    def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
+    def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration) -> None:
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
 
-    def import_data_types(self, matches: dict[int, MatchedFunction]):
-        # wait_for_debugger()
+    def import_data_types(self, matches: dict[int, MatchedFunction]) -> None:
         idt : ImportDataTypes = ImportDataTypes()
 
         # Overwrite the matched effective address with the original effective address.
