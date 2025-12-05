@@ -20,7 +20,7 @@ and use it for Binary Code Similarity to help you Reverse Engineer stripped bina
   - [Compatibility](#Compatibility)
   - [Setup](#Setup)
   - [Verifying the Installation](#verifying-the-installation)
-- Usage
+- [Usage](#usage)
   - [Configuration](#configuration)
   - [Analysis](#analysis)
   - [Auto Unstrip](#auto-unstrip)
@@ -28,7 +28,7 @@ and use it for Binary Code Similarity to help you Reverse Engineer stripped bina
   - [AI Decompilation](#ai-decompilation)
 - [Contributing](#contributing)
   - [Reporting Bugs](#reporting-bugs)
-    - [Known Issues](#known-issues)
+- [Known Issues](#known-issues)
 
 
 ## Key features
@@ -84,7 +84,7 @@ We support the following IDA versions and platforms: `8.5`, `9.0`, `9.1`, `9.2` 
 Once IDA is open, confirm that the RevEng.AI menu appears in the top bar.
 If no errors are displayed in the console and the menu loads, your installation is complete.
 
-## Usage 
+## Usage
 
 In this section, we provide an example workflow for our plugin.
 
@@ -105,7 +105,7 @@ It's usually enough to keep the default options, but you can adjust the analysis
 
 ![Analysis Window](screenshots/analysis-window.png)
 
-You can check the status pf your analysis in the `RevEng.AI -> Analysis -> Check Status` option. Starting an analysis also automatically begins polling for status updates.
+You can check the status of your analysis in the `RevEng.AI -> Analysis -> Check Status` option. Starting an analysis also automatically begins polling for status updates.
 Example logs may look like this:
 ```
 2025-11-10 00:25:24.755 | INFO     | reai_toolkit.app.services.upload.upload_service:analyse_file:87 - RevEng.AI: Uploaded binary file
@@ -163,7 +163,7 @@ The plugin is still undergoing active development currently, and we are looking 
 
 If you've found a bug in the plugin, please open an issue via [GitHub](https://github.com/RevEngAi/plugin-ida/issues/new/choose), or create a post on our [Discord](https://discord.com/invite/ZwQTvzfSbA).
 
-### Known Issues
+## Known Issues
 * The plugin is unstable on macOS with IDA 9.2. We are actively working on a fix for this.
 * On macOS Tahoe the first time you run the plugin you will need to allow execution from untrusted developers. To do this, go to `System Preferences -> Security & Privacy` and click `Open Anyway` for the RevEng.AI plugin.
 
