@@ -114,8 +114,8 @@ class MatchingDialog(DialogBase):
         self.data_types_service = data_types_service
         self._func_map = func_map
 
-        # Used for looking up which function we matched to for a given function id.
-        self.current_to_matched_func: dict[int, MatchedFunction] = {}
+        # Matched function id to original effective address
+        self.matched_func_to_original_ea: dict[int, int] = {}
 
         self.ui = Ui_MatchingPanel()
         self.setWindowTitle("RevEng.AI — Function matching")
@@ -1091,7 +1091,7 @@ class MatchingDialog(DialogBase):
                 r.matched_functions[0] if r.matched_functions else None
             )
 
-            self.current_to_matched_func[r.function_id] = matched_function
+            self.matched_func_to_original_ea[matched_function.function_id] = self._func_map[str(r.function_id)]
 
             # Column 3: Matched Name
             table.setItem(
@@ -1196,7 +1196,7 @@ class MatchingDialog(DialogBase):
     
     def import_data_types(self):
         print("importing data types...")
-        self.data_types_service.import_data_types(self.current_to_matched_func)
+        self.data_types_service.import_data_types(self.matched_func_to_original_ea)
 
     # =====================================================================
     # (Optional) page-switch helpers
