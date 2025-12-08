@@ -115,53 +115,37 @@ class AnalysisSyncService(IThreadService):
         self,
         func_map: FunctionMapping,
     ) -> GenericApiReturn[MatchedFunctionSummary]:
-        function_map = func_map.function_map
-        inverse_function_map = func_map.inverse_function_map
+        # Mapping of local function addresses to mangled names
+        local_vaddr_to_matched_name: dict[str, str] = func_map.name_map
 
-        logger.info(f"RevEng.AI: Retrieved {len(function_map)} function mappings from analysis")
+        logger.info(f"RevEng.AI: Retrieved {len(local_vaddr_to_matched_name)} functions from analysis")
 
         # Compute which IDA functions match the revengai analysis functions
-        matched_functions = []
-        unmatched_local_functions = []
-        unmatched_remote_functions = []
+        matched_function_count: int = 0
+        unmatched_function_count: int = 0
+        total_function_count: int = 0
 
-        # Track local functions matched
-        local_function_vaddrs_matched = set()
-        fun_count = 0
-        for key, value in func_map.name_map.items():
-            if "FUN_" in value:
-                fun_count += 1
-
-        for start_ea in idautils.Functions():
-            if str(start_ea) in inverse_function_map:
-                new_name: str | None = func_map.name_map.get(str(start_ea), None)
-                if new_name is None:
-                    continue
-                
-                self.safe_set_name(start_ea, new_name, check_user_flags=True)
-                matched_functions.append((int(inverse_function_map[str(start_ea)]), start_ea))
-                local_function_vaddrs_matched.add(start_ea)
+        local_vaddr: int
+        for local_vaddr in idautils.Functions():
+            local_vaddr_str: str = str(local_vaddr)
+            new_name: str | None = local_vaddr_to_matched_name.get(local_vaddr_str)
+            if new_name:
+                self.safe_set_name(local_vaddr, new_name, check_user_flags=True)
+                matched_function_count += 1
             else:
-                unmatched_local_functions.append(start_ea)
+                unmatched_function_count += 1
+            
+            total_function_count += 1
 
-        unmatched_portal_map = {}
-        # Track remote functions not matched
-        for func_id_str, func_vaddr in function_map.items():
-            if int(func_vaddr) not in local_function_vaddrs_matched:
-                unmatched_remote_functions.append((int(func_vaddr), int(func_id_str)))
-                unmatched_portal_map[int(func_vaddr)] = int(func_id_str)
-
-        logger.info(f"RevEng.AI: Matched {len(matched_functions)} functions")
-        logger.info(f"RevEng.AI: {len(unmatched_local_functions)} local functions not matched")
-        logger.info(f"RevEng.AI: {len(unmatched_remote_functions)} remote functions not matched")
+        logger.info(f"RevEng.AI: Matched {matched_function_count} functions")
+        logger.info(f"RevEng.AI: {unmatched_function_count} functions not matched")
 
         return GenericApiReturn(
             success=True,
             data=MatchedFunctionSummary(
-                matched_local_function_count=len(matched_functions),
-                unmatched_local_function_count=len(unmatched_local_functions),
-                unmatched_remote_function_count=len(unmatched_remote_functions),
-                total_function_count=len(function_map),
+                matched_function_count=matched_function_count,
+                unmatched_function_count=unmatched_function_count,
+                total_function_count=total_function_count,
             ),
         )
 
@@ -224,10 +208,9 @@ class AnalysisSyncService(IThreadService):
 
         result: FunctionDataTypesList | None = self._get_data_types(analysis_id)
         if result and result.total_data_types_count:
-            logger.debug(f"applying type information for {analysis_id}...")
             import_data_types: ImportDataTypes = ImportDataTypes()
             import_data_types.execute(result)
         else:
-            logger.debug(f"found no type information for {analysis_id}")
+            logger.warning(f"found no type information for {analysis_id}")
 
         self.call_callback(generic_return=response)

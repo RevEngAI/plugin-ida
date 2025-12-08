@@ -77,32 +77,37 @@ class AutoUnstripDialog(DialogBase):
         hdr.setStretchLastSection(False)
 
         table.setRowCount(len(matches))
+        
+        if QT_VER == 6:
+            flags = QtCore.Qt.ItemFlag.ItemIsSelectable | QtCore.Qt.ItemFlag.ItemIsEnabled
+        else:
+            flags = QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled
 
         for row, m in enumerate(matches):
             # 2. address cell
             addr_item = QtWidgets.QTableWidgetItem(hex(m.function_vaddr))
-            addr_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            addr_item.setFlags(flags)
             addr_item.setToolTip(addr_item.text())  # show on hover
             table.setItem(row, 0, addr_item)
 
             # 3. current name cell
             current_name = get_safe_name(m.function_vaddr) or "<unnamed>"
             cur_item = QtWidgets.QTableWidgetItem(current_name)
-            cur_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            cur_item.setFlags(flags)
             cur_item.setToolTip(current_name)
             table.setItem(row, 1, cur_item)
 
             # 4. suggested name cell
             sug_name = m.suggested_name or ""
             sug_item = QtWidgets.QTableWidgetItem(sug_name)
-            sug_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            sug_item.setFlags(flags)
             sug_item.setToolTip(sug_name)  # tooltip always has full text
             table.setItem(row, 2, sug_item)
 
             # 5. Suggested demangled name cell
             demangled_name = m.suggested_demangled_name or sug_name
             dem_item = QtWidgets.QTableWidgetItem(demangled_name)
-            dem_item.setFlags(QtCore.Qt.ItemIsSelectable | QtCore.Qt.ItemIsEnabled)
+            dem_item.setFlags(flags)
             dem_item.setToolTip(demangled_name)  # tooltip always has full text
             table.setItem(row, 3, dem_item)
 

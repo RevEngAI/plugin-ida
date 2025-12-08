@@ -42,8 +42,6 @@ class ImportDataTypes:
             if data_types is None:
                 continue
             
-            logger.debug(f"importing data types for {function.function_id}")
-
             # Track processed dependencies to prevent duplicate imports.
             # Without this:
             # - Shared dependencies get re-processed, breaking references (shows as invalid ordinals in IDA)
@@ -127,6 +125,7 @@ class ImportDataTypes:
 
         target_func: libbs.artifacts.Function | None = self.deci.functions.get(rva) # type: ignore
         if target_func is None:
+            logger.warning(f"failed to update function: {func.name} at rva: 0x{rva:0x}")
             return
 
         target_func.name = func.name

@@ -73,6 +73,7 @@ class Coordinator(BaseCoordinator):
             log=log,
             auto_unstrip_service=app.auto_unstrip_service,
             rename_service=app.rename_service,
+            data_types_service=app.data_types_service
         )
 
         self.ai_decompc: AiDecompCoordinator = AiDecompCoordinator(

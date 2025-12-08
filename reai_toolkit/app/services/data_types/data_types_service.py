@@ -1,4 +1,4 @@
-from revengai import Configuration
+from revengai import Configuration, FunctionMapping
 from revengai.exceptions import NotFoundException
 
 from loguru import logger
@@ -20,8 +20,15 @@ class ImportDataTypesService(IThreadService):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
 
     def import_data_types(self, matches: dict[int, int]) -> None:
-        idt : ImportDataTypes = ImportDataTypes()
+        """ Import data type information from the remote and apply to our local analysis
 
+        Args:
+            matches: Mapping of remote function id to local virtual address
+        """
+        if len(matches) == 0:
+            return
+
+        idt : ImportDataTypes = ImportDataTypes()
         matched_function_ids: list[int] = list(matches.keys())
 
         # Attempt to retrieve the data types from the API and apply them to our analysis.
@@ -41,4 +48,3 @@ class ImportDataTypesService(IThreadService):
             )
             if response.status:
                 return response.data
-

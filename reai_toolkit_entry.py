@@ -4,7 +4,6 @@ from pathlib import Path
 import ida_kernwin
 import idaapi
 
-
 def _add_vendor_paths():
     here = Path(__file__).resolve().parent
     pkg_root = here / "reai_toolkit"  # where your package + vendor live

@@ -1195,7 +1195,6 @@ class MatchingDialog(DialogBase):
             print(f"Failed to enqueue renames: {e}")
     
     def import_data_types(self):
-        print("importing data types...")
         self.data_types_service.import_data_types(self.matched_func_to_original_ea)
 
     # =====================================================================
