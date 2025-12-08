@@ -160,18 +160,23 @@ class ImportDataTypes:
         target_function.header.args = {v.offset: v for v in imported_args.values()}
 
     @staticmethod
-    def normalise_type(type: str) -> str:
-        # TODO: PLU-214 There are inconsistencies with how types are presented, sometimes with a namespace and sometimes without.
-        # Need to investigate further as we need to retain namespace information otherwise potential for symbols clashing.
-        split_type: list[str] = type.split("::")
-        normalized: str = split_type[-1]
+    def normalise_type(data_type: str) -> str:
+        # When we obtain a type from DWARF information, it often looks something like `DWARF/stdint-uintn.h::uint32_t`
+        # Let's remove the DWARF/*.h prefix
+        if data_type.startswith("DWARF/"):
+            # Find the first occurence of `::`
+            delimiter: str = "::"
+            pos: int = data_type.find(delimiter)
+            data_type = data_type[pos+len(delimiter):]
+
+        logger.debug(f"normalising type: {data_type}")
 
         # TODO: PLU-213 Add IDA typedefs for Ghidra primitives so we don't need to bother doing this...
-        if normalized == "uchar":
-            normalized = "unsigned char"
-        elif normalized == "qword":
-            normalized = "unsigned __int64"
-        elif normalized == "sqword":
-            normalized = "__int64"
+        if data_type == "uchar":
+            data_type = "unsigned char"
+        elif data_type == "qword":
+            data_type = "unsigned __int64"
+        elif data_type == "sqword":
+            data_type = "__int64"
 
-        return normalized
+        return data_type
