@@ -31,7 +31,6 @@ class ImportDataTypesService(IThreadService):
         idt : ImportDataTypes = ImportDataTypes()
         matched_function_ids: list[int] = list(matches.keys())
 
-        # Attempt to retrieve the data types from the API and apply them to our analysis.
         try:
             response: FunctionDataTypesList | None = self._get_data_types(matched_function_ids)
         except NotFoundException as e:

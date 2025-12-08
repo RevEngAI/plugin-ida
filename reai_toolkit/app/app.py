@@ -41,7 +41,10 @@ class App:
         self.analysis_status_service = AnalysisStatusService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
-        self.analysis_sync_service = AnalysisSyncService(
+        self.data_types_service = ImportDataTypesService(
+            netstore_service=self.netstore_service, sdk_config=sdk_config
+        )
+        self.analysis_sync_service = AnalysisSyncService(data_types_service=self.data_types_service,
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.existing_analyses_service = ExistingAnalysesService(
@@ -59,6 +62,4 @@ class App:
         self.matching_service = MatchingService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
-        self.data_types_service = ImportDataTypesService(
-            netstore_service=self.netstore_service, sdk_config=sdk_config
-        )
+

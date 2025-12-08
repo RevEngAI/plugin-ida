@@ -10,40 +10,23 @@ import idaapi
 from loguru import logger
 from revengai import (
     AnalysesCoreApi,
-    ApiClient,
     Configuration,
     FunctionMapping,
-    FunctionDataTypesList,
-    FunctionsDataTypesApi,
-    BaseResponseFunctionDataTypesList,
-    Structure,
-    Enumeration,
-    TypeDefinition,
-    GlobalVariable
 )
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
-from reai_toolkit.app.transformations.import_data_types import ImportDataTypes
-
-
-class TaggedDependency:
-    def __init__(self, dependency: Structure | Enumeration | TypeDefinition | GlobalVariable):
-        self.dependency: Structure | Enumeration | TypeDefinition | GlobalVariable = dependency
-        self.processed: bool = False
-        self.name: str = self.dependency.name
-
-    def __repr__(self):
-        return self.dependency.__repr__()
+from reai_toolkit.app.services.data_types.data_types_service import ImportDataTypesService
 
 
 class AnalysisSyncService(IThreadService):
     _thread_callback: Callable[..., Any] = None
 
-    def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
+    def __init__(self, data_types_service: ImportDataTypesService, netstore_service: SimpleNetStore, sdk_config: Configuration):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
+        self.data_types_service: ImportDataTypesService = data_types_service
 
     def call_callback(self, generic_return: GenericApiReturn) -> None:
         self._thread_callback(generic_return)
@@ -149,15 +132,6 @@ class AnalysisSyncService(IThreadService):
             ),
         )
 
-    def _get_data_types(self, analysis_id: int) -> FunctionDataTypesList | None:
-        with ApiClient(configuration=self.sdk_config) as api_client:
-            client = FunctionsDataTypesApi(api_client=api_client)
-            response: BaseResponseFunctionDataTypesList = (
-                client.list_function_data_types_for_analysis(analysis_id)
-            )
-            if response.status:
-                return response.data
-
     def _safe_match_functions(
         self, func_map: FunctionMapping
     ) -> GenericApiReturn[MatchedFunctionSummary]:
@@ -200,17 +174,13 @@ class AnalysisSyncService(IThreadService):
             return
 
         function_mapping: FunctionMapping | None = response.data
+        if function_mapping is None:
+            return
 
         response = self._safe_match_functions(func_map=function_mapping)
         if not response.success:
             self.call_callback(generic_return=response)
             return
 
-        result: FunctionDataTypesList | None = self._get_data_types(analysis_id)
-        if result and result.total_data_types_count:
-            import_data_types: ImportDataTypes = ImportDataTypes()
-            import_data_types.execute(result)
-        else:
-            logger.warning(f"found no type information for {analysis_id}")
-
+        self.data_types_service.import_data_types({int(k): v for k, v in function_mapping.function_map.items()})
         self.call_callback(generic_return=response)

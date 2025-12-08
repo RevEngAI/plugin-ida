@@ -169,8 +169,6 @@ class ImportDataTypes:
             pos: int = data_type.find(delimiter)
             data_type = data_type[pos+len(delimiter):]
 
-        logger.debug(f"normalising type: {data_type}")
-
         # TODO: PLU-213 Add IDA typedefs for Ghidra primitives so we don't need to bother doing this...
         if data_type == "uchar":
             data_type = "unsigned char"
