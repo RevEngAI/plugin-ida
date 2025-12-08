@@ -74,31 +74,38 @@ def demangle(mangled_name: str, attr: int = idc.INF_SHORT_DN) -> str:
 def collect_symbols_from_ida(inclusive_end: bool = False) -> Optional[Symbols]:
     symbols = None
 
-    def _do():
-        base = idaapi.get_imagebase() or 0
+    def _do() -> None:
+        base: int = idaapi.get_imagebase() or 0
         funcs: list[FunctionBoundary] = []
-        mangled_funcs = []
+        mangled_funcs: list[dict] = []
+
+        plt_section: idaapi.segment_t | None = idaapi.get_segm_by_name(".plt")
 
         for start_ea in idautils.Functions():
-            f = ida_funcs.get_func(start_ea)
+            # If this is a .plt stub, we don't want to upload this for analysis.
+            if plt_section and plt_section.start_ea <= start_ea <= plt_section.end_ea:
+                continue
+
+            f: ida_funcs.func_t = ida_funcs.get_func(start_ea)
             if not f:
                 continue
-            end = f.end_ea - 1 if inclusive_end else f.end_ea
-            mangled_name = idc.get_func_name(start_ea)
+
+            end_ea: int = f.end_ea - 1 if inclusive_end else f.end_ea
+            mangled_name: str = idc.get_func_name(start_ea)
 
             funcs.append(
                 FunctionBoundary(
                     mangled_name=mangled_name,
-                    start_address=int(start_ea),
-                    end_address=int(end),
+                    start_address=start_ea,
+                    end_address=end_ea,
                 )
             )
 
             mangled_funcs.append(
                 {
                     "mangled_name": mangled_name,
-                    "start_address": int(start_ea),
-                    "end_address": int(end),
+                    "start_address": start_ea,
+                    "end_address": end_ea,
                 }
             )
 
