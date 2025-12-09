@@ -74,10 +74,9 @@ class AutoUnstripService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             functions_api = FunctionsCoreApi(api_client=api_client)
 
-            result = functions_api.auto_unstrip(
+            result: AutoUnstripResponse = functions_api.auto_unstrip(
                 analysis_id=analysis_id,
                 auto_unstrip_request=AutoUnstripRequest(
-                    min_similarity=0.9,
                     apply=True,  # Will not let the users pick names if enabled.
                 ),
             )
