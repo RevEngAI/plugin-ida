@@ -924,18 +924,14 @@ class MatchingDialog(DialogBase):
             )
 
             # Column 4: Similarity
-            table.setItem(
-                row,
-                MatchColumns.SIMILARITY.value,
-                QtWidgets.QTableWidgetItem(f"{r.similarity:.2f}"),
-            )
+            similarity_item = QtWidgets.QTableWidgetItem()
+            similarity_item.setData(QtCore.Qt.DisplayRole, r.similarity)
+            table.setItem(row, MatchColumns.SIMILARITY.value, similarity_item)
 
             # Column 5: Confidence
-            table.setItem(
-                row,
-                MatchColumns.CONFIDENCE.value,
-                QtWidgets.QTableWidgetItem(f"{r.confidence:.2f}"),
-            )
+            confidence_item = QtWidgets.QTableWidgetItem()
+            confidence_item.setData(QtCore.Qt.DisplayRole, r.confidence)
+            table.setItem(row, MatchColumns.CONFIDENCE.value, confidence_item)
 
             # Column 6: Matched Hash
             table.setItem(
@@ -1091,17 +1087,13 @@ class MatchingDialog(DialogBase):
             )
 
             # Column 4: Similarity
-            table.setItem(
-                row,
-                MatchColumns.SIMILARITY.value,
-                QtWidgets.QTableWidgetItem(f"{matched_function.similarity:.2f}"),
-            )
+            similarity_item = QtWidgets.QTableWidgetItem()
+            similarity_item.setData(QtCore.Qt.DisplayRole, matched_function.similarity)
+            table.setItem(row, MatchColumns.SIMILARITY.value, similarity_item)
             # Column 5: Confidence
-            table.setItem(
-                row,
-                MatchColumns.CONFIDENCE.value,
-                QtWidgets.QTableWidgetItem(f"{matched_function.confidence:.2f}"),
-            )
+            confidence_item = QtWidgets.QTableWidgetItem()
+            confidence_item.setData(QtCore.Qt.DisplayRole, matched_function.confidence)
+            table.setItem(row, MatchColumns.CONFIDENCE.value, confidence_item)
 
             # Column 7: Matched Hash
             table.setItem(
