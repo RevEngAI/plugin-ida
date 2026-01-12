@@ -48,9 +48,8 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         """
         if generic_return.success:
             self.safe_info(
-                msg=f"Analysis data synced successfully. \n\nSynced {generic_return.data.matched_local_function_count} functions with remote analysis."
-                + f"\n{generic_return.data.unmatched_local_function_count} local functions not present in remote analysis."
-                + f"\n{generic_return.data.unmatched_remote_function_count} remote functions not present in local analysis."
+                msg=f"Analysis data synced successfully. \n\nSynced {generic_return.data.matched_function_count} functions with remote analysis."
+                + f"\n{generic_return.data.unmatched_function_count} local functions not present in remote analysis."
             )
         else:
             self.safe_error(message=generic_return.error_message)

@@ -10,6 +10,7 @@ from reai_toolkit.app.services.auto_unstrip.auto_unstrip_service import (
 )
 from reai_toolkit.app.services.rename.rename_service import RenameService
 from reai_toolkit.app.services.rename.schema import RenameInput
+from reai_toolkit.app.services.data_types.data_types_service import ImportDataTypesService
 
 
 class AutoUnstripCoordinator(BaseCoordinator):
@@ -25,10 +26,12 @@ class AutoUnstripCoordinator(BaseCoordinator):
         log,
         auto_unstrip_service: AutoUnstripService,
         rename_service: RenameService,
+        data_types_service: ImportDataTypesService,
     ):
         super().__init__(app=app, factory=factory, log=log)
         self.auto_unstrip_service = auto_unstrip_service
         self.rename_service = rename_service
+        self.data_types_service: ImportDataTypesService = data_types_service
 
     def run_dialog(self) -> None:
         if self.auto_unstrip_service.is_worker_running():
@@ -46,7 +49,7 @@ class AutoUnstripCoordinator(BaseCoordinator):
     def _open_auto_unstrip_dialog(self) -> None:
         self.factory.auto_unstrip(response=self.last_response.data).open_modal()
 
-    def _on_complete(self, response: GenericApiReturn[AutoUnstripResponse]):
+    def _on_complete(self, response: GenericApiReturn[AutoUnstripResponse]) -> None:
         print("Auto-unstrip process completed.")
 
         if not response.success:
@@ -54,6 +57,7 @@ class AutoUnstripCoordinator(BaseCoordinator):
             return
 
         rename_list = []
+        data_types_mapping: dict[int, int] = {}
 
         self.last_response = response
 
@@ -65,8 +69,10 @@ class AutoUnstripCoordinator(BaseCoordinator):
                     new_name=function.suggested_demangled_name,
                 )
             )
+            data_types_mapping[function.function_id] = function.function_vaddr
 
         self.rename_service.enqueue_rename(rename_list=rename_list)
+        self.data_types_service.import_data_types(data_types_mapping)
 
         ida_kernwin.execute_ui_requests([self._open_auto_unstrip_dialog])
 

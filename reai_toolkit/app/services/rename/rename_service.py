@@ -83,14 +83,6 @@ class RenameService(IThreadService):
             # Do before for execute sync, if fails may not be called.
             self._rename_q.task_done()
 
-            # Display the total success/failure
-            ida_kernwin.execute_sync(
-                lambda: logger.info(
-                    f"RevEng.AI: Renaming Batch Completed - Success: {len(function_list) - (total_errors or 0)}, Failures: {total_errors or 0}"
-                ),
-                ida_kernwin.MFF_FAST,
-            )
-
     def _rename_remote_function_safe(self, matched_func_list) -> GenericApiReturn:
         data = GenericApiReturn(success=False)
 
