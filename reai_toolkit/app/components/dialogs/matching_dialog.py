@@ -111,11 +111,12 @@ class MatchingDialog(DialogBase):
 
         self.matching_service = matching_service
         self.rename_service = rename_service
-        self.data_types_service = data_types_service
+        self.data_types_service: ImportDataTypesService = data_types_service
         self._func_map = func_map
 
         # Matched function id to original effective address
         self.matched_func_to_original_ea: dict[int, int] = {}
+        self.local_func_id_to_remote_func_id: dict[int, int] = {}
 
         self.ui = Ui_MatchingPanel()
         self.setWindowTitle("RevEng.AI — Function matching")
@@ -1091,6 +1092,7 @@ class MatchingDialog(DialogBase):
                 r.matched_functions[0] if r.matched_functions else None
             )
 
+            self.local_func_id_to_remote_func_id[r.function_id] = matched_function.function_id
             self.matched_func_to_original_ea[matched_function.function_id] = self._func_map[str(r.function_id)]
 
             # Column 3: Matched Name
@@ -1195,7 +1197,16 @@ class MatchingDialog(DialogBase):
             print(f"Failed to enqueue renames: {e}")
     
     def import_data_types(self):
-        self.data_types_service.import_data_types(self.matched_func_to_original_ea)
+        selected_matches: dict[int, int] = {}
+        table = self.ui.tableResults
+        for r in range(table.rowCount()):
+            item = table.item(r, MatchColumns.SELECT.value)
+            if item and item.checkState() == QtCore.Qt.Checked:
+                local_function_id = item.data(QtCore.Qt.UserRole)
+                remote_function_id: int = self.local_func_id_to_remote_func_id[local_function_id]
+                selected_matches[remote_function_id] = self.matched_func_to_original_ea[remote_function_id]
+
+        self.data_types_service.import_data_types(selected_matches)
 
     # =====================================================================
     # (Optional) page-switch helpers
