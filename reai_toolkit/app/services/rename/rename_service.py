@@ -4,7 +4,6 @@ import time
 from typing import List, Optional
 
 import ida_kernwin
-from loguru import logger
 
 from revengai import (
     Configuration,
@@ -156,9 +155,7 @@ class RenameService(IThreadService):
                     new_name=demangle(func.new_name),
                 )
             )
-
             self.tag_function_as_renamed(func.new_name)
-
 
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             functions_api = FunctionsRenamingHistoryApi(api_client=api_client)
