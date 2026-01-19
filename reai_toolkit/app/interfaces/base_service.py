@@ -3,6 +3,9 @@ from typing import Any, Callable, Optional
 
 import ida_kernwin as kw
 import ida_name
+import ida_dirtree
+from libbs.decompilers.ida.compat import execute_write
+
 from loguru import logger
 from revengai import ApiClient, ApiException, Configuration, FunctionMapping
 
@@ -156,6 +159,25 @@ class BaseService:
         kw.execute_sync(_do, kw.MFF_FAST)
 
         return func_map
+    
+    @staticmethod
+    @execute_write
+    def tag_function_as_renamed(func_name: str) -> None:
+        """
+        Adds the function to the directory `/RevEng.AI` in order to indicate to the user
+        that a function was renamed by the platform.
+
+        Args:
+            func_name (str): Name of the function to tag.
+        """
+        dirtree: ida_dirtree.dirtree_t = ida_dirtree.get_std_dirtree(ida_dirtree.DIRTREE_FUNCS)
+
+        namespace: str = "/RevEng.AI"
+        if dirtree.isdir(namespace) is False:
+            dirtree.mkdir(namespace)
+        
+        dirtree.rename(func_name, f"{namespace}/{func_name}")
+
 
     # =========================================
     # RevEng safe update ida function name

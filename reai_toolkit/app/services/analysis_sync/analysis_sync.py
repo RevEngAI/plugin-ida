@@ -114,6 +114,7 @@ class AnalysisSyncService(IThreadService):
             new_name: str | None = local_vaddr_to_matched_name.get(local_vaddr_str)
             if new_name:
                 self.safe_set_name(local_vaddr, new_name, check_user_flags=True)
+                self.tag_function_as_renamed(new_name)
                 matched_function_count += 1
             else:
                 unmatched_function_count += 1
