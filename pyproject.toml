@@ -17,12 +17,9 @@ dependencies = [
 # Astral uv configuration
 # -------------------------------
 [tool.uv]
-# dev deps go here (this key exists; 'dependency-groups' does not)
-dev-dependencies = [
+[dependency-groups]
+dev = [
   "pytest>=8.3",
-  "black>=24.8",
-  "isort>=5.13",
-  "mypy>=1.12",
   "types-requests",
   "pyqt5-stubs",
   "idapro>=0.0.5",
@@ -31,6 +28,7 @@ dev-dependencies = [
   "pyqt6",
   "PySide6",
   "debugpy>=1.8.17",
+  "ruff>=0.14.13",
 ]
 
 # If you *do* want to install a stub package for IDA later, you can use a sources entry:
