@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from loguru import logger
-from revengai import AnalysesCoreApi, Configuration
+from revengai import AnalysesCoreApi, Configuration, Symbols
 from revengai.models import (
     AnalysisCreateRequest,
     AnalysisCreateResponse,
@@ -27,10 +27,11 @@ class UploadService(IThreadService):
         self,
         file_name: str,
         file_path: str,
+        symbols: Symbols,
         debug_file_path: str | None = None,
         tags: Optional[list[str]] = None,
         public: bool = True,
-        thread_callback: Optional[callable] = None,
+        thread_callback: Optional[callable] = None
     ) -> None:
         """
         Starts the analysis as a background job.
@@ -41,6 +42,7 @@ class UploadService(IThreadService):
             args=(
                 file_name,
                 file_path,
+                symbols,
                 debug_file_path,
                 tags,
                 public,
@@ -55,6 +57,7 @@ class UploadService(IThreadService):
         stop_event: threading.Event,
         file_name: str,
         file_path: str,
+        symbols: Symbols,
         debug_file_path: str | None = None,
         tags: Optional[list[str]] = None,
         public: bool = True,
@@ -113,6 +116,7 @@ class UploadService(IThreadService):
             debug_sha256=debug_sha256,
             tags=tags or [],
             public=public,
+            symbols=symbols
         )
         self.call_callback(generic_return=final_response)
 
@@ -171,12 +175,12 @@ class UploadService(IThreadService):
         self,
         file_name: str,
         binary_sha256: str,
+        symbols: Symbols,
         debug_sha256: Optional[str] = None,
         tags: Optional[list[str]] = None,
         public: bool = True,
     ) -> GenericApiReturn[AnalysisCreateResponse]:
-        symbols = collect_symbols_from_ida()
-        if not symbols:
+        if symbols.function_boundaries is None:
             return GenericApiReturn(
                 success=False,
                 error_message="Failed to collect symbols from IDA.",
