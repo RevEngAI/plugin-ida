@@ -27,7 +27,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.addWidget(
-            QtWidgets.QLabel("Select Function Boundaries to upload to RevEng.AI")
+            QtWidgets.QLabel("Select Functions to Analyse")
         )
 
         self.table = QtWidgets.QTableWidget()
@@ -95,19 +95,21 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
             item: QtWidgets.QTableWidgetItem | None = self.table.item(
                 row, SelectFunctionTableColumns.CHECKBOX
             )
-            if item and item.checkState() != QtCore.Qt.CheckState.Checked:
-                vaddr_widget: QtWidgets.QTableWidgetItem | None = self.table.item(
-                    row, SelectFunctionTableColumns.VADDR
-                )
-                if vaddr_widget is None:
-                    continue
+            if item is None:
+                continue
 
-                # Convert from hexstring representation to int
-                vaddr: int = int(vaddr_widget.text(), 16)
+            vaddr_widget: QtWidgets.QTableWidgetItem | None = self.table.item(
+                row, SelectFunctionTableColumns.VADDR
+            )
+            if vaddr_widget is None:
+                continue
 
-                entry: FunctionBoundaryEx | None = function_boundaries.get(vaddr)
-                if entry:
-                    entry["enabled"] = False
+            # Convert from hexstring representation to int
+            vaddr: int = int(vaddr_widget.text(), 16)
+
+            entry: FunctionBoundaryEx | None = function_boundaries.get(vaddr)
+            if entry:
+                entry["enabled"] = item.checkState() == QtCore.Qt.CheckState.Checked
 
         self.close()
 
