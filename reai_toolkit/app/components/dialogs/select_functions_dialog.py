@@ -1,10 +1,15 @@
+from enum import Enum, auto
 from typing import TypedDict
 from functools import partial
 
-from PySide6.QtCore import Qt
-
 from revengai.models.function_boundary import FunctionBoundary
-from reai_toolkit.app.core.qt_compat import QtWidgets
+from reai_toolkit.app.core.qt_compat import QtWidgets, QtCore
+
+
+class SelectFunctionTableColumns(Enum):
+    NAME = auto()
+    VADDR = auto()
+    CHECKBOX = auto()
 
 
 class FunctionBoundaryEx(TypedDict):
@@ -38,24 +43,33 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         layout.addWidget(self.select_all_checkbox)
 
         # Populate the table
-        for i, item in enumerate(function_boundaries.values()):
+        for row, item in enumerate(function_boundaries.values()):
             boundary: FunctionBoundary = item["boundary"]
-            self.table.setItem(i, 0, QtWidgets.QTableWidgetItem(boundary.mangled_name))
             self.table.setItem(
-                i, 1, QtWidgets.QTableWidgetItem(f"0x{boundary.start_address:0x}")
+                row,
+                SelectFunctionTableColumns.NAME.value,
+                QtWidgets.QTableWidgetItem(boundary.mangled_name),
+            )
+            self.table.setItem(
+                row,
+                SelectFunctionTableColumns.VADDR.value,
+                QtWidgets.QTableWidgetItem(f"0x{boundary.start_address:0x}"),
             )
 
             checkbox_item = QtWidgets.QTableWidgetItem()
             checkbox_item.setFlags(
-                Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
+                QtCore.Qt.ItemFlag.ItemIsUserCheckable
+                | QtCore.Qt.ItemFlag.ItemIsEnabled
             )
 
             if item["enabled"]:
-                checkbox_item.setCheckState(Qt.CheckState.Checked)
+                checkbox_item.setCheckState(QtCore.Qt.CheckState.Checked)
             else:
-                checkbox_item.setCheckState(Qt.CheckState.Unchecked)
+                checkbox_item.setCheckState(QtCore.Qt.CheckState.Unchecked)
 
-            self.table.setItem(i, 2, checkbox_item)
+            self.table.setItem(
+                row, SelectFunctionTableColumns.CHECKBOX.value, checkbox_item
+            )
 
         self.table.resizeColumnsToContents()
 
@@ -79,10 +93,12 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         self, function_boundaries: dict[int, FunctionBoundaryEx]
     ) -> None:
         for row in range(self.table.rowCount()):
-            item: QtWidgets.QTableWidgetItem | None = self.table.item(row, 2)
-            if item and item.checkState() != Qt.CheckState.Checked:
+            item: QtWidgets.QTableWidgetItem | None = self.table.item(
+                row, SelectFunctionTableColumns.CHECKBOX.value
+            )
+            if item and item.checkState() != QtCore.Qt.CheckState.Checked:
                 vaddr_widget: QtWidgets.QTableWidgetItem | None = self.table.item(
-                    row, 1
+                    row, SelectFunctionTableColumns.VADDR.value
                 )
                 if vaddr_widget is None:
                     continue
@@ -100,11 +116,15 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         # Block signals to prevent itemChanged from firing for each row
         self.table.blockSignals(True)
 
-        new_state: Qt.CheckState | Qt.CheckState = (
-            Qt.CheckState.Checked if state == 2 else Qt.CheckState.Unchecked
+        new_state: QtCore.Qt.CheckState | QtCore.Qt.CheckState = (
+            QtCore.Qt.CheckState.Checked
+            if state == SelectFunctionTableColumns.CHECKBOX.value
+            else QtCore.Qt.CheckState.Unchecked
         )
         for row in range(self.table.rowCount()):
-            item: QtWidgets.QTableWidgetItem | None = self.table.item(row, 2)
+            item: QtWidgets.QTableWidgetItem | None = self.table.item(
+                row, SelectFunctionTableColumns.CHECKBOX.value
+            )
             if item:
                 item.setCheckState(new_state)
 
@@ -112,7 +132,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
 
     def update_select_all_state(self, item: QtWidgets.QTableWidgetItem) -> None:
         # Only respond to checkbox column changes
-        if item.column() != 2:
+        if item.column() != SelectFunctionTableColumns.CHECKBOX.value:
             return
 
         # Block signals to prevent recursive calls
@@ -121,16 +141,20 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         # Count checked items
         checked_count = 0
         for row in range(self.table.rowCount()):
-            checkbox: QtWidgets.QTableWidgetItem | None = self.table.item(row, 2)
-            if checkbox and checkbox.checkState() == Qt.CheckState.Checked:
+            checkbox: QtWidgets.QTableWidgetItem | None = self.table.item(
+                row, SelectFunctionTableColumns.CHECKBOX.value
+            )
+            if checkbox and checkbox.checkState() == QtCore.Qt.CheckState.Checked:
                 checked_count += 1
 
         # Update Select All checkbox state
         if checked_count == 0:
-            self.select_all_checkbox.setCheckState(Qt.CheckState.Unchecked)
+            self.select_all_checkbox.setCheckState(QtCore.Qt.CheckState.Unchecked)
         elif checked_count == self.table.rowCount():
-            self.select_all_checkbox.setCheckState(Qt.CheckState.Checked)
+            self.select_all_checkbox.setCheckState(QtCore.Qt.CheckState.Checked)
         else:
-            self.select_all_checkbox.setCheckState(Qt.CheckState.PartiallyChecked)
+            self.select_all_checkbox.setCheckState(
+                QtCore.Qt.CheckState.PartiallyChecked
+            )
 
         self.select_all_checkbox.blockSignals(False)

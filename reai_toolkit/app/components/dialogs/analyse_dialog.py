@@ -4,7 +4,6 @@ from typing import Any, Callable
 import idaapi
 from loguru import logger
 
-
 from revengai import Symbols
 from revengai.models.function_boundary import FunctionBoundary
 
