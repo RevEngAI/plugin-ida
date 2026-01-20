@@ -23,23 +23,40 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("RevEng.AI — Select Functions")
-        self.setGeometry(200, 200, 500, 400)
+        
+        # Size relative to screen
+        screen = QtWidgets.QApplication.primaryScreen().geometry()
+        width = int(screen.width() * 0.5)
+        height = int(screen.height() * 0.6)
+        self.resize(width, height)
+        self.setMinimumSize(500, 400)
 
         layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(
-            QtWidgets.QLabel("Select Functions to Analyse")
+        
+        # Header label - fixed height
+        header_label = QtWidgets.QLabel("Select Functions to Analyse")
+        header_label.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Fixed
         )
+        layout.addWidget(header_label)
 
+        # Select all checkbox - fixed height
+        self.select_all_checkbox = QtWidgets.QCheckBox("Select All")
+        self.select_all_checkbox.stateChanged.connect(self.toggle_all)
+        layout.addWidget(self.select_all_checkbox)
+
+        # Table - expands to fill available space
         self.table = QtWidgets.QTableWidget()
         self.table.setRowCount(len(function_boundaries))
+        self.table.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding
+        )
 
         headers: list[str] = ["Function", "Virtual Address", "Upload"]
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
-
-        self.select_all_checkbox = QtWidgets.QCheckBox("Select All")
-        self.select_all_checkbox.stateChanged.connect(self.toggle_all)
-        layout.addWidget(self.select_all_checkbox)
 
         # Populate the table
         for row, item in enumerate(function_boundaries.values()):
@@ -70,24 +87,36 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
                 row, SelectFunctionTableColumns.CHECKBOX, checkbox_item
             )
 
-        self.table.resizeColumnsToContents()
+        # Column sizing - make function name column stretch
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(
+            SelectFunctionTableColumns.NAME,
+            QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        header.setSectionResizeMode(
+            SelectFunctionTableColumns.VADDR,
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
+        header.setSectionResizeMode(
+            SelectFunctionTableColumns.CHECKBOX,
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+        )
 
         # Update "Select All" when individual checkboxes change
         self.table.itemChanged.connect(self.update_select_all_state)
-        layout.addWidget(self.table)
+        layout.addWidget(self.table, stretch=1)  # Give table the stretch
 
+        # Button layout - fixed height
         button_layout = QtWidgets.QHBoxLayout()
         button_layout.addStretch()
 
         close_button = QtWidgets.QPushButton("Close")
-
         close_button.clicked.connect(
             partial(self.select_function_boundary_subset, function_boundaries)
         )
         button_layout.addWidget(close_button)
 
         layout.addLayout(button_layout)
-
     def select_function_boundary_subset(
         self, function_boundaries: dict[int, FunctionBoundaryEx]
     ) -> None:
