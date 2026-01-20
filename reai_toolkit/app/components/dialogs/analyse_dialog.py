@@ -61,14 +61,14 @@ class AnalyseDialog(DialogBase):
         self.file_path: str = idaapi.get_input_file_path()
         self.file_name: str = idaapi.get_root_filename()
         self.debug_file_path: str | None = None
-        self.ui = Ui_AuthPanel()
+        self.ui: Ui_AuthPanel = Ui_AuthPanel()
         self.ui.setupUi(self)
         self.setFixedSize(self.size())
 
         logo_path: str | None = self._find_resource(self.base_logo_path)
         if logo_path:
             px: QtGui.QPixmap = QtGui.QPixmap(logo_path)
-            self.ui.logoArea.setPixmap(px)
+            self.ui.logoArea.setPixmap(px) # type: ignore
 
         self.ui.apiFileName.setText(self.file_name)
 
@@ -121,7 +121,7 @@ class AnalyseDialog(DialogBase):
         if AnalyseDialog.cached_symbols is None:
             return
 
-        # Pass only the subset of function boundaries selected by the user (by default, everything)
+        # Pass only the subset of function boundaries selected by the user
         AnalyseDialog.cached_symbols.function_boundaries = [
             x["boundary"]
             for x in AnalyseDialog.cached_function_boundaries.values()
@@ -134,7 +134,7 @@ class AnalyseDialog(DialogBase):
             symbols=AnalyseDialog.cached_symbols,
             debug_file_path=self.debug_file_path,
             tags=[],
-            public=True if self.ui.radioButton_2.isChecked() else False,
+            public=self.ui.radioButton_2.isChecked(),
             thread_callback=self.callback,
         )
 
