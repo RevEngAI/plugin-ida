@@ -1,4 +1,4 @@
-from enum import Enum, auto
+from enum import Enum
 from typing import TypedDict
 from functools import partial
 
@@ -7,9 +7,9 @@ from reai_toolkit.app.core.qt_compat import QtWidgets, QtCore
 
 
 class SelectFunctionTableColumns(Enum):
-    NAME = auto()
-    VADDR = auto()
-    CHECKBOX = auto()
+    NAME = 0
+    VADDR = 1
+    CHECKBOX = 2
 
 
 class FunctionBoundaryEx(TypedDict):
@@ -30,7 +30,6 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
             QtWidgets.QLabel("Select Function Boundaries to upload to RevEng.AI")
         )
 
-        # Create and configure table
         self.table = QtWidgets.QTableWidget()
         self.table.setRowCount(len(function_boundaries))
 
