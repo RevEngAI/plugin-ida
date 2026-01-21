@@ -1,10 +1,8 @@
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
+from logging import Logger
 from typing import TYPE_CHECKING, Any, Callable
 
 import ida_kernwin
-from loguru import logger
 
 if TYPE_CHECKING:
     from reai_toolkit.app.app import App
@@ -19,10 +17,10 @@ class BaseCoordinator(ABC):
       - Authentication helpers (require_auth)
     """
 
-    def __init__(self, *, app: "App", factory: "DialogFactory", log: logger):
+    def __init__(self, *, app: "App", factory: "DialogFactory", log: Logger) -> None:
         self.app: "App" = app
         self.factory: "DialogFactory" = factory
-        self.log: logger = log
+        self.log: Logger = log
 
     # ======================================================
     # IDA-safe helpers — executed on the UI thread safely

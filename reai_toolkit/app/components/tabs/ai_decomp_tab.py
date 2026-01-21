@@ -170,7 +170,7 @@ class AIDecompView(kw.PluginForm):
 
     def OnCreate(self, form) -> None:
         """Called by IDA when the form is created; build our Qt UI here."""
-        self._parent_w = kw.PluginForm.FormToPyQtWidget(form)
+        self._parent_w = self.FormToPyQtWidget(form)
 
         # Layout root
         layout = QtWidgets.QVBoxLayout(self._parent_w)
@@ -185,7 +185,7 @@ class AIDecompView(kw.PluginForm):
         font = QtGui.QFont(
             "Menlo"
             if QtCore.QOperatingSystemVersion.currentType()
-            == QtCore.QOperatingSystemVersion.MacOS
+            == QtCore.QOperatingSystemVersion.OSType.MacOS
             else "Consolas"
         )
         font.setStyleHint(QtGui.QFont.Monospace)
