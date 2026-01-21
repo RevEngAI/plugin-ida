@@ -25,9 +25,9 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         self.setWindowTitle("RevEng.AI — Select Functions")
 
         # Size relative to screen
-        screen = QtWidgets.QApplication.primaryScreen().geometry()
-        width = int(screen.width() * 0.5)
-        height = int(screen.height() * 0.6)
+        screen: QtCore.QRect = QtWidgets.QApplication.primaryScreen().geometry()
+        width = int(screen.width() * 0.4)
+        height = int(screen.height() * 0.5)
         self.resize(width, height)
         self.setMinimumSize(500, 400)
 
@@ -85,7 +85,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
             self.table.setItem(row, SelectFunctionTableColumns.CHECKBOX, checkbox_item)
 
         # Column sizing - make function name column stretch
-        header = self.table.horizontalHeader()
+        header: QtWidgets.QHeaderView = self.table.horizontalHeader()
         header.setSectionResizeMode(
             SelectFunctionTableColumns.NAME, QtWidgets.QHeaderView.ResizeMode.Stretch
         )
