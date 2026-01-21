@@ -3,6 +3,7 @@ from typing import Any, Callable
 
 import ida_kernwin
 from libbs.decompilers.ida.compat import execute_write, execute_read
+import idc
 
 import idautils
 import idaapi
@@ -112,9 +113,12 @@ class AnalysisSyncService(IThreadService):
         for local_vaddr in idautils.Functions():
             local_vaddr_str: str = str(local_vaddr)
             new_name: str | None = local_vaddr_to_matched_name.get(local_vaddr_str)
+            old_name: str | None = idc.get_func_name(local_vaddr)
             if new_name:
-                self.safe_set_name(local_vaddr, new_name, check_user_flags=True)
-                self.tag_function_as_renamed(new_name)
+                if new_name != old_name:
+                    self.safe_set_name(local_vaddr, new_name, check_user_flags=True)
+                    self.tag_function_as_renamed(new_name)
+
                 matched_function_count += 1
             else:
                 unmatched_function_count += 1
