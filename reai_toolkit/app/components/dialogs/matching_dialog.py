@@ -1,5 +1,7 @@
-from enum import Enum
+from enum import IntEnum
 from typing import List, Optional
+
+from loguru import logger
 
 from revengai.models import (
     BinarySearchResult,
@@ -44,7 +46,7 @@ print("[AnnDialog] Qt version:", QT_VER)
 DEBOUNCE_MS = 250
 
 
-class MatchColumns(Enum):
+class MatchColumns(IntEnum):
     SELECT = 0
     VIRTUAL_ADDRESS = 1
     FUNC_NAME = 2
@@ -905,12 +907,12 @@ class MatchingDialog(DialogBase):
                 else QtCore.Qt.Unchecked
             )
             c0.setData(QtCore.Qt.UserRole, current_func_id)
-            table.setItem(row, MatchColumns.SELECT.value, c0)
+            table.setItem(row, MatchColumns.SELECT, c0)
 
             # Column 1: Virtual Address
             table.setItem(
                 row,
-                MatchColumns.VIRTUAL_ADDRESS.value,
+                MatchColumns.VIRTUAL_ADDRESS,
                 QtWidgets.QTableWidgetItem(
                     hex(self._func_map[str(self.matching_results.results[0].function_id)])
                 ),
@@ -919,7 +921,7 @@ class MatchingDialog(DialogBase):
             # Column 2: Function Name
             table.setItem(
                 row,
-                MatchColumns.FUNC_NAME.value,
+                MatchColumns.FUNC_NAME,
                 QtWidgets.QTableWidgetItem(
                     self.matching_service.function_id_to_local_name(
                         self.matching_results.results[0].function_id
@@ -929,47 +931,47 @@ class MatchingDialog(DialogBase):
 
             # Column 3: Matched Name
             table.setItem(
-                row, MatchColumns.MATCHED_NAME.value, QtWidgets.QTableWidgetItem(r.function_name)
+                row, MatchColumns.MATCHED_NAME, QtWidgets.QTableWidgetItem(r.function_name)
             )
 
             # Column 4: Similarity
             similarity_item = QtWidgets.QTableWidgetItem()
             similarity_item.setData(QtCore.Qt.DisplayRole, r.similarity)
-            table.setItem(row, MatchColumns.SIMILARITY.value, similarity_item)
+            table.setItem(row, MatchColumns.SIMILARITY, similarity_item)
 
             # Column 5: Confidence
             confidence_item = QtWidgets.QTableWidgetItem()
             confidence_item.setData(QtCore.Qt.DisplayRole, r.confidence)
-            table.setItem(row, MatchColumns.CONFIDENCE.value, confidence_item)
+            table.setItem(row, MatchColumns.CONFIDENCE, confidence_item)
 
             # Column 6: Matched Hash
             table.setItem(
                 row,
-                MatchColumns.MATCHED_BINARY_HASH.value,
+                MatchColumns.MATCHED_BINARY_HASH,
                 QtWidgets.QTableWidgetItem(r.sha_256_hash),
             )
 
             # Column 7: Matched Binary
             table.setItem(
                 row,
-                MatchColumns.MATCHED_BINARY_NAME.value,
+                MatchColumns.MATCHED_BINARY_NAME,
                 QtWidgets.QTableWidgetItem(r.binary_name),
             )
 
         # Select, Vaddr, Similarity, Confidence, SHA-256
         for col in [
-            MatchColumns.SELECT.value,
-            MatchColumns.VIRTUAL_ADDRESS.value,
-            MatchColumns.SIMILARITY.value,
-            MatchColumns.CONFIDENCE.value,
-            MatchColumns.MATCHED_BINARY_HASH.value,
+            MatchColumns.SELECT,
+            MatchColumns.VIRTUAL_ADDRESS,
+            MatchColumns.SIMILARITY,
+            MatchColumns.CONFIDENCE,
+            MatchColumns.MATCHED_BINARY_HASH,
         ]:
             table.resizeColumnToContents(col)
         # Current Name, Matched Func Name, Matched Binary Name
         for col in [
-            MatchColumns.FUNC_NAME.value,
-            MatchColumns.MATCHED_NAME.value,
-            MatchColumns.MATCHED_BINARY_NAME.value,
+            MatchColumns.FUNC_NAME,
+            MatchColumns.MATCHED_NAME,
+            MatchColumns.MATCHED_BINARY_NAME,
         ]:
             table.setColumnWidth(col, 250)
         # allow these to word wrap
@@ -1009,12 +1011,16 @@ class MatchingDialog(DialogBase):
         table.blockSignals(False)
         table.setUpdatesEnabled(True)
 
-    def display_matching_results_multiple_functions(self, query: str = ""):
+    def display_matching_results_multiple_functions(self, query: str = "") -> None:
         """Special handling for multi-function ANN results. (One result per function)"""
-        table: QtWidgets.QTableWidget = self.ui.tableResults
+        table: QtWidgets.QTableWidget = self.ui.tableResults # type: ignore
+
+        if self.matching_results is None:
+            logger.error("unable to display function matching results as no results received from platform")
+            return
 
         # Columns
-        labels = [
+        labels: list[str] = [
             "Select",
             "Virtual Address",
             "Function Name",
@@ -1034,106 +1040,114 @@ class MatchingDialog(DialogBase):
         table.setWordWrap(True)
         table.horizontalHeader().setVisible(True)
 
-        filtered_funcs: List[FunctionMatch] = []
+        def filter_functions(functions: list[FunctionMatch], query: str) -> list[FunctionMatch]:
+            filtered_funcs: list[FunctionMatch] = []
 
-        for r in self.matching_results.results:
-            if query:
-                matched_function = r.matched_functions[0] if r.matched_functions else None
-                if query in self.matching_service.function_id_to_local_name(r.function_id) or (
-                    matched_function
-                    and (
-                        query in matched_function.function_name
-                        or query in (matched_function.mangled_name or "")
-                        or query in matched_function.binary_name
-                    )
-                ):
-                    filtered_funcs.append(r)
-            else:
-                filtered_funcs.append(r)
+            for func in functions:
+                if not query:
+                    filtered_funcs.append(func)
+                    continue
 
-        for row, r in enumerate(filtered_funcs):
+                local_func_name: str | None = self.matching_service.function_id_to_local_name(func.function_id) 
+
+                if local_func_name and query in local_func_name:
+                    filtered_funcs.append(func)
+                    continue
+                
+                if len(func.matched_functions) > 0:
+                    closest_match: MatchedFunction = func.matched_functions[0]
+
+                    if query in closest_match.function_name or query in closest_match.mangled_name or query in closest_match.binary_name:
+                        filtered_funcs.append(func)
+                    
+            return filtered_funcs
+
+        filtered_funcs: list[FunctionMatch] = filter_functions(self.matching_results.results, query)
+        for row, result in enumerate(filtered_funcs):
+            if len(result.matched_functions) == 0:
+                continue
+
+            matched_function: MatchedFunction = result.matched_functions[0]
+            self.local_func_id_to_remote_func_id[result.function_id] = matched_function.function_id
+            self.matched_func_to_original_ea[matched_function.function_id] = self._func_map[str(result.function_id)]
+
             # Column 0: checkbox
-            c0 = QtWidgets.QTableWidgetItem("")
-            c0.setFlags(
-                c0.flags()
-                | QtCore.Qt.ItemIsUserCheckable
-                | QtCore.Qt.ItemIsSelectable
-                | QtCore.Qt.ItemIsEnabled
+            checkbox = QtWidgets.QTableWidgetItem("")
+            checkbox.setFlags(
+                checkbox.flags()
+                | QtCore.Qt.ItemFlag.ItemIsUserCheckable
+                | QtCore.Qt.ItemFlag.ItemIsSelectable
+                | QtCore.Qt.ItemFlag.ItemIsEnabled
             )
-            c0.setCheckState(
-                QtCore.Qt.Checked
-                if r.function_id in self._selected_matching_items
-                else QtCore.Qt.Unchecked
+            checkbox.setCheckState(
+                QtCore.Qt.CheckState.Checked
+                if result.function_id in self._selected_matching_items
+                else QtCore.Qt.CheckState.Unchecked
             )
-            c0.setData(QtCore.Qt.UserRole, r.function_id)
-            table.setItem(row, MatchColumns.SELECT.value, c0)
+            checkbox.setData(QtCore.Qt.ItemDataRole.UserRole, result.function_id)
+            table.setItem(row, MatchColumns.SELECT, checkbox)
 
             # Column 1: Virtual Address
             table.setItem(
                 row,
-                MatchColumns.VIRTUAL_ADDRESS.value,
-                QtWidgets.QTableWidgetItem(hex(self._func_map[str(r.function_id)])),
+                MatchColumns.VIRTUAL_ADDRESS,
+                QtWidgets.QTableWidgetItem(hex(self._func_map[str(result.function_id)])),
             )
 
             # Column 2: Function Name
+            function_name: str = self.matching_service.function_id_to_local_name(result.function_id) or ""
             table.setItem(
                 row,
-                MatchColumns.FUNC_NAME.value,
+                MatchColumns.FUNC_NAME,
                 QtWidgets.QTableWidgetItem(
-                    self.matching_service.function_id_to_local_name(r.function_id)
+                    function_name
                 ),
             )
-
-            matched_function: MatchedFunction = (
-                r.matched_functions[0] if r.matched_functions else None
-            )
-
-            self.local_func_id_to_remote_func_id[r.function_id] = matched_function.function_id
-            self.matched_func_to_original_ea[matched_function.function_id] = self._func_map[str(r.function_id)]
 
             # Column 3: Matched Name
             table.setItem(
                 row,
-                MatchColumns.MATCHED_NAME.value,
+                MatchColumns.MATCHED_NAME,
                 QtWidgets.QTableWidgetItem(matched_function.function_name),
             )
 
             # Column 4: Similarity
             similarity_item = QtWidgets.QTableWidgetItem()
-            similarity_item.setData(QtCore.Qt.DisplayRole, matched_function.similarity)
-            table.setItem(row, MatchColumns.SIMILARITY.value, similarity_item)
+            similarity_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, matched_function.similarity)
+            table.setItem(row, MatchColumns.SIMILARITY, similarity_item)
+
             # Column 5: Confidence
             confidence_item = QtWidgets.QTableWidgetItem()
-            confidence_item.setData(QtCore.Qt.DisplayRole, matched_function.confidence)
-            table.setItem(row, MatchColumns.CONFIDENCE.value, confidence_item)
+            confidence_item.setData(QtCore.Qt.ItemDataRole.DisplayRole, matched_function.confidence)
+            table.setItem(row, MatchColumns.CONFIDENCE, confidence_item)
 
             # Column 7: Matched Hash
             table.setItem(
                 row,
-                MatchColumns.MATCHED_BINARY_HASH.value,
+                MatchColumns.MATCHED_BINARY_HASH,
                 QtWidgets.QTableWidgetItem(matched_function.sha_256_hash),
             )
 
             # Column 6: Matched Binary
             table.setItem(
                 row,
-                MatchColumns.MATCHED_BINARY_NAME.value,
+                MatchColumns.MATCHED_BINARY_NAME,
                 QtWidgets.QTableWidgetItem(matched_function.binary_name),
             )
 
         for col in [
-            MatchColumns.SELECT.value,
-            MatchColumns.VIRTUAL_ADDRESS.value,
-            MatchColumns.SIMILARITY.value,
-            MatchColumns.CONFIDENCE.value,
-            MatchColumns.MATCHED_BINARY_HASH.value,
+            MatchColumns.SELECT,
+            MatchColumns.VIRTUAL_ADDRESS,
+            MatchColumns.SIMILARITY,
+            MatchColumns.CONFIDENCE,
+            MatchColumns.MATCHED_BINARY_HASH,
         ]:
             table.resizeColumnToContents(col)
 
         for col in [
-            MatchColumns.FUNC_NAME.value,
-            MatchColumns.MATCHED_NAME.value,
-            MatchColumns.MATCHED_BINARY_NAME.value,
+            MatchColumns.FUNC_NAME,
+            MatchColumns.MATCHED_NAME,
+            MatchColumns.MATCHED_BINARY_NAME,
         ]:
             table.setColumnWidth(col, 250)
 
@@ -1141,17 +1155,17 @@ class MatchingDialog(DialogBase):
         table.setWordWrap(True)
         table.resizeRowsToContents()
 
-        def on_item_changed(item: QtWidgets.QTableWidgetItem):
+        def on_item_changed(item: QtWidgets.QTableWidgetItem) -> None:
             if item.column() != 0:
                 return
-            if item.checkState() != QtCore.Qt.Checked:
-                self._selected_matching_items.discard(item.data(QtCore.Qt.UserRole))
+            if item.checkState() != QtCore.Qt.CheckState.Checked:
+                self._selected_matching_items.discard(item.data(QtCore.Qt.ItemDataRole.UserRole))
                 return
             else:
-                self._selected_matching_items.add(item.data(QtCore.Qt.UserRole))
+                self._selected_matching_items.add(item.data(QtCore.Qt.ItemDataRole.UserRole))
 
             self._selected_matching_items.pop()
-            self._selected_matching_items.add(item.data(QtCore.Qt.UserRole))
+            self._selected_matching_items.add(item.data(QtCore.Qt.ItemDataRole.UserRole))
 
         table.itemChanged.connect(on_item_changed)
 
@@ -1159,8 +1173,36 @@ class MatchingDialog(DialogBase):
         table.blockSignals(False)
         table.setUpdatesEnabled(True)
 
+        def clear_all() -> None:
+            # Block signals to prevent itemChanged from firing for each row
+            table.blockSignals(True)
+
+            for row in range(table.rowCount()):
+                item: QtWidgets.QTableWidgetItem | None = table.item(
+                    row, MatchColumns.SELECT
+                )
+                if item:
+                    item.setCheckState(QtCore.Qt.CheckState.Unchecked)
+
+            table.blockSignals(False)
+
+        def select_all() -> None:
+            # Block signals to prevent itemChanged from firing for each row
+            table.blockSignals(True)
+
+            for row in range(table.rowCount()):
+                item: QtWidgets.QTableWidgetItem | None = table.item(
+                    row, MatchColumns.SELECT
+                )
+                if item:
+                    item.setCheckState(QtCore.Qt.CheckState.Checked)
+
+            table.blockSignals(False)
+
+        self.ui.btnResultClearAll.clicked.connect(clear_all)
+        self.ui.btnResultSelectAll.clicked.connect(select_all)
+
         print(f"Multiple: Displayed {len(self.matching_results.results)} ANN results")
-        pass
 
     def enqueue_renames(self):
         # Read checked rows from results table
@@ -1169,10 +1211,10 @@ class MatchingDialog(DialogBase):
         try:
             rename_list: List[RenameInput] = []
             for r in range(table.rowCount()):
-                item = table.item(r, MatchColumns.SELECT.value)
-                if item is not None and item.checkState() == QtCore.Qt.Checked:
-                    function_id = item.data(QtCore.Qt.UserRole)
-                    matched_item = table.item(r, MatchColumns.MATCHED_NAME.value).text()
+                item = table.item(r, MatchColumns.SELECT)
+                if item is not None and item.checkState() == QtCore.Qt.CheckState.Checked:
+                    function_id = item.data(QtCore.Qt.ItemDataRole.UserRole)
+                    matched_item = table.item(r, MatchColumns.MATCHED_NAME).text()
                     vaddr = self.rename_service.function_id_to_vaddr(function_id)
                     print(f"RENAME: Function ID {function_id} -> {matched_item}")
                     rename_list.append(
@@ -1192,7 +1234,7 @@ class MatchingDialog(DialogBase):
         selected_matches: dict[int, int] = {}
         table = self.ui.tableResults
         for r in range(table.rowCount()):
-            item = table.item(r, MatchColumns.SELECT.value)
+            item = table.item(r, MatchColumns.SELECT)
             if item and item.checkState() == QtCore.Qt.Checked:
                 local_function_id = item.data(QtCore.Qt.UserRole)
                 remote_function_id: int = self.local_func_id_to_remote_func_id[local_function_id]
