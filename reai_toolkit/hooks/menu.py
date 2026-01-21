@@ -1,6 +1,6 @@
 from importlib.metadata import version
 
-import ida_kernwin # type: ignore
+import ida_kernwin  # type: ignore
 
 from reai_toolkit.app.coordinator import Coordinator
 
@@ -67,7 +67,9 @@ class AnalyseH(ida_kernwin.action_handler_t):
 
     def activate(self, ctx) -> int:
         self.coordinator.create_analysisc.run_dialog()
-        self.analysis_id = self.coordinator.app.upload_service.safe_get_analysis_id_local()
+        self.analysis_id = (
+            self.coordinator.app.upload_service.safe_get_analysis_id_local()
+        )
         return 1
 
     def update(self, ctx) -> int:
@@ -85,7 +87,9 @@ class SyncH(ida_kernwin.action_handler_t):
 
     def activate(self, ctx) -> int:
         self.coordinator.sync_analysisc.sync_analysis()
-        self.analysis_id = self.coordinator.app.upload_service.safe_get_analysis_id_local()
+        self.analysis_id = (
+            self.coordinator.app.upload_service.safe_get_analysis_id_local()
+        )
         return 1
 
     def update(self, ctx) -> int:
@@ -104,7 +108,9 @@ class DetachAnalysisH(ida_kernwin.action_handler_t):
 
     def activate(self, ctx) -> int:
         self.coordinator.detachc.run_dialog()
-        self.analysis_id = self.coordinator.app.analysis_sync_service.safe_get_analysis_id_local()
+        self.analysis_id = (
+            self.coordinator.app.analysis_sync_service.safe_get_analysis_id_local()
+        )
         return 1
 
     def update(self, ctx) -> int:
@@ -121,7 +127,9 @@ class ViewAnalysisH(ida_kernwin.action_handler_t):
 
     def activate(self, ctx) -> int:
         self.coordinator.redirect_analysis_portal()
-        self.binary_id = self.coordinator.app.analysis_sync_service.safe_get_binary_id_local()
+        self.binary_id = (
+            self.coordinator.app.analysis_sync_service.safe_get_binary_id_local()
+        )
         return 1
 
     def update(self, ctx) -> int:
@@ -138,7 +146,9 @@ class ExistingAnalysesH(ida_kernwin.action_handler_t):
 
     def activate(self, ctx) -> int:
         self.coordinator.existing_analysisc.run_dialog()
-        self.analysis_id = self.coordinator.app.upload_service.safe_get_analysis_id_local()
+        self.analysis_id = (
+            self.coordinator.app.upload_service.safe_get_analysis_id_local()
+        )
         return 1
 
     def update(self, ctx) -> int:
@@ -231,12 +241,16 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         _safe_detach(aid, MENU_ROOT)
         _safe_unregister(aid)
 
-    ida_kernwin.register_action(ida_kernwin.action_desc_t("reai:ping", "Ping", _handlers["ping"]))
+    ida_kernwin.register_action(
+        ida_kernwin.action_desc_t("reai:ping", "Ping", _handlers["ping"])
+    )
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t("reai:about", "About", _handlers["about"])
     )
 
-    ida_kernwin.register_action(ida_kernwin.action_desc_t("reai:help", "Help", _handlers["help"]))
+    ida_kernwin.register_action(
+        ida_kernwin.action_desc_t("reai:help", "Help", _handlers["help"])
+    )
 
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t("reai:auth", "Configure", _handlers["auth"])
@@ -245,7 +259,7 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t("reai:analyse", "Create new", _handlers["analyse"])
     )
-    
+
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t(
             "reai:existing_analysis",
@@ -255,13 +269,17 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     )
     #
     ida_kernwin.register_action(
-        ida_kernwin.action_desc_t("reai:detatch_analysis", "Detach", _handlers["detatch_analysis"])
+        ida_kernwin.action_desc_t(
+            "reai:detatch_analysis", "Detach", _handlers["detatch_analysis"]
+        )
     )
-    
+
     ida_kernwin.register_action(
-        ida_kernwin.action_desc_t("reai:sync_and_poll", "Check status", _handlers["sync_and_poll"])
+        ida_kernwin.action_desc_t(
+            "reai:sync_and_poll", "Check status", _handlers["sync_and_poll"]
+        )
     )
-    
+
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t(
             "reai:view_analysis", "View in portal", _handlers["view_analysis"]
@@ -269,7 +287,9 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     )
 
     ida_kernwin.register_action(
-        ida_kernwin.action_desc_t("reai:autounstrip", "Auto Unstrip", _handlers["autounstrip"])
+        ida_kernwin.action_desc_t(
+            "reai:autounstrip", "Auto Unstrip", _handlers["autounstrip"]
+        )
     )
 
     ida_kernwin.register_action(
@@ -302,8 +322,14 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         MENU_ROOT + "Function Matching", "reai:function_match", ida_kernwin.SETMENU_APP
     )
 
-    ida_kernwin.attach_action_to_menu(MENU_ROOT + "Configure", "reai:auth", ida_kernwin.SETMENU_APP)
-    ida_kernwin.attach_action_to_menu(MENU_ROOT + "Help", "reai:help", ida_kernwin.SETMENU_APP)
-    ida_kernwin.attach_action_to_menu(MENU_ROOT + "About", "reai:about", ida_kernwin.SETMENU_APP)
+    ida_kernwin.attach_action_to_menu(
+        MENU_ROOT + "Configure", "reai:auth", ida_kernwin.SETMENU_APP
+    )
+    ida_kernwin.attach_action_to_menu(
+        MENU_ROOT + "Help", "reai:help", ida_kernwin.SETMENU_APP
+    )
+    ida_kernwin.attach_action_to_menu(
+        MENU_ROOT + "About", "reai:about", ida_kernwin.SETMENU_APP
+    )
     ida_kernwin.refresh_idaview_anyway()
     return _handlers
