@@ -8,7 +8,6 @@ from loguru import logger
 from reai_toolkit.app.app import App
 from reai_toolkit.app.services.rename.schema import RenameInput
 
-
 # ---- Add this: a small event router ----
 def _is_func_ea(ea: int) -> bool:
     return ida_funcs.get_func(ea) is not None
