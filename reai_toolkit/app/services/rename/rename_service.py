@@ -4,7 +4,7 @@ import time
 from typing import List, Optional
 
 import ida_kernwin
-from loguru import logger
+
 from revengai import (
     Configuration,
     FunctionRenameMap,
@@ -105,7 +105,7 @@ class RenameService(IThreadService):
         new_func_list = []
         for function in function_list:
             # Rename local function
-            success = self.safe_set_name(ea=function.ea, new_name=function.new_name)
+            success: bool = self.safe_set_name(ea=function.ea, new_name=function.new_name)
 
             if not success:
                 total_errors += 1
@@ -130,6 +130,7 @@ class RenameService(IThreadService):
                             ea=func.ea, new_name=func.new_name, function_id=function_id
                         )
                     )
+            
 
         if not matched_func_list:
             return total_errors
@@ -154,6 +155,7 @@ class RenameService(IThreadService):
                     new_name=demangle(func.new_name),
                 )
             )
+            self.tag_function_as_renamed(func.new_name)
 
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             functions_api = FunctionsRenamingHistoryApi(api_client=api_client)
