@@ -1,6 +1,6 @@
 import threading
 import time
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 from loguru import logger
 from revengai import (
@@ -8,7 +8,7 @@ from revengai import (
     FunctionMapping,
     FunctionsAIDecompilationApi,
 )
-from revengai.models import GetAiDecompilationTask
+from revengai.models.get_ai_decompilation_task import GetAiDecompilationTask
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -16,16 +16,19 @@ from reai_toolkit.app.interfaces.thread_service import IThreadService
 
 
 class AiDecompService(IThreadService):
-    _thread_callback: Callable[..., Any] = None
     _decomp_cache: dict[int, GetAiDecompilationTask] = {}
 
-    def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
+    def __init__(
+        self, netstore_service: SimpleNetStore, sdk_config: Configuration
+    ) -> None:
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
+        self._thread_callback: Callable[[GenericApiReturn], None] | None = None
 
     def call_callback(
         self, generic_return: GenericApiReturn[GetAiDecompilationTask]
     ) -> None:
-        self._thread_callback(generic_return)
+        if self._thread_callback:
+            self._thread_callback(generic_return)
 
     def thread_in_progress(self) -> bool:
         """
@@ -50,18 +53,17 @@ class AiDecompService(IThreadService):
             args=(ea,),
         )
 
-    def _get_function_id(self, start_ea: int) -> Optional[int]:
-        function_map: FunctionMapping = self.safe_get_function_mapping_local()
+    def _get_function_id(self, start_ea: int) -> int | None:
+        function_map: FunctionMapping | None = self.safe_get_function_mapping_local()
+        if function_map is None:
+            return
 
-        inverse_function_map = function_map.inverse_function_map
-
-        function_id = inverse_function_map.get(str(int(start_ea)), None)
-
-        return function_id
+        inverse_function_map: dict[str, int] = function_map.inverse_function_map
+        return inverse_function_map.get(str(start_ea))
 
     def _poll_ai_decomp_task(
         self, function_id: int
-    ) -> Optional[GetAiDecompilationTask]:
+    ) -> GetAiDecompilationTask | None:
         """
         Polls the AI decompilation task until completion or failure.
         """
@@ -83,16 +85,15 @@ class AiDecompService(IThreadService):
             response = client.create_ai_decompilation_task(
                 function_id=function_id,
             )
-            return response.status
+            return response.status if response.status is not None else False
 
     def _begin_ai_decomp_task(self, stop_event: threading.Event, start_ea: int) -> None:
         """
         Begins the AI decompilation task for the given function address.
         """
+        function_id: int | None = self._get_function_id(start_ea=start_ea)
 
-        function_id = self._get_function_id(start_ea=start_ea)
-
-        if function_id is None and not stop_event.is_set():
+        if function_id is None:
             self.call_callback(
                 GenericApiReturn[GetAiDecompilationTask](
                     success=True,
@@ -101,7 +102,7 @@ class AiDecompService(IThreadService):
             )
             return
 
-        if function_id in self._decomp_cache and not stop_event.is_set():
+        if function_id in self._decomp_cache:
             self.call_callback(
                 GenericApiReturn[GetAiDecompilationTask](
                     success=True,
@@ -110,19 +111,21 @@ class AiDecompService(IThreadService):
             )
             return
 
-        while not stop_event.is_set():
+        while stop_event.is_set() is False:
             # Sleep between polls without blocking IDA’s UI
-            for _ in range(50):  # 50 * 0.1s = 5s; allows quicker cancellation
+            for _ in range(50):
                 if stop_event.is_set():
                     return
+
                 time.sleep(0.5)
 
-                # Fetch result - if uninistialised or none, begin task
-                response = self.api_request_returning(
-                    fn=lambda: self._poll_ai_decomp_task(function_id=function_id)
+                response: GenericApiReturn[GetAiDecompilationTask] = (
+                    self.api_request_returning(
+                        fn=lambda: self._poll_ai_decomp_task(function_id=function_id)
+                    )
                 )
 
-                if not response.success:
+                if response.success is False or response.data is None:
                     self.call_callback(generic_return=response)
                     return
 
@@ -132,29 +135,30 @@ class AiDecompService(IThreadService):
                     f"RevEng.AI: AI Decompilation progress for function id {function_id}: {data.status}"
                 )
 
-                if data.status == "uninitialised" and not stop_event.is_set():
+                if data.status == "error":
+                    self.call_callback(
+                        GenericApiReturn[GetAiDecompilationTask](
+                            success=False,
+                            error_message="AI Decompilation task failed! Please retry the decompilation.",
+                        )
+                    )
+                    return
+
+                elif data.status == "uninitialised":
                     # Means task not started, so start it
                     response = self.api_request_returning(
                         fn=lambda: self._create_ai_decomp_task(function_id=function_id)
                     )
-                    if not response.success:
+                    if response.success is False:
                         self.call_callback(generic_return=response)
                         return
 
-                elif data.status == "success" and not stop_event.is_set():
+                elif data.status == "success":
                     self._decomp_cache[function_id] = data
                     self.call_callback(
                         GenericApiReturn[GetAiDecompilationTask](
                             success=True,
                             data=data,
-                        )
-                    )
-                    return
-                elif data.status == "error" and not stop_event.is_set():
-                    self.call_callback(
-                        GenericApiReturn[GetAiDecompilationTask](
-                            success=False,
-                            error_message="AI Decompilation task failed! Please retry the decompilation.",
                         )
                     )
                     return
