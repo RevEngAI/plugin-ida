@@ -16,13 +16,12 @@ from reai_toolkit.app.interfaces.thread_service import IThreadService
 
 
 class AiDecompService(IThreadService):
-    _decomp_cache: dict[int, GetAiDecompilationTask] = {}
-
     def __init__(
         self, netstore_service: SimpleNetStore, sdk_config: Configuration
     ) -> None:
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
         self._thread_callback: Callable[[GenericApiReturn], None] | None = None
+        self._decomp_cache: dict[int, GetAiDecompilationTask] = {}
 
     def call_callback(
         self, generic_return: GenericApiReturn[GetAiDecompilationTask]
@@ -61,9 +60,7 @@ class AiDecompService(IThreadService):
         inverse_function_map: dict[str, int] = function_map.inverse_function_map
         return inverse_function_map.get(str(start_ea))
 
-    def _poll_ai_decomp_task(
-        self, function_id: int
-    ) -> GetAiDecompilationTask | None:
+    def _poll_ai_decomp_task(self, function_id: int) -> GetAiDecompilationTask | None:
         """
         Polls the AI decompilation task until completion or failure.
         """
