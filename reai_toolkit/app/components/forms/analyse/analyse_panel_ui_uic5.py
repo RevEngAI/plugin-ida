@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'reai_toolkit/app/components/forms/analyse/analyse_panel_qt5.ui'
+# Form implementation generated from reading ui file 'analyse_panel_qt5.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -18,22 +18,20 @@ class Ui_AuthPanel(object):
         AuthPanel.setMinimumSize(QtCore.QSize(520, 420))
         AuthPanel.setMaximumSize(QtCore.QSize(520, 420))
         AuthPanel.setAutoFillBackground(False)
-        AuthPanel.setStyleSheet(
-            "\n"
-            "    QGroupBox{font-weight:600;margin-top:8px;}\n"
-            "    QGroupBox::title{subcontrol-origin: margin; left: 6px; padding:2px 4px;}\n"
-            "    QLineEdit{border:1px solid #3c3f44;border-radius:6px;padding:6px;}\n"
-            "    QLineEdit:focus{border-color:#5865f2;}\n"
-            "    QPushButton{border:1px solid #3c3f44;border-radius:8px;padding:6px 12px;}\n"
-            "    QPushButton:hover{border-color:#5865f2;}\n"
-            "    #okButton {\n"
-            "      background:rgb(35, 144, 236); color:white; border:0; border-radius:8px; padding:6px 12px;\n"
-            "    }\n"
-            "    #cancelButton {\n"
-            "      background:rgb(153, 12, 25); color:white; border:0; border-radius:8px; padding:6px 12px;\n"
-            "    }\n"
-            "   "
-        )
+        AuthPanel.setStyleSheet("\n"
+"    QGroupBox{font-weight:600;margin-top:8px;}\n"
+"    QGroupBox::title{subcontrol-origin: margin; left: 6px; padding:2px 4px;}\n"
+"    QLineEdit{border:1px solid #3c3f44;border-radius:6px;padding:6px;}\n"
+"    QLineEdit:focus{border-color:#5865f2;}\n"
+"    QPushButton{border:1px solid #3c3f44;border-radius:8px;padding:6px 12px;}\n"
+"    QPushButton:hover{border-color:#5865f2;}\n"
+"    #okButton {\n"
+"      background:rgb(35, 144, 236); color:white; border:0; border-radius:8px; padding:6px 12px;\n"
+"    }\n"
+"    #cancelButton {\n"
+"      background:rgb(153, 12, 25); color:white; border:0; border-radius:8px; padding:6px 12px;\n"
+"    }\n"
+"   ")
         self.rootLayout = QtWidgets.QVBoxLayout(AuthPanel)
         self.rootLayout.setContentsMargins(12, 12, 12, 12)
         self.rootLayout.setSpacing(10)
@@ -49,11 +47,7 @@ class Ui_AuthPanel(object):
         self.logoArea.setMaximumSize(QtCore.QSize(96, 96))
         self.logoArea.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.logoArea.setText("")
-        self.logoArea.setPixmap(
-            QtGui.QPixmap(
-                "reai_toolkit/app/components/forms/analyse/../../resources/reveng_ai_logo.jpg"
-            )
-        )
+        self.logoArea.setPixmap(QtGui.QPixmap("../../resources/reveng_ai_logo.jpg"))
         self.logoArea.setScaledContents(True)
         self.logoArea.setObjectName("logoArea")
         self.headerLayout.addWidget(self.logoArea)
@@ -77,19 +71,13 @@ class Ui_AuthPanel(object):
         self.formLayout = QtWidgets.QFormLayout(self.groupEndpoints)
         self.formLayout.setLabelAlignment(QtCore.Qt.AlignRight)
         self.formLayout.setObjectName("formLayout")
-        spacerItem = QtWidgets.QSpacerItem(
-            1, 1, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum
-        )
+        spacerItem = QtWidgets.QSpacerItem(1, 1, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.formLayout.setItem(0, QtWidgets.QFormLayout.FieldRole, spacerItem)
         self.labelFileName = QtWidgets.QLabel(self.groupEndpoints)
         self.labelFileName.setObjectName("labelFileName")
-        self.formLayout.setWidget(
-            1, QtWidgets.QFormLayout.LabelRole, self.labelFileName
-        )
+        self.formLayout.setWidget(1, QtWidgets.QFormLayout.LabelRole, self.labelFileName)
         self.apiFileName = QtWidgets.QLineEdit(self.groupEndpoints)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.apiFileName.sizePolicy().hasHeightForWidth())
@@ -103,9 +91,7 @@ class Ui_AuthPanel(object):
         self.labelTags.setObjectName("labelTags")
         self.formLayout.setWidget(2, QtWidgets.QFormLayout.LabelRole, self.labelTags)
         self.apiTags = QtWidgets.QLineEdit(self.groupEndpoints)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.apiTags.sizePolicy().hasHeightForWidth())
@@ -117,17 +103,13 @@ class Ui_AuthPanel(object):
         self.formLayout.setWidget(2, QtWidgets.QFormLayout.FieldRole, self.apiTags)
         self.labelDebugFile = QtWidgets.QLabel(self.groupEndpoints)
         self.labelDebugFile.setObjectName("labelDebugFile")
-        self.formLayout.setWidget(
-            3, QtWidgets.QFormLayout.LabelRole, self.labelDebugFile
-        )
+        self.formLayout.setWidget(3, QtWidgets.QFormLayout.LabelRole, self.labelDebugFile)
         self.debugFileLayout = QtWidgets.QHBoxLayout()
         self.debugFileLayout.setContentsMargins(0, 0, 0, 0)
         self.debugFileLayout.setSpacing(6)
         self.debugFileLayout.setObjectName("debugFileLayout")
         self.apiDebugFile = QtWidgets.QLineEdit(self.groupEndpoints)
-        sizePolicy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed
-        )
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.apiDebugFile.sizePolicy().hasHeightForWidth())
@@ -141,9 +123,7 @@ class Ui_AuthPanel(object):
         self.btnBrowseDebug = QtWidgets.QPushButton(self.groupEndpoints)
         self.btnBrowseDebug.setObjectName("btnBrowseDebug")
         self.debugFileLayout.addWidget(self.btnBrowseDebug)
-        self.formLayout.setLayout(
-            3, QtWidgets.QFormLayout.FieldRole, self.debugFileLayout
-        )
+        self.formLayout.setLayout(3, QtWidgets.QFormLayout.FieldRole, self.debugFileLayout)
         self.labelScope = QtWidgets.QLabel(self.groupEndpoints)
         self.labelScope.setObjectName("labelScope")
         self.formLayout.setWidget(4, QtWidgets.QFormLayout.LabelRole, self.labelScope)
@@ -156,22 +136,25 @@ class Ui_AuthPanel(object):
         self.radioButton = QtWidgets.QRadioButton(self.groupEndpoints)
         self.radioButton.setObjectName("radioButton")
         self.horizontalLayout.addWidget(self.radioButton)
-        self.formLayout.setLayout(
-            4, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout
-        )
+        self.formLayout.setLayout(4, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout)
+        self.functionsLabel = QtWidgets.QLabel(self.groupEndpoints)
+        self.functionsLabel.setObjectName("functionsLabel")
+        self.formLayout.setWidget(5, QtWidgets.QFormLayout.LabelRole, self.functionsLabel)
+        self.selectFuncs = QtWidgets.QPushButton(self.groupEndpoints)
+        self.selectFuncs.setMinimumSize(QtCore.QSize(296, 32))
+        self.selectFuncs.setMaximumSize(QtCore.QSize(296, 32))
+        self.selectFuncs.setAutoDefault(False)
+        self.selectFuncs.setObjectName("selectFuncs")
+        self.formLayout.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.selectFuncs)
         self.rootLayout.addWidget(self.groupEndpoints)
         self.linkRow = QtWidgets.QHBoxLayout()
         self.linkRow.setObjectName("linkRow")
-        spacerItem1 = QtWidgets.QSpacerItem(
-            0, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
+        spacerItem1 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.linkRow.addItem(spacerItem1)
         self.rootLayout.addLayout(self.linkRow)
         self.buttonsRow = QtWidgets.QHBoxLayout()
         self.buttonsRow.setObjectName("buttonsRow")
-        spacerItem2 = QtWidgets.QSpacerItem(
-            40, 20, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
+        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.buttonsRow.addItem(spacerItem2)
         self.cancelButton = QtWidgets.QPushButton(AuthPanel)
         self.cancelButton.setObjectName("cancelButton")
@@ -179,9 +162,7 @@ class Ui_AuthPanel(object):
         self.okButton = QtWidgets.QPushButton(AuthPanel)
         self.okButton.setObjectName("okButton")
         self.buttonsRow.addWidget(self.okButton)
-        spacerItem3 = QtWidgets.QSpacerItem(
-            0, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding
-        )
+        spacerItem3 = QtWidgets.QSpacerItem(0, 0, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.buttonsRow.addItem(spacerItem3)
         self.rootLayout.addLayout(self.buttonsRow)
         self.labelFileName.setBuddy(self.apiFileName)
@@ -195,9 +176,7 @@ class Ui_AuthPanel(object):
         _translate = QtCore.QCoreApplication.translate
         AuthPanel.setWindowTitle(_translate("AuthPanel", "RevEng.AI — Connection"))
         self.titleLabel.setText(_translate("AuthPanel", "RevEng.AI — Analysis"))
-        self.subtitleLabel.setText(
-            _translate("AuthPanel", "Analyse your binary with RevEng.AI")
-        )
+        self.subtitleLabel.setText(_translate("AuthPanel", "Analyse your binary with RevEng.AI"))
         self.groupEndpoints.setTitle(_translate("AuthPanel", "Analysis Config"))
         self.labelFileName.setText(_translate("AuthPanel", "File Name"))
         self.apiFileName.setPlaceholderText(_translate("AuthPanel", "File Name"))
@@ -210,5 +189,7 @@ class Ui_AuthPanel(object):
         self.labelScope.setText(_translate("AuthPanel", "Scope"))
         self.radioButton_2.setText(_translate("AuthPanel", "Public"))
         self.radioButton.setText(_translate("AuthPanel", "Private"))
+        self.functionsLabel.setText(_translate("AuthPanel", "Functions"))
+        self.selectFuncs.setText(_translate("AuthPanel", "Select Functions to Upload"))
         self.cancelButton.setText(_translate("AuthPanel", "Cancel"))
         self.okButton.setText(_translate("AuthPanel", "OK"))

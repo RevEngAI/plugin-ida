@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 
 from revengai import AnalysisCreateResponse
 
+from reai_toolkit.app.components.dialogs.analyse_dialog import AnalyseDialog
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.coordinators.poll_status_coordinator import (
     AnalysisStatusCoordinator,
@@ -29,7 +30,7 @@ class CreateAnalysisCoordinator(BaseCoordinator):
         self.analysis_status_coord = analysis_status_coord
 
     def run_dialog(self) -> None:
-        dialog = self.factory.create_analysis(service_callback=self._on_complete)
+        dialog: AnalyseDialog = self.factory.create_analysis(service_callback=self._on_complete)
         # only call open_modal safely on the UI thread
         self.safe_ui_exec(lambda: dialog.open_modal())
         self.safe_refresh()

@@ -335,6 +335,35 @@
         </item>
        </layout>
       </item>
+      <item row="5" column="0">
+       <widget class="QLabel" name="functionsLabel">
+        <property name="text">
+         <string>Functions</string>
+        </property>
+       </widget>
+      </item>
+      <item row="5" column="1">
+       <widget class="QPushButton" name="selectFuncs">
+        <property name="minimumSize">
+         <size>
+          <width>296</width>
+          <height>32</height>
+         </size>
+        </property>
+        <property name="maximumSize">
+         <size>
+          <width>296</width>
+          <height>32</height>
+         </size>
+        </property>
+        <property name="text">
+         <string>Select Functions to Upload</string>
+        </property>
+        <property name="autoDefault">
+         <bool>false</bool>
+        </property>
+       </widget>
+      </item>
      </layout>
     </widget>
    </item>
