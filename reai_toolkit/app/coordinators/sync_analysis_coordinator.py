@@ -24,7 +24,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         super().__init__(app=app, factory=factory, log=log)
 
         self.analysis_sync_service: AnalysisSyncService = analysis_sync_service
-        # TODO: Add function selection dialog as member variable.
+        # TODO: Add SelectFunctionsWindow as member variable from PLU-231
 
     def run_dialog(self) -> None:
         pass
@@ -58,5 +58,5 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         self.safe_refresh()
 
     def _on_receive_function_map(self, func_map: FunctionMapping) -> None:
-        # TODO: Present window for select subset of functions. Use existing window from create analysis.
+        # TODO: Present window for select subset of functions. Use existing SelectFunctionsWindow from PLU-231
         self.analysis_sync_service.start_syncing(func_map, callback=self._on_complete)
