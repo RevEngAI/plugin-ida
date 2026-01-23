@@ -3,6 +3,7 @@ from importlib.metadata import version
 import ida_kernwin  # type: ignore
 
 from reai_toolkit.app.coordinator import Coordinator
+import reai_toolkit.hooks.globals as menu_hook_globals
 
 
 MENU_TITLE: str = "RevEng.AI"
@@ -63,18 +64,14 @@ class AnalyseH(ida_kernwin.action_handler_t):
     def __init__(self, coordinator: Coordinator) -> None:
         super().__init__()
         self.coordinator: Coordinator = coordinator
-        self.analysis_id: int | None = None
 
     def activate(self, ctx) -> int:
         self.coordinator.create_analysisc.run_dialog()
-        self.analysis_id = (
-            self.coordinator.app.upload_service.safe_get_analysis_id_local()
-        )
         return 1
 
     def update(self, ctx) -> int:
         is_authed: bool = self.coordinator.app.auth_service.is_authenticated()
-        if is_authed is False or self.analysis_id is None:
+        if is_authed is False or menu_hook_globals.ANALYSIS_ID is not None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
 
@@ -83,19 +80,15 @@ class SyncH(ida_kernwin.action_handler_t):
     def __init__(self, coordinator: Coordinator) -> None:
         super().__init__()
         self.coordinator: Coordinator = coordinator
-        self.analysis_id: int | None = None
 
     def activate(self, ctx) -> int:
         self.coordinator.sync_analysisc.sync_analysis()
-        self.analysis_id = (
-            self.coordinator.app.upload_service.safe_get_analysis_id_local()
-        )
         return 1
 
     def update(self, ctx) -> int:
         is_authed: bool = self.coordinator.app.auth_service.is_authenticated()
 
-        if is_authed is False or self.analysis_id is None:
+        if is_authed is False or menu_hook_globals.ANALYSIS_ID is None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
 
@@ -104,17 +97,16 @@ class DetachAnalysisH(ida_kernwin.action_handler_t):
     def __init__(self, coordinator: Coordinator) -> None:
         super().__init__()
         self.coordinator: Coordinator = coordinator
-        self.analysis_id: int | None = None
 
     def activate(self, ctx) -> int:
         self.coordinator.detachc.run_dialog()
-        self.analysis_id = (
-            self.coordinator.app.analysis_sync_service.safe_get_analysis_id_local()
-        )
+        menu_hook_globals.ANALYSIS_ID = None
+        menu_hook_globals.BINARY_ID = None
+        menu_hook_globals.MODEL_ID = None
         return 1
 
     def update(self, ctx) -> int:
-        if self.analysis_id is None:
+        if menu_hook_globals.ANALYSIS_ID is None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
 
@@ -123,17 +115,13 @@ class ViewAnalysisH(ida_kernwin.action_handler_t):
     def __init__(self, coordinator: Coordinator) -> None:
         super().__init__()
         self.coordinator: Coordinator = coordinator
-        self.binary_id: int | None = None
 
     def activate(self, ctx) -> int:
         self.coordinator.redirect_analysis_portal()
-        self.binary_id = (
-            self.coordinator.app.analysis_sync_service.safe_get_binary_id_local()
-        )
         return 1
 
     def update(self, ctx) -> int:
-        if self.binary_id is None:
+        if menu_hook_globals.BINARY_ID is None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
 
@@ -142,36 +130,30 @@ class ExistingAnalysesH(ida_kernwin.action_handler_t):
     def __init__(self, coordinator: Coordinator) -> None:
         super().__init__()
         self.coordinator: Coordinator = coordinator
-        self.analysis_id: int | None = None
 
     def activate(self, ctx) -> int:
         self.coordinator.existing_analysisc.run_dialog()
-        self.analysis_id = (
-            self.coordinator.app.upload_service.safe_get_analysis_id_local()
-        )
         return 1
 
     def update(self, ctx) -> int:
         is_authed: bool = self.coordinator.app.auth_service.is_authenticated()
 
-        if is_authed is False or self.analysis_id is not None:
+        if is_authed is False or menu_hook_globals.ANALYSIS_ID is not None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
 
 
 class AutoUnstripH(ida_kernwin.action_handler_t):
-    def __init__(self, coordinator: Coordinator):
+    def __init__(self, coordinator: Coordinator) -> None:
         super().__init__()
         self.coordinator: Coordinator = coordinator
-        self.model_id: int | None = None
 
     def activate(self, ctx) -> int:
         self.coordinator.auto_unstripc.run_dialog()
-        self.model_id = self.coordinator.app.matching_service.safe_get_model_id_local()
         return 1
 
     def update(self, ctx) -> int:
-        if self.model_id is None:
+        if menu_hook_globals.MODEL_ID is None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
 
@@ -180,15 +162,13 @@ class MatchingH(ida_kernwin.action_handler_t):
     def __init__(self, coordinator: Coordinator) -> None:
         super().__init__()
         self.coordinator: Coordinator = coordinator
-        self.model_id: int | None = None
 
     def activate(self, ctx) -> int:
         self.coordinator.matchingc.fetch_functions()
-        self.model_id = self.coordinator.app.matching_service.safe_get_model_id_local()
         return 1
 
     def update(self, ctx) -> int:
-        if self.model_id is None:
+        if menu_hook_globals.MODEL_ID is None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
 
@@ -218,14 +198,14 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         "sync_and_poll": SyncH(coordinator),
         "function_match": MatchingH(coordinator),
         "existing_analysis": ExistingAnalysesH(coordinator),
-        "detatch_analysis": DetachAnalysisH(coordinator),
+        "detach_analysis": DetachAnalysisH(coordinator),
         "view_analysis": ViewAnalysisH(coordinator),
     }
 
     all_aids: list[str] = [
         "reai:analyse",
         "reai:existing_analysis",
-        "reai:detatch_analysis",
+        "reai:detach_analysis",
         "reai:sync_and_poll",
         "reai:view_analysis",
         "reai:autounstrip",
@@ -270,7 +250,7 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     #
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t(
-            "reai:detatch_analysis", "Detach", _handlers["detatch_analysis"]
+            "reai:detach_analysis", "Detach", _handlers["detach_analysis"]
         )
     )
 
@@ -306,7 +286,7 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         MENU_ROOT + "Analysis/", "reai:existing_analysis", ida_kernwin.SETMENU_APP
     )
     ida_kernwin.attach_action_to_menu(
-        MENU_ROOT + "Analysis/", "reai:detatch_analysis", ida_kernwin.SETMENU_APP
+        MENU_ROOT + "Analysis/", "reai:detach_analysis", ida_kernwin.SETMENU_APP
     )
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Analysis/", "reai:sync_and_poll", ida_kernwin.SETMENU_APP

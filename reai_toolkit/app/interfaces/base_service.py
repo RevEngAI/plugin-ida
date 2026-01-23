@@ -9,6 +9,7 @@ from revengai import ApiClient, ApiException, Configuration, FunctionMapping
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.core.utils import parse_exception
+import reai_toolkit.hooks.globals as menu_hook_globals
 
 
 class BaseService:
@@ -53,6 +54,7 @@ class BaseService:
             success = self.netstore_service.put_model_id(model_id=model_id)
 
         kw.execute_sync(_do, kw.MFF_FAST)
+        menu_hook_globals.MODEL_ID = model_id
 
         return success
 
@@ -97,7 +99,7 @@ class BaseService:
             success = self.netstore_service.put_analysis_id(analysis_id=analysis_id)
 
         kw.execute_sync(_do, kw.MFF_FAST)
-
+        menu_hook_globals.ANALYSIS_ID = analysis_id
         return success
 
     def safe_get_analysis_id_local(self) -> Optional[int]:
@@ -119,6 +121,7 @@ class BaseService:
             success = self.netstore_service.put_binary_id(binary_id=binary_id)
 
         kw.execute_sync(_do, kw.MFF_FAST)
+        menu_hook_globals.BINARY_ID = binary_id
 
         return success
 
