@@ -100,6 +100,7 @@ class BaseService:
 
         kw.execute_sync(_do, kw.MFF_FAST)
         menu_hook_globals.ANALYSIS_ID = analysis_id
+        
         return success
 
     def safe_get_analysis_id_local(self) -> Optional[int]:

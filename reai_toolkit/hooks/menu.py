@@ -87,7 +87,6 @@ class SyncH(ida_kernwin.action_handler_t):
 
     def update(self, ctx) -> int:
         is_authed: bool = self.coordinator.app.auth_service.is_authenticated()
-
         if is_authed is False or menu_hook_globals.ANALYSIS_ID is None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
@@ -137,7 +136,6 @@ class ExistingAnalysesH(ida_kernwin.action_handler_t):
 
     def update(self, ctx) -> int:
         is_authed: bool = self.coordinator.app.auth_service.is_authenticated()
-
         if is_authed is False or menu_hook_globals.ANALYSIS_ID is not None:
             return ida_kernwin.AST_DISABLE
         return ida_kernwin.AST_ENABLE
