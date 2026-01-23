@@ -5,14 +5,14 @@ from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
 
+from revengai.models.function_mapping import FunctionMapping
+
 if TYPE_CHECKING:
     from reai_toolkit.app.app import App
     from reai_toolkit.app.factory import DialogFactory
 
 
 class AnalysisSyncCoordinator(BaseCoordinator):
-    analysis_sync_service: AnalysisSyncService
-
     def __init__(
         self,
         *,
@@ -20,10 +20,11 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         factory: "DialogFactory",
         log,
         analysis_sync_service: AnalysisSyncService,
-    ):
+    ) -> None:
         super().__init__(app=app, factory=factory, log=log)
 
-        self.analysis_sync_service = analysis_sync_service
+        self.analysis_sync_service: AnalysisSyncService = analysis_sync_service
+        # TODO: Add function selection dialog as member variable.
 
     def run_dialog(self) -> None:
         pass
@@ -37,7 +38,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
 
     def sync_analysis(self) -> None:
         """Sync the analysis data."""
-        self.analysis_sync_service.start_syncing(thread_callback=self._on_complete)
+        self.analysis_sync_service.get_function_matches(callback=self._on_receive_function_map)
         self.safe_refresh()
 
     def _on_complete(
@@ -55,3 +56,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
             self.safe_error(message=generic_return.error_message)
 
         self.safe_refresh()
+
+    def _on_receive_function_map(self, func_map: FunctionMapping) -> None:
+        # TODO: Present window for select subset of functions. Use existing window from create analysis.
+        self.analysis_sync_service.start_syncing(func_map, callback=self._on_complete)

@@ -67,7 +67,6 @@ class ExistingAnalysesCoordinator(BaseCoordinator):
 
         self.analysis_sync_coord.sync_analysis()
 
-        pass
 
     def is_authed(self) -> bool:
         return self.app.auth_service.is_authenticated()
