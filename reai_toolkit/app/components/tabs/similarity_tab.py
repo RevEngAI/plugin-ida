@@ -16,8 +16,9 @@ TAB_TITLE = "RevEng.AI — Function Similarity"
 class SimilarityTableColumns(IntEnum):
     FUNCTION = 0
     SIMILARITY = 1
-    BINARY = 2
-    DIFF = 3
+    CONFIDENCE = 2
+    BINARY = 3
+    DIFF = 4
 
 
 class ButtonDelegate(QtWidgets.QStyledItemDelegate):
@@ -60,11 +61,12 @@ class ButtonDelegate(QtWidgets.QStyledItemDelegate):
 
 
 class SimilarityTableModel(QtCore.QAbstractTableModel):
-    COLUMNS: list[str] = ["Function", "Similarity", "Binary", ""]
+    COLUMNS: list[str] = ["Function", "Similarity", "Confidence", "Binary", ""]
     
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._data: list[MatchedFunction] = []
+        self._func_id: int | None = None
     
     def rowCount(self, parent=QtCore.QModelIndex()) -> int:
         return len(self._data)
@@ -85,18 +87,16 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
             elif col == SimilarityTableColumns.SIMILARITY:
                 similarity: float = match.similarity or 0.0
                 return f"{similarity:.1f}%"
+            elif col == SimilarityTableColumns.CONFIDENCE:
+                confidence: float = match.confidence or 0.0
+                return f"{confidence:.1f}%"
             elif col == SimilarityTableColumns.BINARY:
                 return match.binary_name
             elif col == SimilarityTableColumns.DIFF:
                 return None  # Button column - handled by delegate
         
         elif role == QtCore.Qt.ItemDataRole.UserRole:
-            # Store function_id for button click handling
-            # You'll need to construct the URL from this
-
-            # TODO: Construct it here, or pass the matched func_id back and get the local_func_id from somewhere cached.
-            url_template: str = f"https://portal.reveng.ai/function/942464108/compare?id={match.function_id}"
-            return match.function_id
+            return f"https://portal.reveng.ai/function/{self._func_id}/compare?id={match.function_id}"
         
         elif role == QtCore.Qt.ItemDataRole.TextAlignmentRole:
             if col == SimilarityTableColumns.SIMILARITY:
@@ -105,10 +105,18 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
         
         elif role == QtCore.Qt.ItemDataRole.ForegroundRole:
             if col == SimilarityTableColumns.SIMILARITY:
-                similarity = match.similarity or match.confidence or 0
-                if similarity >= 0.9:
+                similarity = match.similarity or 0
+                if similarity >= 90:
                     return QtGui.QColor("#2ecc71")  # Green
-                elif similarity >= 0.7:
+                elif similarity >= 70:
+                    return QtGui.QColor("#f39c12")  # Orange
+                else:
+                    return QtGui.QColor("#e74c3c")  # Red
+            elif col == SimilarityTableColumns.CONFIDENCE:
+                confidence = match.confidence or 0
+                if confidence >= 90:
+                    return QtGui.QColor("#2ecc71")  # Green
+                elif confidence >= 70:
                     return QtGui.QColor("#f39c12")  # Orange
                 else:
                     return QtGui.QColor("#e74c3c")  # Red
@@ -121,8 +129,9 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
             return self.COLUMNS[section]
         return None
     
-    def set_data(self, data: list[MatchedFunction]) -> None:
+    def set_data(self, func_id: int, data: list[MatchedFunction]) -> None:
         self.beginResetModel()
+        self._func_id = func_id
         self._data = data
         self.endResetModel()
     
@@ -142,6 +151,7 @@ class SimilarityTab(kw.PluginForm):
         self._model: Optional[SimilarityTableModel] = None
         self._status_label: Optional[QtWidgets.QLabel] = None
         self._current_func_addr: Optional[int] = None
+        self._current_func_id: Optional[int] = None
         self._on_close_callback = on_close_callback
 
     def Create(self, title: str = "") -> Any:
@@ -221,14 +231,14 @@ class SimilarityTab(kw.PluginForm):
             logger.debug(f"Opening URL: {url}")
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
    
-    def _on_fetch_finished(self, func_addr: int, data: list[MatchedFunction]) -> None:
+    def _on_fetch_finished(self, func_id: int, func_addr: int, data: list[MatchedFunction]) -> None:
         """Handle successful API response (called on main thread)."""
         # Ignore results if user has moved to a different function
         if func_addr != self._current_func_addr:
             return
         
         if self._model:
-            self._model.set_data(data)
+            self._model.set_data(func_id, data)
         
         func_name = idaapi.get_func_name(func_addr) or f"sub_{func_addr:X}"
         
@@ -241,7 +251,7 @@ class SimilarityTab(kw.PluginForm):
                 self._status_label.setStyleSheet("color: #888; font-style: italic;")
         
 
-    def update_for_function(self, func_addr: int, data: list[MatchedFunction], force: bool = False) -> None:
+    def update_for_function(self, func_id: int, func_addr: int, data: list[MatchedFunction], force: bool = False) -> None:
         if not force and func_addr == self._current_func_addr:
             return
         
@@ -258,4 +268,4 @@ class SimilarityTab(kw.PluginForm):
         if self._model:
             self._model.clear()
         
-        self._on_fetch_finished(func_addr, data)
+        self._on_fetch_finished(func_id, func_addr, data)

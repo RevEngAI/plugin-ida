@@ -49,32 +49,38 @@ class SimilarityCoordinator(BaseCoordinator):
         if function_id is None:
             return
 
-        # TODO: Handle the case where tab is already opened.
-        # TODO: Ensure that tab remains in focus if already opened, similar to AI Decomp.
+        callback = self._launch_similarity_tab if self._similarity_tab is None else self._update_similarity_tab
         if self._similarity_service.is_worker_running() is False:
             self._similarity_service.fetch_similar_functions(
-                function_id, ea, self._launch_similarity_tab
+                function_id, ea, callback
             )
 
-    def enable_function_tracking(self):
+    def enable_function_tracking(self) -> None:
         if self._hook is None:
             self._hook = FunctionSimilarityHook(self) # type: ignore
             self._hook.hook()
 
-    def disable_function_tracking(self):
+    def disable_function_tracking(self) -> None:
         if self._hook is not None:
             self._hook.unhook()
             self._hook = None
 
-    def _launch_similarity_tab(self, ea, functions: list[MatchedFunction]) -> None:
-        logger.debug("_launch_similarity_tab called")
-
+    def _launch_similarity_tab(self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction]) -> None:
         def _show_tab() -> None:
             self._similarity_tab = SimilarityTab(self._on_pane_closed) # type: ignore
             self._similarity_tab.Create()
-            self._similarity_tab.update_for_function(ea, functions)
+            self._similarity_tab.update_for_function(local_func_id, local_vaddr, functions)
 
         kw.execute_ui_requests([_show_tab])
+    
+    def _update_similarity_tab(self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction]) -> None:
+        def _update_tab() -> None:
+            if self._similarity_tab is None:
+                return
+            
+            self._similarity_tab.update_for_function(local_func_id, local_vaddr, functions)
+
+        kw.execute_ui_requests([_update_tab])
 
     def _on_pane_closed(self) -> None:
         self._similarity_tab = None
@@ -137,7 +143,7 @@ class FunctionSimilarityHook(kw.UI_Hooks):
             )
 
     def _check_debounce(self):
-        now = time.time()
+        now: float = time.time()
 
         # Wait until no changes for the debounce interval
         if self._pending_ea and (now - self._last_change_time) >= (
