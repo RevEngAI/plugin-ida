@@ -68,7 +68,7 @@ class AnalyseDialog(DialogBase):
         logo_path: str | None = self._find_resource(self.base_logo_path)
         if logo_path:
             px: QtGui.QPixmap = QtGui.QPixmap(logo_path)
-            self.ui.logoArea.setPixmap(px) # type: ignore
+            self.ui.logoArea.setPixmap(px)  # type: ignore
 
         self.ui.apiFileName.setText(self.file_name)
 

@@ -23,21 +23,20 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("RevEng.AI — Select Functions")
-        
+
         # Size relative to screen
-        screen = QtWidgets.QApplication.primaryScreen().geometry()
-        width = int(screen.width() * 0.5)
-        height = int(screen.height() * 0.6)
+        screen: QtCore.QRect = QtWidgets.QApplication.primaryScreen().geometry()
+        width = int(screen.width() * 0.4)
+        height = int(screen.height() * 0.5)
         self.resize(width, height)
         self.setMinimumSize(500, 400)
 
         layout = QtWidgets.QVBoxLayout(self)
-        
+
         # Header label - fixed height
         header_label = QtWidgets.QLabel("Select Functions to Analyse")
         header_label.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Fixed
+            QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
         )
         layout.addWidget(header_label)
 
@@ -51,7 +50,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         self.table.setRowCount(len(function_boundaries))
         self.table.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Expanding
+            QtWidgets.QSizePolicy.Policy.Expanding,
         )
 
         headers: list[str] = ["Function", "Virtual Address", "Upload"]
@@ -83,23 +82,20 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
             else:
                 checkbox_item.setCheckState(QtCore.Qt.CheckState.Unchecked)
 
-            self.table.setItem(
-                row, SelectFunctionTableColumns.CHECKBOX, checkbox_item
-            )
+            self.table.setItem(row, SelectFunctionTableColumns.CHECKBOX, checkbox_item)
 
         # Column sizing - make function name column stretch
-        header = self.table.horizontalHeader()
+        header: QtWidgets.QHeaderView = self.table.horizontalHeader()
         header.setSectionResizeMode(
-            SelectFunctionTableColumns.NAME,
-            QtWidgets.QHeaderView.ResizeMode.Stretch
+            SelectFunctionTableColumns.NAME, QtWidgets.QHeaderView.ResizeMode.Stretch
         )
         header.setSectionResizeMode(
             SelectFunctionTableColumns.VADDR,
-            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents,
         )
         header.setSectionResizeMode(
             SelectFunctionTableColumns.CHECKBOX,
-            QtWidgets.QHeaderView.ResizeMode.ResizeToContents
+            QtWidgets.QHeaderView.ResizeMode.ResizeToContents,
         )
 
         # Update "Select All" when individual checkboxes change
@@ -117,6 +113,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         button_layout.addWidget(close_button)
 
         layout.addLayout(button_layout)
+
     def select_function_boundary_subset(
         self, function_boundaries: dict[int, FunctionBoundaryEx]
     ) -> None:
