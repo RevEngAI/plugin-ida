@@ -77,7 +77,6 @@ def collect_symbols_from_ida(inclusive_end: bool = False) -> Optional[Symbols]:
     def _do() -> None:
         base: int = idaapi.get_imagebase() or 0
         funcs: list[FunctionBoundary] = []
-        mangled_funcs: list[dict] = []
 
         plt_section: idaapi.segment_t | None = idaapi.get_segm_by_name(".plt")
 
@@ -99,14 +98,6 @@ def collect_symbols_from_ida(inclusive_end: bool = False) -> Optional[Symbols]:
                     start_address=start_ea,
                     end_address=end_ea,
                 )
-            )
-
-            mangled_funcs.append(
-                {
-                    "mangled_name": mangled_name,
-                    "start_address": start_ea,
-                    "end_address": end_ea,
-                }
             )
 
         nonlocal symbols
