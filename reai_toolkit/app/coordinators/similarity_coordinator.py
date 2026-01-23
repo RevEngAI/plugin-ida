@@ -35,29 +35,33 @@ class SimilarityCoordinator(BaseCoordinator):
 
     def find_similar_functions(self) -> None:
         logger.debug("find_similar_functions called")
-        func_map: FunctionMapping | None = self._similarity_service.safe_get_function_mapping_local()
+        func_map: FunctionMapping | None = (
+            self._similarity_service.safe_get_function_mapping_local()
+        )
         if func_map is None:
             return
-        
+
         inverse_map: dict[str, int] = func_map.inverse_function_map
         ea: int = kw.get_screen_ea()
         current_func: ida_funcs.func_t | None = ida_funcs.get_func(ea)
         if current_func is None:
             return
-        
+
         function_id: int | None = inverse_map.get(str(current_func.start_ea), None)
         if function_id is None:
             return
 
-        callback = self._launch_similarity_tab if self._similarity_tab is None else self._update_similarity_tab
+        callback = (
+            self._launch_similarity_tab
+            if self._similarity_tab is None
+            else self._update_similarity_tab
+        )
         if self._similarity_service.is_worker_running() is False:
-            self._similarity_service.fetch_similar_functions(
-                function_id, ea, callback
-            )
+            self._similarity_service.fetch_similar_functions(function_id, ea, callback)
 
     def enable_function_tracking(self) -> None:
         if self._hook is None:
-            self._hook = FunctionSimilarityHook(self) # type: ignore
+            self._hook = FunctionSimilarityHook(self)  # type: ignore
             self._hook.hook()
 
     def disable_function_tracking(self) -> None:
@@ -65,20 +69,28 @@ class SimilarityCoordinator(BaseCoordinator):
             self._hook.unhook()
             self._hook = None
 
-    def _launch_similarity_tab(self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction]) -> None:
+    def _launch_similarity_tab(
+        self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction]
+    ) -> None:
         def _show_tab() -> None:
-            self._similarity_tab = SimilarityTab(self._on_pane_closed) # type: ignore
+            self._similarity_tab = SimilarityTab(self._on_pane_closed)  # type: ignore
             self._similarity_tab.Create()
-            self._similarity_tab.update_for_function(local_func_id, local_vaddr, functions)
+            self._similarity_tab.update_for_function(
+                local_func_id, local_vaddr, functions
+            )
 
         kw.execute_ui_requests([_show_tab])
-    
-    def _update_similarity_tab(self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction]) -> None:
+
+    def _update_similarity_tab(
+        self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction]
+    ) -> None:
         def _update_tab() -> None:
             if self._similarity_tab is None:
                 return
-            
-            self._similarity_tab.update_for_function(local_func_id, local_vaddr, functions)
+
+            self._similarity_tab.update_for_function(
+                local_func_id, local_vaddr, functions
+            )
 
         kw.execute_ui_requests([_update_tab])
 
@@ -91,7 +103,9 @@ class SimilarityCoordinator(BaseCoordinator):
 
 
 class FunctionSimilarityHook(kw.UI_Hooks):
-    def __init__(self, coordinator: SimilarityCoordinator, debounce_ms: int = 200) -> None:
+    def __init__(
+        self, coordinator: SimilarityCoordinator, debounce_ms: int = 200
+    ) -> None:
         super().__init__()
         self.coordinator: SimilarityCoordinator = coordinator
         self._debounce_ms = debounce_ms
@@ -154,7 +168,9 @@ class FunctionSimilarityHook(kw.UI_Hooks):
             self._timer_id = None
             self._last_func_start = ea
 
-            logger.debug(f"[FunctionSimilarityHook] Function changed (debounced): {hex(ea)}")
+            logger.debug(
+                f"[FunctionSimilarityHook] Function changed (debounced): {hex(ea)}"
+            )
 
             try:
                 self.coordinator.find_similar_functions()

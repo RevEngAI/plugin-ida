@@ -23,28 +23,36 @@ class SimilarityTableColumns(IntEnum):
 
 class ButtonDelegate(QtWidgets.QStyledItemDelegate):
     clicked = QtCore.Signal(QtCore.QModelIndex)
-    
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._pressed_index = None
-    
-    def paint(self, painter: QtGui.QPainter, option: QtWidgets.QStyleOptionViewItem, 
-              index: QtCore.QModelIndex) -> None:
+
+    def paint(
+        self,
+        painter: QtGui.QPainter,
+        option: QtWidgets.QStyleOptionViewItem,
+        index: QtCore.QModelIndex,
+    ) -> None:
         button_option = QtWidgets.QStyleOptionButton()
         button_option.rect = option.rect.adjusted(4, 4, -4, -4)
         button_option.text = "View"
         button_option.state = QtWidgets.QStyle.State_Enabled
-        
+
         if self._pressed_index == index:
             button_option.state |= QtWidgets.QStyle.State_Sunken
-        
+
         QtWidgets.QApplication.style().drawControl(
             QtWidgets.QStyle.CE_PushButton, button_option, painter
         )
-    
-    def editorEvent(self, event: QtCore.QEvent, model: QtCore.QAbstractItemModel,
-                    option: QtWidgets.QStyleOptionViewItem, 
-                    index: QtCore.QModelIndex) -> bool:
+
+    def editorEvent(
+        self,
+        event: QtCore.QEvent,
+        model: QtCore.QAbstractItemModel,
+        option: QtWidgets.QStyleOptionViewItem,
+        index: QtCore.QModelIndex,
+    ) -> bool:
         if event.type() == QtCore.QEvent.Type.MouseButtonPress:
             self._pressed_index = index
             return True
@@ -54,33 +62,36 @@ class ButtonDelegate(QtWidgets.QStyledItemDelegate):
             self._pressed_index = None
             return True
         return False
-    
-    def sizeHint(self, option: QtWidgets.QStyleOptionViewItem, 
-                 index: QtCore.QModelIndex) -> QtCore.QSize:
+
+    def sizeHint(
+        self, option: QtWidgets.QStyleOptionViewItem, index: QtCore.QModelIndex
+    ) -> QtCore.QSize:
         return QtCore.QSize(60, 30)
 
 
 class SimilarityTableModel(QtCore.QAbstractTableModel):
     COLUMNS: list[str] = ["Function", "Similarity", "Confidence", "Binary", ""]
-    
+
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._data: list[MatchedFunction] = []
         self._func_id: int | None = None
-    
+
     def rowCount(self, parent=QtCore.QModelIndex()) -> int:
         return len(self._data)
-    
+
     def columnCount(self, parent=QtCore.QModelIndex()) -> int:
         return len(self.COLUMNS)
-    
-    def data(self, index: QtCore.QModelIndex, role: int = QtCore.Qt.ItemDataRole.DisplayRole) -> Any:
+
+    def data(
+        self, index: QtCore.QModelIndex, role: int = QtCore.Qt.ItemDataRole.DisplayRole
+    ) -> Any:
         if not index.isValid() or not (0 <= index.row() < len(self._data)):
             return None
-        
+
         match: MatchedFunction = self._data[index.row()]
         col: int = index.column()
-        
+
         if role == QtCore.Qt.ItemDataRole.DisplayRole:
             if col == SimilarityTableColumns.FUNCTION:
                 return match.function_name
@@ -94,15 +105,17 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
                 return match.binary_name
             elif col == SimilarityTableColumns.DIFF:
                 return None  # Button column - handled by delegate
-        
+
         elif role == QtCore.Qt.ItemDataRole.UserRole:
             return f"https://portal.reveng.ai/function/{self._func_id}/compare?id={match.function_id}"
-        
+
         elif role == QtCore.Qt.ItemDataRole.TextAlignmentRole:
             if col == SimilarityTableColumns.SIMILARITY:
                 return QtCore.Qt.AlignmentFlag.AlignCenter
-            return QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
-        
+            return (
+                QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
+            )
+
         elif role == QtCore.Qt.ItemDataRole.ForegroundRole:
             if col == SimilarityTableColumns.SIMILARITY:
                 similarity = match.similarity or 0
@@ -120,21 +133,28 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
                     return QtGui.QColor("#f39c12")  # Orange
                 else:
                     return QtGui.QColor("#e74c3c")  # Red
-        
+
         return None
-    
-    def headerData(self, section: int, orientation: QtCore.Qt.Orientation, 
-                   role: int = QtCore.Qt.ItemDataRole.DisplayRole) -> Any:
-        if orientation == QtCore.Qt.Orientation.Horizontal and role == QtCore.Qt.ItemDataRole.DisplayRole:
+
+    def headerData(
+        self,
+        section: int,
+        orientation: QtCore.Qt.Orientation,
+        role: int = QtCore.Qt.ItemDataRole.DisplayRole,
+    ) -> Any:
+        if (
+            orientation == QtCore.Qt.Orientation.Horizontal
+            and role == QtCore.Qt.ItemDataRole.DisplayRole
+        ):
             return self.COLUMNS[section]
         return None
-    
+
     def set_data(self, func_id: int, data: list[MatchedFunction]) -> None:
         self.beginResetModel()
         self._func_id = func_id
         self._data = data
         self.endResetModel()
-    
+
     def clear(self) -> None:
         self.beginResetModel()
         self._data = []
@@ -143,7 +163,7 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
 
 class SimilarityTab(kw.PluginForm):
     """Dockable view showing similar functions for the currently selected function."""
-    
+
     def __init__(self, on_close_callback: Callable) -> None:
         super().__init__()
         self._parent_w: Optional[QtWidgets.QWidget] = None
@@ -186,38 +206,52 @@ class SimilarityTab(kw.PluginForm):
         self._status_label.setStyleSheet("color: #888; font-style: italic;")
         header_layout.addWidget(self._status_label)
         header_layout.addStretch()
-        
+
         layout.addLayout(header_layout)
 
         # Table view
         self._table = QtWidgets.QTableView(self._parent_w)
         self._model = SimilarityTableModel(self._table)
         self._table.setModel(self._model)
-        
+
         # Configure table appearance
-        self._table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
-        self._table.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self._table.setSelectionBehavior(
+            QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows
+        )
+        self._table.setSelectionMode(
+            QtWidgets.QAbstractItemView.SelectionMode.SingleSelection
+        )
         self._table.setAlternatingRowColors(True)
         self._table.verticalHeader().setVisible(False)
         self._table.horizontalHeader().setStretchLastSection(False)
         self._table.setShowGrid(False)
-        
+
         # Set column widths
         header: QtWidgets.QHeaderView = self._table.horizontalHeader()
-        header.setSectionResizeMode(SimilarityTableColumns.FUNCTION, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(SimilarityTableColumns.SIMILARITY, QtWidgets.QHeaderView.ResizeMode.Fixed)
-        header.setSectionResizeMode(SimilarityTableColumns.BINARY, QtWidgets.QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(SimilarityTableColumns.DIFF, QtWidgets.QHeaderView.ResizeMode.Fixed)
+        header.setSectionResizeMode(
+            SimilarityTableColumns.FUNCTION, QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        header.setSectionResizeMode(
+            SimilarityTableColumns.SIMILARITY, QtWidgets.QHeaderView.ResizeMode.Fixed
+        )
+        header.setSectionResizeMode(
+            SimilarityTableColumns.BINARY, QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+        header.setSectionResizeMode(
+            SimilarityTableColumns.DIFF, QtWidgets.QHeaderView.ResizeMode.Fixed
+        )
         self._table.setColumnWidth(SimilarityTableColumns.SIMILARITY, 80)
         self._table.setColumnWidth(SimilarityTableColumns.DIFF, 70)
-        
+
         # Button delegate for the last column
         button_delegate = ButtonDelegate(self._table)
         button_delegate.clicked.connect(self._on_button_clicked)
-        self._table.setItemDelegateForColumn(SimilarityTableColumns.DIFF, button_delegate)
-        
+        self._table.setItemDelegateForColumn(
+            SimilarityTableColumns.DIFF, button_delegate
+        )
+
         layout.addWidget(self._table)
-        
+
     def OnClose(self, form) -> None:
         self._on_close_callback()
 
@@ -225,47 +259,58 @@ class SimilarityTab(kw.PluginForm):
         """Handle click on the View button."""
         if self._model is None:
             return
-        
+
         url = self._model.data(index, QtCore.Qt.ItemDataRole.UserRole)
         if url:
             logger.debug(f"Opening URL: {url}")
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
-   
-    def _on_fetch_finished(self, func_id: int, func_addr: int, data: list[MatchedFunction]) -> None:
+
+    def _on_fetch_finished(
+        self, func_id: int, func_addr: int, data: list[MatchedFunction]
+    ) -> None:
         """Handle successful API response (called on main thread)."""
         # Ignore results if user has moved to a different function
         if func_addr != self._current_func_addr:
             return
-        
+
         if self._model:
             self._model.set_data(func_id, data)
-        
+
         func_name = idaapi.get_func_name(func_addr) or f"sub_{func_addr:X}"
-        
+
         if self._status_label:
             if data:
-                self._status_label.setText(f"Similar to {func_name} ({len(data)} results)")
+                self._status_label.setText(
+                    f"Similar to {func_name} ({len(data)} results)"
+                )
                 self._status_label.setStyleSheet("color: #ccc;")
             else:
-                self._status_label.setText(f"No similar functions found for {func_name}")
+                self._status_label.setText(
+                    f"No similar functions found for {func_name}"
+                )
                 self._status_label.setStyleSheet("color: #888; font-style: italic;")
-        
 
-    def update_for_function(self, func_id: int, func_addr: int, data: list[MatchedFunction], force: bool = False) -> None:
+    def update_for_function(
+        self,
+        func_id: int,
+        func_addr: int,
+        data: list[MatchedFunction],
+        force: bool = False,
+    ) -> None:
         if not force and func_addr == self._current_func_addr:
             return
-        
+
         self._current_func_addr = func_addr
-        
+
         # Get function name for display
         func_name: str = idaapi.get_func_name(func_addr)
-        
+
         if self._status_label:
             self._status_label.setText(f"Loading similarities for {func_name}...")
             self._status_label.setStyleSheet("color: #888; font-style: italic;")
-        
+
         # Clear table while loading
         if self._model:
             self._model.clear()
-        
+
         self._on_fetch_finished(func_id, func_addr, data)

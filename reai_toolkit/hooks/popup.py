@@ -127,7 +127,7 @@ def _register_function_similarity_action(coordinator: Coordinator):
         kw.unregister_action(SIMILARITY_ACTION_NAME)
     except Exception:
         pass
-    h = FunctionSimilarityViewH(coordinator) # type: ignore
+    h = FunctionSimilarityViewH(coordinator)  # type: ignore
     _HANDLERS[SIMILARITY_ACTION_NAME] = h
     desc = kw.action_desc_t(
         SIMILARITY_ACTION_NAME,
@@ -138,6 +138,7 @@ def _register_function_similarity_action(coordinator: Coordinator):
     )
     kw.register_action(desc)
     return SIMILARITY_ACTION_NAME
+
 
 def build_hooks(coordinator: Coordinator):
     """Attach our action directly to all popups (IDA 9.1 compatible)."""
