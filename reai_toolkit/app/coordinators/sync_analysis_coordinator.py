@@ -1,9 +1,13 @@
 from typing import TYPE_CHECKING
 
+from revengai import Symbols
+
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
+from reai_toolkit.app.components.dialogs.import_functions_dialog import ImportFunctionsWindow, MatchedFunction
+from reai_toolkit.app.core.utils import collect_symbols_from_ida
 
 from revengai.models.function_mapping import FunctionMapping
 
@@ -24,7 +28,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         super().__init__(app=app, factory=factory, log=log)
 
         self.analysis_sync_service: AnalysisSyncService = analysis_sync_service
-        # TODO: Add SelectFunctionsWindow as member variable from PLU-231
+        self._import_funcs_window: ImportFunctionsWindow | None = None
 
     def run_dialog(self) -> None:
         pass
@@ -37,7 +41,27 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         return self.analysis_sync_service.is_worker_running()
 
     def sync_analysis(self) -> None:
-        """Sync the analysis data."""
+        """
+        AnalysisSyncCoordinator.sync_analysis - Entrypoint
+                       |
+                       v
+        AnalysisSyncService.get_function_matches - Query the API for function matches
+                       |
+                       v
+        AnalysisSyncCoordinator._on_receive_function_map - Process the function matches in preparation for presenting in a dialog window
+                       |
+                       v
+        ImportFunctionsWindow.show - Present matches in a dialog window for user to subset
+                       |
+                       v
+        AnalysisSyncCoordinator._execute_sync - Callback wrapper
+                       |
+                       v
+        AnalysisSyncService.start_syncing - Execute renaming and importing of data types for selected matched functions.
+                       |
+                       v
+        AnalysisSyncCoordinator.on_complete - Sync complete
+        """
         self.analysis_sync_service.get_function_matches(callback=self._on_receive_function_map)
         self.safe_refresh()
 
@@ -57,6 +81,26 @@ class AnalysisSyncCoordinator(BaseCoordinator):
 
         self.safe_refresh()
 
-    def _on_receive_function_map(self, func_map: FunctionMapping) -> None:
-        # TODO: Present window for select subset of functions. Use existing SelectFunctionsWindow from PLU-231
-        self.analysis_sync_service.start_syncing(func_map, callback=self._on_complete)
+    def _execute_sync(self, remote_mapping: FunctionMapping) -> None:
+        self.analysis_sync_service.start_syncing(remote_mapping, callback=self._on_complete)
+
+    def _on_receive_function_map(self, remote_mapping: FunctionMapping) -> None:
+        out: dict[int, MatchedFunction] = {}
+
+        symbols: Symbols | None = collect_symbols_from_ida()
+        if symbols is None or symbols.function_boundaries is None:
+            return
+
+        for func_boundary in symbols.function_boundaries:
+            old_name: str = func_boundary.mangled_name
+            start_addr: str = str(func_boundary.start_address)
+            new_name: str | None = remote_mapping.name_map.get(start_addr)
+            if new_name:
+                entry: MatchedFunction = MatchedFunction(old_name=old_name, new_name=new_name, vaddr=func_boundary.start_address, enabled=True)
+                out[func_boundary.start_address] = entry
+
+        importFuncsWindow = ImportFunctionsWindow(
+            out, remote_mapping, self._execute_sync
+        )
+        
+        importFuncsWindow.show()

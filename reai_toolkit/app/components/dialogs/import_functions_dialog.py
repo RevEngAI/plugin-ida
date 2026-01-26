@@ -1,28 +1,33 @@
 from enum import IntEnum
-from typing import TypedDict
+from typing import Callable, TypedDict
 from functools import partial
 
-from revengai.models.function_boundary import FunctionBoundary
 from reai_toolkit.app.core.qt_compat import QtWidgets, QtCore
+from revengai.models.function_mapping import FunctionMapping
 
 
-class SelectFunctionTableColumns(IntEnum):
-    NAME = 0
-    VADDR = 1
-    CHECKBOX = 2
+class ImportFunctionTableColumns(IntEnum):
+    OLD_NAME = 0
+    NEW_NAME = 1
+    VADDR = 2
+    CHECKBOX = 3
 
 
-class FunctionBoundaryEx(TypedDict):
-    boundary: FunctionBoundary
+class MatchedFunction(TypedDict):
+    old_name: str
+    new_name: str
+    vaddr: int
     enabled: bool
 
 
-class SelectFunctionsWindow(QtWidgets.QDialog):
+class ImportFunctionsWindow(QtWidgets.QDialog):
     def __init__(
-        self, function_boundaries: dict[int, FunctionBoundaryEx], parent=None
+        self, matched_functions: dict[int, MatchedFunction], mapping: FunctionMapping, function_sync_callback: Callable[[FunctionMapping], None], parent=None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("RevEng.AI — Select Functions")
+        self._function_sync_callback: Callable[[FunctionMapping], None] = function_sync_callback
+        self._mapping: FunctionMapping = mapping
 
         # Size relative to screen
         screen: QtCore.QRect = QtWidgets.QApplication.primaryScreen().geometry()
@@ -34,7 +39,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
 
         # Header label - fixed height
-        header_label = QtWidgets.QLabel("Select Functions to Analyse")
+        header_label = QtWidgets.QLabel("Select Functions to Import")
         header_label.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed
         )
@@ -47,28 +52,34 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
 
         # Table - expands to fill available space
         self.table = QtWidgets.QTableWidget()
-        self.table.setRowCount(len(function_boundaries))
+        self.table.setRowCount(len(matched_functions))
         self.table.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
         )
 
-        headers: list[str] = ["Function", "Virtual Address", "Upload"]
+        headers: list[str] = ["Old Name", "New Name", "Virtual Address", "Import"]
+
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
 
         # Populate the table
-        for row, item in enumerate(function_boundaries.values()):
-            boundary: FunctionBoundary = item["boundary"]
+        for row, item in enumerate(matched_functions.values()):
             self.table.setItem(
                 row,
-                SelectFunctionTableColumns.NAME,
-                QtWidgets.QTableWidgetItem(boundary.mangled_name),
+                ImportFunctionTableColumns.OLD_NAME,
+                QtWidgets.QTableWidgetItem(item["old_name"]),
             )
             self.table.setItem(
                 row,
-                SelectFunctionTableColumns.VADDR,
-                QtWidgets.QTableWidgetItem(f"0x{boundary.start_address:0x}"),
+                ImportFunctionTableColumns.NEW_NAME,
+                QtWidgets.QTableWidgetItem(item["new_name"]),
+            )
+
+            self.table.setItem(
+                row,
+                ImportFunctionTableColumns.VADDR,
+                QtWidgets.QTableWidgetItem(f"0x{item['vaddr']:0x}")
             )
 
             checkbox_item = QtWidgets.QTableWidgetItem()
@@ -82,19 +93,25 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
             else:
                 checkbox_item.setCheckState(QtCore.Qt.CheckState.Unchecked)
 
-            self.table.setItem(row, SelectFunctionTableColumns.CHECKBOX, checkbox_item)
+            self.table.setItem(row, ImportFunctionTableColumns.CHECKBOX, checkbox_item)
 
         # Column sizing - make function name column stretch
         header: QtWidgets.QHeaderView = self.table.horizontalHeader()
         header.setSectionResizeMode(
-            SelectFunctionTableColumns.NAME, QtWidgets.QHeaderView.ResizeMode.Stretch
+            ImportFunctionTableColumns.OLD_NAME, QtWidgets.QHeaderView.ResizeMode.Stretch
         )
+
         header.setSectionResizeMode(
-            SelectFunctionTableColumns.VADDR,
+            ImportFunctionTableColumns.NEW_NAME, QtWidgets.QHeaderView.ResizeMode.Stretch
+        )
+
+        header.setSectionResizeMode(
+            ImportFunctionTableColumns.VADDR,
             QtWidgets.QHeaderView.ResizeMode.ResizeToContents,
         )
+
         header.setSectionResizeMode(
-            SelectFunctionTableColumns.CHECKBOX,
+            ImportFunctionTableColumns.CHECKBOX,
             QtWidgets.QHeaderView.ResizeMode.ResizeToContents,
         )
 
@@ -108,24 +125,24 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
 
         close_button = QtWidgets.QPushButton("Close")
         close_button.clicked.connect(
-            partial(self.select_function_boundary_subset, function_boundaries)
+            partial(self.subset_matched_functions, matched_functions)
         )
         button_layout.addWidget(close_button)
 
         layout.addLayout(button_layout)
 
-    def select_function_boundary_subset(
-        self, function_boundaries: dict[int, FunctionBoundaryEx]
+    def subset_matched_functions(
+        self, matched_funcs: dict[int, MatchedFunction]
     ) -> None:
         for row in range(self.table.rowCount()):
             item: QtWidgets.QTableWidgetItem | None = self.table.item(
-                row, SelectFunctionTableColumns.CHECKBOX
+                row, ImportFunctionTableColumns.CHECKBOX
             )
             if item is None:
                 continue
 
             vaddr_widget: QtWidgets.QTableWidgetItem | None = self.table.item(
-                row, SelectFunctionTableColumns.VADDR
+                row, ImportFunctionTableColumns.VADDR
             )
             if vaddr_widget is None:
                 continue
@@ -133,14 +150,16 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
             # Convert from hexstring representation to int
             vaddr: int = int(vaddr_widget.text(), 16)
 
-            entry: FunctionBoundaryEx | None = function_boundaries.get(vaddr)
+            entry: MatchedFunction | None = matched_funcs.get(vaddr)
             if entry:
                 entry["enabled"] = item.checkState() == QtCore.Qt.CheckState.Checked
+                if entry["enabled"] is False:
+                    del self._mapping.name_map[str(vaddr)]
 
         self.close()
+        self._function_sync_callback(self._mapping)
 
     def toggle_all(self, state) -> None:
-        # Block signals to prevent itemChanged from firing for each row
         self.table.blockSignals(True)
 
         new_state: QtCore.Qt.CheckState | QtCore.Qt.CheckState = (
@@ -150,7 +169,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         )
         for row in range(self.table.rowCount()):
             item: QtWidgets.QTableWidgetItem | None = self.table.item(
-                row, SelectFunctionTableColumns.CHECKBOX
+                row, ImportFunctionTableColumns.CHECKBOX
             )
             if item:
                 item.setCheckState(new_state)
@@ -159,7 +178,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
 
     def update_select_all_state(self, item: QtWidgets.QTableWidgetItem) -> None:
         # Only respond to checkbox column changes
-        if item.column() != SelectFunctionTableColumns.CHECKBOX:
+        if item.column() != ImportFunctionTableColumns.CHECKBOX:
             return
 
         # Block signals to prevent recursive calls
@@ -169,7 +188,7 @@ class SelectFunctionsWindow(QtWidgets.QDialog):
         checked_count = 0
         for row in range(self.table.rowCount()):
             checkbox: QtWidgets.QTableWidgetItem | None = self.table.item(
-                row, SelectFunctionTableColumns.CHECKBOX
+                row, ImportFunctionTableColumns.CHECKBOX
             )
             if checkbox and checkbox.checkState() == QtCore.Qt.CheckState.Checked:
                 checked_count += 1
