@@ -1,38 +1,146 @@
 from typing import Any, Callable, Optional
-
-import ida_kernwin as kw
 from loguru import logger
 
-# Use IDA's Qt through your compat layer
+import ida_kernwin as kw
+
 from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets
+
+
+class AIDecompView(kw.PluginForm):
+    """
+    Dockable tab using Qt editor + QSyntaxHighlighter.
+    API kept compatible with your previous simplecustviewer_t:
+      - Create(title)    -> shows the form
+      - set_code(text)   -> updates text (UI-thread safe)
+      - focus()          -> activates the tab
+      - OnClose()        -> calls on_closed callback
+    """
+
+    TITLE = "RevEng.AI — Decompiled View"
+
+    def __init__(self, on_closed: Optional[Callable[[], None]] = None) -> None:
+        super().__init__()
+        self._on_closed: Callable[[], None] | None = on_closed
+        self._parent_window: QtWidgets.QWidget | None = None
+        self._editor: QtWidgets.QPlainTextEdit | None = None
+        self._highlighter: CppHighlighter | None = None
+
+    def Create(self, title: Any) -> Any:
+        """Compatibility shim: show the PluginForm like your previous Create()."""
+        flags = getattr(kw.PluginForm, "WOPN_DP_TAB", 0) | getattr(
+            kw.PluginForm, "WOPN_RESTORE", 0
+        )
+        ok = self.Show(str(title) if title else self.TITLE, flags)
+        if not ok:
+            logger.error("Failed to show AI Decompiler tab")
+        else:
+            # Try docking near Hex-Rays
+            try:
+                kw.set_dock_pos(
+                    str(title) if title else self.TITLE, "Pseudocode-A", kw.DP_RIGHT
+                )
+            except Exception:
+                pass
+        return ok
+
+    def OnCreate(self, form) -> None:
+        """Called by IDA when the form is created; build our Qt UI here."""
+        self._parent_window = self.FormToPyQtWidget(form)
+
+        # Layout root
+        layout = QtWidgets.QVBoxLayout(self._parent_window)
+        layout.setContentsMargins(0, 0, 0, 0)
+
+        # Editor
+        self._editor = QtWidgets.QPlainTextEdit(self._parent_window)
+        self._editor.setReadOnly(True)
+        self._editor.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+
+        # Monospace font tuned for IDA
+        font = QtGui.QFont(
+            "Menlo"
+            if QtCore.QOperatingSystemVersion.currentType()
+            == QtCore.QOperatingSystemVersion.OSType.MacOS
+            else "Consolas"
+        )
+        font.setStyleHint(QtGui.QFont.Monospace)
+        font.setFixedPitch(True)
+        font.setPointSize(11)
+        self._editor.setFont(font)
+
+        layout.addWidget(self._editor)
+
+        # Highlighter
+        self._highlighter = CppHighlighter(self._editor.document())
+
+    def OnClose(self, form) -> None:
+        """Called when the user closes the tab."""
+        if callable(self._on_closed):
+            try:
+                self._on_closed()
+            except Exception as e:
+                logger.warning(f"on_closed callback failed: {e}")
+        self._highlighter = None
+        self._editor = None
+        self._parent_window = None
+
+    # --- public API ------------------------------------------------
+    def update_view_content(self, code: str) -> None:
+        def _apply() -> None:
+            if not self._editor:
+                return
+
+            self._editor.blockSignals(True)
+            try:
+                self._editor.setPlainText(code)
+            finally:
+                self._editor.blockSignals(False)
+
+        # ensure we’re on IDA’s UI thread
+        try:
+            kw.execute_sync(_apply, kw.MFF_FAST)
+        except Exception:
+            _apply()  # best-effort fallback
+
+    def clear(self) -> None:
+        self.update_view_content("")
+
+    def focus(self) -> None:
+        if self._parent_window:
+            try:
+                kw.activate_widget(self._parent_window, True)
+            except Exception:
+                pass
 
 
 # -----------------------------
 # Rich C/C++-style highlighter
 # -----------------------------
 class CppHighlighter(QtGui.QSyntaxHighlighter):
-    def __init__(self, parent_doc: QtGui.QTextDocument):
+    def __init__(self, parent_doc: QtGui.QTextDocument) -> None:
         super().__init__(parent_doc)
 
-        self.fmt_kw = self._fmt("#c678dd", bold=True)  # keywords
-        self.fmt_type = self._fmt("#56b6c2")  # builtin types
-        self.fmt_num = self._fmt("#d19a66")  # numbers
-        self.fmt_str = self._fmt("#98c379")  # strings / chars
-        self.fmt_com = self._fmt("#5c6370", italic=True)  # comments
-        self.fmt_fn = self._fmt("#61afef")  # function idents
+        self.fmt_kw: QtGui.QTextCharFormat = self._fmt("#c678dd", bold=True)  # keywords
+        self.fmt_type: QtGui.QTextCharFormat = self._fmt("#56b6c2")  # builtin types
+        self.fmt_num: QtGui.QTextCharFormat = self._fmt("#d19a66")  # numbers
+        self.fmt_str: QtGui.QTextCharFormat = self._fmt("#98c379")  # strings / chars
+        self.fmt_com: QtGui.QTextCharFormat = self._fmt(
+            "#5c6370", italic=True
+        )  # comments
+        self.fmt_fn: QtGui.QTextCharFormat = self._fmt("#61afef")  # function idents
 
-        keywords = """
+        keywords: list[str] = """
             alignas alignof and and_eq asm auto break case catch class compl concept const consteval constexpr constinit
             continue decltype default delete do else enum explicit export extern false for friend goto if inline mutable
             namespace new noexcept not not_eq nullptr operator or or_eq private protected public reflexpr register
             reinterpret_cast requires return sizeof static static_assert static_cast struct switch template this
             thread_local throw true try typedef typeid typename union using virtual volatile while xor xor_eq
-        """.split()
+        """.split()  # type: ignore
 
-        types = """
+        types: list[str] = """
             char char8_t char16_t char32_t wchar_t bool short int long signed unsigned float double void
             size_t ptrdiff_t int8_t int16_t int32_t int64_t uint8_t uint16_t uint32_t uint64_t
-        """.split()
+        """.split()  # type: ignore
 
         self.rules: list[tuple[QtCore.QRegularExpression, QtGui.QTextCharFormat]] = []
         b = r"\b"
@@ -72,17 +180,17 @@ class CppHighlighter(QtGui.QSyntaxHighlighter):
         f = QtGui.QTextCharFormat()
         f.setForeground(QtGui.QColor(color))
         if bold:
-            f.setFontWeight(QtGui.QFont.Bold)
+            f.setFontWeight(QtGui.QFont.Weight.Bold)
         if italic:
             f.setFontItalic(True)
         return f
 
-    def highlightBlock(self, text: str):
+    def highlightBlock(self, text: str) -> None:
         # base token rules
         for rx, fmt in self.rules:
-            it = rx.globalMatch(text)
+            it: QtCore.QRegularExpressionMatchIterator = rx.globalMatch(text)
             while it.hasNext():
-                m = it.next()
+                m: QtCore.QRegularExpressionMatch = it.next()
                 self.setFormat(m.capturedStart(), m.capturedLength(), fmt)
 
         # strings / chars
@@ -114,130 +222,13 @@ class CppHighlighter(QtGui.QSyntaxHighlighter):
             start_idx = 0
 
         while start_idx >= 0:
-            endm = self.end_block.match(text, start_idx)
+            endm: QtCore.QRegularExpressionMatch = self.end_block.match(text, start_idx)
             if endm.hasMatch():
-                end_idx = endm.capturedEnd()
+                end_idx: int = endm.capturedEnd()
                 self.setFormat(start_idx, end_idx - start_idx, self.fmt_com)
                 m = self.start_block.match(text, end_idx)
-                start_idx = m.capturedStart() if m.hasMatch() else -1
+                start_idx: int = m.capturedStart() if m.hasMatch() else -1
             else:
                 self.setFormat(start_idx, len(text) - start_idx, self.fmt_com)
                 self.setCurrentBlockState(1)
                 break
-
-
-# ----------------------------------------
-# Dockable view that hosts the highlighter
-# ----------------------------------------
-class AIDecompView(kw.PluginForm):
-    """
-    Dockable tab using Qt editor + QSyntaxHighlighter.
-    API kept compatible with your previous simplecustviewer_t:
-      - Create(title)    -> shows the form
-      - set_code(text)   -> updates text (UI-thread safe)
-      - focus()          -> activates the tab
-      - OnClose()        -> calls on_closed callback
-    """
-
-    TITLE = "RevEng.AI — Decompiled View"
-
-    def __init__(self, on_closed: Optional[Callable[[], None]] = None) -> None:
-        super().__init__()
-        self._on_closed = on_closed
-        self._parent_w: Optional[QtWidgets.QWidget] = None
-        self._editor: Optional[QtWidgets.QPlainTextEdit] = None
-        self._highlighter: Optional[CppHighlighter] = None
-
-    # --- lifecycle -------------------------------------------------
-
-    def Create(self, title: Any) -> Any:
-        """Compatibility shim: show the PluginForm like your previous Create()."""
-        flags = getattr(kw.PluginForm, "WOPN_DP_TAB", 0) | getattr(
-            kw.PluginForm, "WOPN_RESTORE", 0
-        )
-        ok = self.Show(str(title) if title else self.TITLE, flags)
-        if not ok:
-            logger.error("Failed to show AI Decompiler tab")
-        else:
-            # Try docking near Hex-Rays
-            try:
-                kw.set_dock_pos(
-                    str(title) if title else self.TITLE, "Pseudocode-A", kw.DP_RIGHT
-                )
-            except Exception:
-                pass
-        return ok
-
-    def OnCreate(self, form) -> None:
-        """Called by IDA when the form is created; build our Qt UI here."""
-        self._parent_w = kw.PluginForm.FormToPyQtWidget(form)
-
-        # Layout root
-        layout = QtWidgets.QVBoxLayout(self._parent_w)
-        layout.setContentsMargins(0, 0, 0, 0)
-
-        # Editor
-        self._editor = QtWidgets.QPlainTextEdit(self._parent_w)
-        self._editor.setReadOnly(True)
-        self._editor.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
-
-        # Monospace font tuned for IDA
-        font = QtGui.QFont(
-            "Menlo"
-            if QtCore.QOperatingSystemVersion.currentType()
-            == QtCore.QOperatingSystemVersion.MacOS
-            else "Consolas"
-        )
-        font.setStyleHint(QtGui.QFont.Monospace)
-        font.setFixedPitch(True)
-        font.setPointSize(11)
-        self._editor.setFont(font)
-
-        layout.addWidget(self._editor)
-
-        # Highlighter
-        self._highlighter = CppHighlighter(self._editor.document())
-
-    def OnClose(self, form) -> None:
-        """Called when the user closes the tab."""
-        if callable(self._on_closed):
-            try:
-                self._on_closed()
-            except Exception as e:
-                logger.warning(f"on_closed callback failed: {e}")
-        self._highlighter = None
-        self._editor = None
-        self._parent_w = None
-
-    # --- public API ------------------------------------------------
-
-    def set_code(self, code: Optional[str], *, highlight: bool = True) -> None:
-        """Thread-safe: marshal to UI thread if needed."""
-
-        def _apply():
-            if not self._editor:
-                return
-            self._editor.blockSignals(True)
-            try:
-                self._editor.setPlainText(code or "// No code available.")
-                # Highlighter is attached to the document; nothing extra to do.
-                # (If you ever want to toggle highlighting off, you can
-                # reassign a NullHighlighter or call self._highlighter.setDocument(None).)
-            finally:
-                self._editor.blockSignals(False)
-
-        # ensure we’re on IDA’s UI thread
-        try:
-            kw.execute_sync(_apply, kw.MFF_FAST)
-        except Exception:
-            _apply()  # best-effort fallback
-
-    def clear(self) -> None:
-        self.set_code("")
-
-    def focus(self) -> None:
-        if self._parent_w:
-            try:
-                kw.activate_widget(self._parent_w, True)
-            except Exception:
-                pass
