@@ -239,7 +239,7 @@ class MatchingService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             functions_client = FunctionsCoreApi(api_client)
 
-            result = functions_client.analysis_function_matching(
+            result: FunctionMatchingResponse = functions_client.analysis_function_matching(
                 analysis_id=self.safe_get_analysis_id_local(),
                 analysis_function_matching_request=AnalysisFunctionMatchingRequest(
                     min_similarity=min_similarity,

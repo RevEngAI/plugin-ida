@@ -22,6 +22,9 @@ from reai_toolkit.app.coordinators.poll_status_coordinator import (
 from reai_toolkit.app.coordinators.sync_analysis_coordinator import (
     AnalysisSyncCoordinator,
 )
+from reai_toolkit.app.coordinators.similarity_coordinator import (
+    SimilarityCoordinator
+)
 from reai_toolkit.app.core.qt_compat import QtCore, QtGui
 
 
@@ -89,6 +92,13 @@ class Coordinator(BaseCoordinator):
             log=log,
             matching_service=app.matching_service,
             rename_service=app.rename_service,
+        )
+
+        self.similarityc: SimilarityCoordinator = SimilarityCoordinator(
+            app=app,
+            factory=factory,
+            log=log,
+            similarity_service=app.similarity_service
         )
 
     def run_dialog(self):

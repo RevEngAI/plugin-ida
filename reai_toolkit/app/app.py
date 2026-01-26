@@ -15,6 +15,7 @@ from reai_toolkit.app.services.matching.matching_service import MatchingService
 from reai_toolkit.app.services.rename.rename_service import RenameService
 from reai_toolkit.app.services.upload.upload_service import UploadService
 from reai_toolkit.app.services.data_types.data_types_service import ImportDataTypesService
+from reai_toolkit.app.services.matching.similarity_service import SimilarityService
 
 
 class App:
@@ -60,6 +61,9 @@ class App:
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.matching_service = MatchingService(
+            netstore_service=self.netstore_service, sdk_config=sdk_config
+        )
+        self.similarity_service = SimilarityService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
 
