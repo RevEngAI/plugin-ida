@@ -22,11 +22,17 @@ class MatchedFunction(TypedDict):
 
 class ImportFunctionsWindow(QtWidgets.QDialog):
     def __init__(
-        self, matched_functions: dict[int, MatchedFunction], mapping: FunctionMapping, function_sync_callback: Callable[[FunctionMapping], None], parent=None,
+        self,
+        matched_functions: dict[int, MatchedFunction],
+        mapping: FunctionMapping,
+        function_sync_callback: Callable[[FunctionMapping], None],
+        parent=None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("RevEng.AI — Select Functions")
-        self._function_sync_callback: Callable[[FunctionMapping], None] = function_sync_callback
+        self._function_sync_callback: Callable[[FunctionMapping], None] = (
+            function_sync_callback
+        )
         self._mapping: FunctionMapping = mapping
 
         # Size relative to screen
@@ -79,7 +85,7 @@ class ImportFunctionsWindow(QtWidgets.QDialog):
             self.table.setItem(
                 row,
                 ImportFunctionTableColumns.VADDR,
-                QtWidgets.QTableWidgetItem(f"0x{item['vaddr']:0x}")
+                QtWidgets.QTableWidgetItem(f"0x{item['vaddr']:0x}"),
             )
 
             checkbox_item = QtWidgets.QTableWidgetItem()
@@ -98,11 +104,13 @@ class ImportFunctionsWindow(QtWidgets.QDialog):
         # Column sizing - make function name column stretch
         header: QtWidgets.QHeaderView = self.table.horizontalHeader()
         header.setSectionResizeMode(
-            ImportFunctionTableColumns.OLD_NAME, QtWidgets.QHeaderView.ResizeMode.Stretch
+            ImportFunctionTableColumns.OLD_NAME,
+            QtWidgets.QHeaderView.ResizeMode.Stretch,
         )
 
         header.setSectionResizeMode(
-            ImportFunctionTableColumns.NEW_NAME, QtWidgets.QHeaderView.ResizeMode.Stretch
+            ImportFunctionTableColumns.NEW_NAME,
+            QtWidgets.QHeaderView.ResizeMode.Stretch,
         )
 
         header.setSectionResizeMode(

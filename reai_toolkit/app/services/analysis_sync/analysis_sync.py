@@ -1,5 +1,5 @@
 import threading
-from typing import Any, Callable
+from typing import Callable
 
 import ida_kernwin
 from libbs.decompilers.ida.compat import execute_write, execute_read
@@ -175,7 +175,7 @@ class AnalysisSyncService(IThreadService):
 
         return data
 
-    def _sync_analysis_data(self, _: threading.Event, func_map: FunctionMapping, callback: Callable[[GenericApiReturn[MatchedFunctionSummary]], None]) -> None:
+    def _sync_analysis_data(self, _: threading.Event, func_map: FunctionMapping, on_complete_callback: Callable[[GenericApiReturn[MatchedFunctionSummary]], None]) -> None:
         """
         Syncs the analysis data until completion or failure.
         """
@@ -184,4 +184,4 @@ class AnalysisSyncService(IThreadService):
             return
 
         self.data_types_service.import_data_types({int(k): v for k, v in func_map.function_map.items()})
-        callback(response)
+        on_complete_callback(response)

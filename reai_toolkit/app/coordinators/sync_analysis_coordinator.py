@@ -6,7 +6,10 @@ from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
-from reai_toolkit.app.components.dialogs.import_functions_dialog import ImportFunctionsWindow, MatchedFunction
+from reai_toolkit.app.components.dialogs.import_functions_dialog import (
+    ImportFunctionsWindow,
+    MatchedFunction,
+)
 from reai_toolkit.app.core.utils import collect_symbols_from_ida
 
 from revengai.models.function_mapping import FunctionMapping
@@ -42,27 +45,31 @@ class AnalysisSyncCoordinator(BaseCoordinator):
 
     def sync_analysis(self) -> None:
         """
-        AnalysisSyncCoordinator.sync_analysis - Entrypoint
-                       |
-                       v
-        AnalysisSyncService.get_function_matches - Query the API for function matches
-                       |
-                       v
-        AnalysisSyncCoordinator._on_receive_function_map - Process the function matches in preparation for presenting in a dialog window
-                       |
-                       v
-        ImportFunctionsWindow.show - Present matches in a dialog window for user to subset
-                       |
-                       v
-        AnalysisSyncCoordinator._execute_sync - Callback wrapper
-                       |
-                       v
-        AnalysisSyncService.start_syncing - Execute renaming and importing of data types for selected matched functions.
-                       |
-                       v
-        AnalysisSyncCoordinator.on_complete - Sync complete
+        Sync Flow:
+
+            AnalysisSyncCoordinator.sync_analysis          <- Entrypoint
+                            │
+                            ▼
+            AnalysisSyncService.get_function_matches       <- Query API for function matches
+                            │
+                            ▼
+            AnalysisSyncCoordinator._on_receive_function_map   <- Process matches for dialog
+                            │
+                            ▼
+            ImportFunctionsWindow.show                     <- User selects functions
+                            │
+                            ▼
+            AnalysisSyncCoordinator._execute_sync          <- Callback wrapper
+                            │
+                            ▼
+            AnalysisSyncService.start_syncing              <- Rename functions & import types
+                            │
+                            ▼
+            AnalysisSyncCoordinator.on_complete            <- Notify user of completion
         """
-        self.analysis_sync_service.get_function_matches(callback=self._on_receive_function_map)
+        self.analysis_sync_service.get_function_matches(
+            callback=self._on_receive_function_map
+        )
         self.safe_refresh()
 
     def _on_complete(
@@ -82,7 +89,9 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         self.safe_refresh()
 
     def _execute_sync(self, remote_mapping: FunctionMapping) -> None:
-        self.analysis_sync_service.start_syncing(remote_mapping, callback=self._on_complete)
+        self.analysis_sync_service.start_syncing(
+            remote_mapping, callback=self._on_complete
+        )
 
     def _on_receive_function_map(self, remote_mapping: FunctionMapping) -> None:
         out: dict[int, MatchedFunction] = {}
@@ -96,11 +105,16 @@ class AnalysisSyncCoordinator(BaseCoordinator):
             start_addr: str = str(func_boundary.start_address)
             new_name: str | None = remote_mapping.name_map.get(start_addr)
             if new_name:
-                entry: MatchedFunction = MatchedFunction(old_name=old_name, new_name=new_name, vaddr=func_boundary.start_address, enabled=True)
+                entry: MatchedFunction = MatchedFunction(
+                    old_name=old_name,
+                    new_name=new_name,
+                    vaddr=func_boundary.start_address,
+                    enabled=True,
+                )
                 out[func_boundary.start_address] = entry
 
         importFuncsWindow = ImportFunctionsWindow(
             out, remote_mapping, self._execute_sync
         )
-        
+
         importFuncsWindow.show()
