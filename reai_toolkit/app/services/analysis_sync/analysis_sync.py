@@ -1,5 +1,5 @@
 import threading
-from typing import Any, Callable
+from typing import Callable
 
 import ida_kernwin
 from libbs.decompilers.ida.compat import execute_write, execute_read
@@ -12,7 +12,6 @@ from loguru import logger
 from revengai import (
     AnalysesCoreApi,
     Configuration,
-    FunctionMapping,
 )
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -21,16 +20,13 @@ from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
 from reai_toolkit.app.services.data_types.data_types_service import ImportDataTypesService
 
+from revengai.models.function_mapping import FunctionMapping
+
 
 class AnalysisSyncService(IThreadService):
-    _thread_callback: Callable[..., Any] = None
-
     def __init__(self, data_types_service: ImportDataTypesService, netstore_service: SimpleNetStore, sdk_config: Configuration):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
         self.data_types_service: ImportDataTypesService = data_types_service
-
-    def call_callback(self, generic_return: GenericApiReturn) -> None:
-        self._thread_callback(generic_return)
 
     def thread_in_progress(self) -> bool:
         """
@@ -38,18 +34,41 @@ class AnalysisSyncService(IThreadService):
         """
         return self.is_worker_running()
 
-    def start_syncing(self, thread_callback: Callable[..., Any]) -> None:
+    def start_syncing(self, func_map: FunctionMapping, callback: Callable[[GenericApiReturn[MatchedFunctionSummary]], None]) -> None:
         """
         Starts syncing the analysis data as a background job.
         """
-        analysis_id = self.safe_get_analysis_id_local()
-        self._thread_callback = thread_callback
         # Ensure any existing worker is stopped before starting a new one
         self.stop_worker()
         self.start_worker(
             target=self._sync_analysis_data,
-            args=(analysis_id,),
+            args=(func_map, callback),
         )
+
+    def get_function_matches(self, callback: Callable[[FunctionMapping], None]) -> None:
+        analysis_id: int | None = self.safe_get_analysis_id_local()
+        if analysis_id is None:
+            return
+
+        response = self.api_request_returning(
+            fn=lambda: self._fetch_model_id(analysis_id=analysis_id)
+        )
+
+        if response.success is False:
+            logger.error("failed to retrieve model id")
+            return
+
+        response: GenericApiReturn[FunctionMapping] = self.api_request_returning(
+            fn=lambda: self._fetch_function_map(analysis_id=analysis_id)
+        )
+
+        if response.success is False:
+            logger.error("failed to retrieve function map")
+            return
+        
+        if response.data:
+            callback(response.data)
+
 
     def _fetch_model_id(self, analysis_id: int) -> int:
         """
@@ -156,36 +175,13 @@ class AnalysisSyncService(IThreadService):
 
         return data
 
-    def _sync_analysis_data(self, _: threading.Event, analysis_id: int) -> None:
+    def _sync_analysis_data(self, _: threading.Event, func_map: FunctionMapping, on_complete_callback: Callable[[GenericApiReturn[MatchedFunctionSummary]], None]) -> None:
         """
         Syncs the analysis data until completion or failure.
         """
-
-        # Fetch Model ID - Used for function matching
-        response = self.api_request_returning(
-            fn=lambda: self._fetch_model_id(analysis_id=analysis_id)
-        )
-
-        if not response.success:
-            self.call_callback(generic_return=response)
+        response: GenericApiReturn[MatchedFunctionSummary] = self._safe_match_functions(func_map=func_map)
+        if response.success is False:
             return
 
-        response = self.api_request_returning(
-            fn=lambda: self._fetch_function_map(analysis_id=analysis_id)
-        )
-
-        if not response.success:
-            self.call_callback(generic_return=response)
-            return
-
-        function_mapping: FunctionMapping | None = response.data
-        if function_mapping is None:
-            return
-
-        response = self._safe_match_functions(func_map=function_mapping)
-        if not response.success:
-            self.call_callback(generic_return=response)
-            return
-
-        self.data_types_service.import_data_types({int(k): v for k, v in function_mapping.function_map.items()})
-        self.call_callback(generic_return=response)
+        self.data_types_service.import_data_types({int(k): v for k, v in func_map.function_map.items()})
+        on_complete_callback(response)
