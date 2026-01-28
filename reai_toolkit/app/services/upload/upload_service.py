@@ -1,27 +1,26 @@
+from typing import Callable
 import threading
 from pathlib import Path
 from typing import Optional, Tuple
 
 from loguru import logger
 from revengai import AnalysesCoreApi, Configuration, Symbols
-from revengai.models import (
-    AnalysisCreateRequest,
-    AnalysisCreateResponse,
-    AnalysisScope,
-    UploadFileType,
-)
+from revengai.models.analysis_create_request import AnalysisCreateRequest
+from revengai.models.analysis_create_response import AnalysisCreateResponse
+from revengai.models.analysis_scope import AnalysisScope
+from revengai.models.upload_file_type import UploadFileType
+from revengai.models.base_response_upload_response import BaseResponseUploadResponse
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
-from reai_toolkit.app.core.utils import collect_symbols_from_ida, sha256_file
+from reai_toolkit.app.core.utils import sha256_file
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 
 
 class UploadService(IThreadService):
-    _thread_callback: Optional[callable] = None
-
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
+        self._thread_callback: Optional[Callable[[GenericApiReturn], None]] = None
 
     def start_analysis(
         self,
@@ -31,7 +30,7 @@ class UploadService(IThreadService):
         debug_file_path: str | None = None,
         tags: Optional[list[str]] = None,
         public: bool = True,
-        thread_callback: Optional[callable] = None
+        thread_callback: Optional[Callable[[GenericApiReturn], None]] = None
     ) -> None:
         """
         Starts the analysis as a background job.
@@ -50,7 +49,8 @@ class UploadService(IThreadService):
         )
 
     def call_callback(self, generic_return: GenericApiReturn) -> None:
-        self._thread_callback(generic_return)
+        if self._thread_callback:
+            self._thread_callback(generic_return)
 
     def analyse_file(
         self,
@@ -80,7 +80,7 @@ class UploadService(IThreadService):
             debug_sha256 = sha256_file(dp)
 
         # First, upload the file
-        upload_response = self.upload_user_file(
+        upload_response: GenericApiReturn[BaseResponseUploadResponse] = self.upload_user_file(
             file_path=file_path,
             upload_file_type=UploadFileType.BINARY,  # must match server UploadFileType
             force_overwrite=True,
@@ -126,10 +126,10 @@ class UploadService(IThreadService):
         file: Tuple[str, bytes],
         packed_password: Optional[str] = None,
         force_overwrite: bool = False,
-    ) -> None:
+    ) -> BaseResponseUploadResponse:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
-            analyses_client.upload_file(
+            return analyses_client.upload_file(
                 upload_file_type=UploadFileType(upload_file_type),
                 force_overwrite=force_overwrite,
                 packed_password=packed_password,
@@ -143,7 +143,7 @@ class UploadService(IThreadService):
         upload_file_type: UploadFileType,
         packed_password: Optional[str] = None,
         force_overwrite: bool = False,
-    ) -> GenericApiReturn[None]:
+    ) -> GenericApiReturn[BaseResponseUploadResponse]:
         p = Path(file_path)
         if not p.is_file():
             return GenericApiReturn(success=False, error_message="File does not exist.")
@@ -153,7 +153,7 @@ class UploadService(IThreadService):
         except Exception:
             return GenericApiReturn(success=False, error_message="File does not exist.")
 
-        response = self.api_request_returning(
+        response: GenericApiReturn[BaseResponseUploadResponse] = self.api_request_returning(
             lambda: self._upload_file_req(
                 upload_file_type, (p.name, file_bytes), packed_password, force_overwrite
             )
