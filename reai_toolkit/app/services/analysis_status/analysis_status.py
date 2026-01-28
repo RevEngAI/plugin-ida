@@ -20,7 +20,7 @@ class AnalysisStatusService(IThreadService):
     def call_callback(self, generic_return: GenericApiReturn) -> None:
         self._thread_callback(generic_return)
 
-    def start_polling(self, analysis_id: str, thread_callback: Callable[..., Any]) -> None:
+    def start_polling(self, analysis_id: int, thread_callback: Callable[..., Any]) -> None:
         """
         Starts polling the analysis status as a background job.
         """
