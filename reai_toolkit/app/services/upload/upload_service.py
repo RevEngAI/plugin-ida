@@ -89,9 +89,6 @@ class UploadService(IThreadService):
         if upload_response.success:
             logger.info("RevEng.AI: Uploaded binary file")
         else:
-            logger.error(
-                f"RevEng.AI: Failed to upload binary file: {upload_response.error_message}"
-            )
             self.call_callback(generic_return=upload_response)
             return
 
