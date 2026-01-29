@@ -3,13 +3,17 @@ import json
 from pathlib import Path
 from typing import Optional
 
+from libbs.decompilers.ida.compat import execute_read
+
 import ida_funcs
 import ida_kernwin as kw
 import idaapi
 import idautils
 import idc
+
 from revengai import ApiException, BaseResponse
-from revengai.models import FunctionBoundary, Symbols
+from revengai.models.function_boundary import FunctionBoundary
+from revengai.models.symbols import Symbols
 
 
 def parse_exception(exception: ApiException) -> BaseResponse | None:
@@ -71,38 +75,33 @@ def demangle(mangled_name: str, attr: int = idc.INF_SHORT_DN) -> str:
     return demangled_name if demangled_name else mangled_name
 
 
+@execute_read
 def collect_symbols_from_ida(inclusive_end: bool = False) -> Optional[Symbols]:
-    symbols = None
+    base: int = idaapi.get_imagebase() or 0
+    funcs: list[FunctionBoundary] = []
 
-    def _do() -> None:
-        base: int = idaapi.get_imagebase() or 0
-        funcs: list[FunctionBoundary] = []
+    plt_section: idaapi.segment_t | None = idaapi.get_segm_by_name(".plt")
 
-        plt_section: idaapi.segment_t | None = idaapi.get_segm_by_name(".plt")
+    for start_ea in idautils.Functions():
+        # If this is a .plt stub, we don't want to upload this for analysis.
+        if plt_section and plt_section.start_ea <= start_ea <= plt_section.end_ea:
+            continue
 
-        for start_ea in idautils.Functions():
-            # If this is a .plt stub, we don't want to upload this for analysis.
-            if plt_section and plt_section.start_ea <= start_ea <= plt_section.end_ea:
-                continue
+        f: ida_funcs.func_t = ida_funcs.get_func(start_ea)
+        if not f:
+            continue
 
-            f: ida_funcs.func_t = ida_funcs.get_func(start_ea)
-            if not f:
-                continue
+        end_ea: int = f.end_ea - 1 if inclusive_end else f.end_ea
+        mangled_name: str = idc.get_func_name(start_ea)
 
-            end_ea: int = f.end_ea - 1 if inclusive_end else f.end_ea
-            mangled_name: str = idc.get_func_name(start_ea)
-
-            funcs.append(
-                FunctionBoundary(
-                    mangled_name=mangled_name,
-                    start_address=start_ea,
-                    end_address=end_ea,
-                )
+        funcs.append(
+            FunctionBoundary(
+                mangled_name=mangled_name,
+                start_address=start_ea,
+                end_address=end_ea,
             )
+        )
 
-        nonlocal symbols
-        symbols = Symbols(base_address=int(base), function_boundaries=funcs)
-
-    kw.execute_sync(_do, idaapi.MFF_FAST)
+    symbols = Symbols(base_address=int(base), function_boundaries=funcs)
 
     return symbols

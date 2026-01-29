@@ -1,9 +1,10 @@
 from enum import IntEnum
-from typing import Callable, TypedDict
+from typing import TypedDict
 from functools import partial
 
 from reai_toolkit.app.core.qt_compat import QtWidgets, QtCore
 from revengai.models.function_mapping import FunctionMapping
+from reai_toolkit.app.components.dialogs.base_dialog import DialogBase
 
 
 class ImportFunctionTableColumns(IntEnum):
@@ -20,19 +21,15 @@ class MatchedFunction(TypedDict):
     enabled: bool
 
 
-class ImportFunctionsWindow(QtWidgets.QDialog):
+class ImportFunctionsWindow(DialogBase):
     def __init__(
         self,
         matched_functions: dict[int, MatchedFunction],
         mapping: FunctionMapping,
-        function_sync_callback: Callable[[FunctionMapping], None],
         parent=None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("RevEng.AI — Select Functions")
-        self._function_sync_callback: Callable[[FunctionMapping], None] = (
-            function_sync_callback
-        )
         self._mapping: FunctionMapping = mapping
 
         # Size relative to screen
@@ -164,8 +161,8 @@ class ImportFunctionsWindow(QtWidgets.QDialog):
                 if entry["enabled"] is False:
                     del self._mapping.name_map[str(vaddr)]
 
-        self.close()
-        self._function_sync_callback(self._mapping)
+        self.result_data = self._mapping
+        self.accept()
 
     def toggle_all(self, state) -> None:
         self.table.blockSignals(True)
