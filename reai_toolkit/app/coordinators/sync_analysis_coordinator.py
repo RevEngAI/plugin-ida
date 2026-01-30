@@ -2,6 +2,8 @@ from typing import TYPE_CHECKING
 
 from revengai import Symbols
 
+from libbs.decompilers.ida.compat import execute_ui
+
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
@@ -31,10 +33,19 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         super().__init__(app=app, factory=factory, log=log)
 
         self.analysis_sync_service: AnalysisSyncService = analysis_sync_service
-        self._import_funcs_window: ImportFunctionsWindow | None = None
+        self._attach_to_existing_analysis: bool = False
 
-    def run_dialog(self) -> None:
-        pass
+    @execute_ui
+    def run_dialog(self, matched_functions: dict[int, MatchedFunction], remote_mapping: FunctionMapping) -> None:
+        importFuncsWindow = ImportFunctionsWindow(
+            matched_functions, remote_mapping
+        )
+
+        success: bool
+        subset: FunctionMapping
+        success, subset = importFuncsWindow.open_modal() # type: ignore
+        if success:
+            self._execute_sync(subset)
 
     def is_authed(self) -> bool:
         return self.app.auth_service.is_authenticated()
@@ -43,7 +54,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         """Check if the analysis sync worker is active."""
         return self.analysis_sync_service.is_worker_running()
 
-    def sync_analysis(self) -> None:
+    def sync_analysis(self, attach_to_existing_analysis: bool = False) -> None:
         """
         Sync Flow:
 
@@ -56,7 +67,10 @@ class AnalysisSyncCoordinator(BaseCoordinator):
             AnalysisSyncCoordinator._on_receive_function_map   <- Process matches for dialog
                             │
                             ▼
-            ImportFunctionsWindow.show                     <- User selects functions
+            AnalysisSyncCoordinator.run_dialog             <- Safely launch modal in UI thread
+                            │
+                            ▼
+            ImportFunctionsWindow.open_modal               <- User selects functions
                             │
                             ▼
             AnalysisSyncCoordinator._execute_sync          <- Callback wrapper
@@ -67,6 +81,8 @@ class AnalysisSyncCoordinator(BaseCoordinator):
                             ▼
             AnalysisSyncCoordinator.on_complete            <- Notify user of completion
         """
+        self._attach_to_existing_analysis = attach_to_existing_analysis
+
         self.analysis_sync_service.get_function_matches(
             callback=self._on_receive_function_map
         )
@@ -94,7 +110,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         )
 
     def _on_receive_function_map(self, remote_mapping: FunctionMapping) -> None:
-        out: dict[int, MatchedFunction] = {}
+        matched_functions: dict[int, MatchedFunction] = {}
 
         symbols: Symbols | None = collect_symbols_from_ida()
         if symbols is None or symbols.function_boundaries is None:
@@ -111,10 +127,10 @@ class AnalysisSyncCoordinator(BaseCoordinator):
                     vaddr=func_boundary.start_address,
                     enabled=True,
                 )
-                out[func_boundary.start_address] = entry
+                matched_functions[func_boundary.start_address] = entry
 
-        importFuncsWindow = ImportFunctionsWindow(
-            out, remote_mapping, self._execute_sync
-        )
-
-        importFuncsWindow.show()
+        # If we are syncing from an existing analysis, present a modal to the user to select which functions they wish to import.
+        if self._attach_to_existing_analysis:
+            self.run_dialog(matched_functions, remote_mapping)
+        else:
+            self._execute_sync(remote_mapping)

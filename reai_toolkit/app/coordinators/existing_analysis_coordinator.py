@@ -65,7 +65,7 @@ class ExistingAnalysesCoordinator(BaseCoordinator):
         self.existing_analyses_service.safe_put_binary_id(binary_id=data.binary_id)
         self.safe_refresh()
 
-        self.analysis_sync_coord.sync_analysis()
+        self.analysis_sync_coord.sync_analysis(attach_to_existing_analysis=True)
 
 
     def is_authed(self) -> bool:
