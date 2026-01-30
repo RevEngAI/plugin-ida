@@ -9,7 +9,7 @@ dependencies = [
   "requests>=2.32",
   "loguru>=0.7",
   "pydantic",
-  "revengai>=2.11.0",
+  "revengai>=3.0.0",
   "libbs>=2.16.5",
 ]
 

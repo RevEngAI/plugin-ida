@@ -54,7 +54,7 @@ class AnalysisStatusCoordinator(BaseCoordinator):
         Handle completion of analysis status polling.
         """
         if not generic_return.success:
-            self.safe_error(message=generic_return.error_message)
+            self.safe_error(message=generic_return.error_message or "failed to poll analysis status")
 
         self.analysis_sync_coord.sync_analysis()
 

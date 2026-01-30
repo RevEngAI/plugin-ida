@@ -1,6 +1,4 @@
 from typing import TYPE_CHECKING
-import re
-from http import HTTPStatus
 
 from revengai import AnalysisCreateResponse
 
@@ -14,10 +12,6 @@ from reai_toolkit.app.core.shared_schema import GenericApiReturn
 if TYPE_CHECKING:
     from reai_toolkit.app.app import App
     from reai_toolkit.app.factory import DialogFactory
-
-
-# TODO: PRO-2090 We should query this via an endpoint rather than hard-coding the limit here.
-MAX_SIZE_LIMIT_MB = 10
 
 
 class CreateAnalysisCoordinator(BaseCoordinator):
@@ -43,7 +37,7 @@ class CreateAnalysisCoordinator(BaseCoordinator):
 
     def is_authed(self) -> bool:
         return self.app.auth_service.is_authenticated()
-
+    
     def _on_complete(self, service_response: GenericApiReturn) -> None:
         """Handle completion of analysis creation."""
         if service_response.success and isinstance(service_response.data, AnalysisCreateResponse):
@@ -57,12 +51,4 @@ class CreateAnalysisCoordinator(BaseCoordinator):
             self.analysis_status_coord.poll_status(analysis_id=service_response.data.analysis_id)
         else:
             error_message: str = service_response.error_message or "Unknown error"
-            match: re.Match[str] | None = re.search(r'API Exception: \((\d+)\)', error_message)
-            http_error_code: int | None = int(match.group(1)) if match else None
-            if http_error_code == HTTPStatus.CONTENT_TOO_LARGE:
-                error_message = f"Failed to upload binary due to it exceeding maximum size limit of {MAX_SIZE_LIMIT_MB}MB"
-
             self.safe_error(error_message)
-
-
-

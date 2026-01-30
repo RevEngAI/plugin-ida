@@ -4,7 +4,9 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from loguru import logger
-from revengai import AnalysesCoreApi, Configuration, Symbols
+from revengai import AnalysesCoreApi, BaseResponseConfigResponse, Configuration, Symbols
+from revengai.api.config_api import ConfigApi
+
 from revengai.models.analysis_create_request import AnalysisCreateRequest
 from revengai.models.analysis_create_response import AnalysisCreateResponse
 from revengai.models.analysis_scope import AnalysisScope
@@ -15,6 +17,9 @@ from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.core.utils import sha256_file
 from reai_toolkit.app.interfaces.thread_service import IThreadService
+
+
+MAX_DEFAULT_FILE_SIZE_BYTES = 10 * 1024 * 1024
 
 
 class UploadService(IThreadService):
@@ -117,6 +122,15 @@ class UploadService(IThreadService):
         )
         self.call_callback(generic_return=final_response)
 
+    def _get_max_upload_size(self) -> int:
+        with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+            config_client: ConfigApi = ConfigApi(api_client)
+            response: BaseResponseConfigResponse = config_client.get_config()
+            if response.data:
+                return response.data.max_file_size_bytes
+        
+        return MAX_DEFAULT_FILE_SIZE_BYTES
+
     def _upload_file_req(
         self,
         upload_file_type: UploadFileType,
@@ -146,13 +160,19 @@ class UploadService(IThreadService):
             return GenericApiReturn(success=False, error_message="File does not exist.")
 
         try:
-            file_bytes = p.read_bytes()
+            blob: bytes = p.read_bytes()
         except Exception:
             return GenericApiReturn(success=False, error_message="File does not exist.")
+        
+        max_upload_size_bytes: int = self._get_max_upload_size()
+        
+        if len(blob) > max_upload_size_bytes:
+            max_upload_size_mb: float = max_upload_size_bytes / (1024 * 1024)
+            return GenericApiReturn(success=False, error_message=f"Failed to upload binary due to it exceeding maximum size limit of {max_upload_size_mb}MiB")
 
         response: GenericApiReturn[BaseResponseUploadResponse] = self.api_request_returning(
             lambda: self._upload_file_req(
-                upload_file_type, (p.name, file_bytes), packed_password, force_overwrite
+                upload_file_type, (p.name, blob), packed_password, force_overwrite
             )
         )
 
