@@ -29,8 +29,8 @@ class DetachCoordinator(BaseCoordinator):
 
         self.app.netstore_service.clear_all_ns()
 
-        self.safe_info(msg="Analysis detached successfully.")
-        self.safe_refresh()
+        self.show_info_dialog(msg="Analysis detached successfully.")
+        self.refresh_disassembly_view()
 
     def run_dialog(self) -> None:
         msg = QtWidgets.QMessageBox()

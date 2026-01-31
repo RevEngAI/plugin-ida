@@ -41,13 +41,13 @@ class ExistingAnalysesCoordinator(BaseCoordinator):
         )
 
         if not response.success:
-            self.safe_error(message=response.error_message)
+            self.show_error_dialog(message=response.error_message)
             return
 
         analyses_list: List[AnalysisRecord] = response.data
 
         if not analyses_list:
-            self.safe_info(msg="No existing analyses found for this binary.")
+            self.show_info_dialog(msg="No existing analyses found for this binary.")
             return
 
         ok, data = self.factory.existing_analysis(
@@ -59,11 +59,9 @@ class ExistingAnalysesCoordinator(BaseCoordinator):
 
         data: AnalysisRecord
 
-        self.existing_analyses_service.safe_put_analysis_id(
-            analysis_id=data.analysis_id
-        )
-        self.existing_analyses_service.safe_put_binary_id(binary_id=data.binary_id)
-        self.safe_refresh()
+        self.existing_analyses_service.netstore_service.put_analysis_id(data.analysis_id)
+        self.existing_analyses_service.netstore_service.put_binary_id(data.binary_id)
+        self.refresh_disassembly_view()
 
         self.analysis_sync_coord.sync_analysis(attach_to_existing_analysis=True)
 

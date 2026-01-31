@@ -222,13 +222,13 @@ class UploadService(IThreadService):
         )
 
         if response.success:
-            data: AnalysisCreateResponse = response.data
+            data: AnalysisCreateResponse | None = response.data
+            if data:
+                self.netstore_service.put_analysis_id(data.analysis_id)
+                self.netstore_service.put_binary_id(data.binary_id)
 
-            self.safe_put_analysis_id(data.analysis_id)
-            self.safe_put_binary_id(data.binary_id)
-
-            logger.info(
-                f"RevEng.AI: Analysis started successfully. Analysis ID: {data.analysis_id}, Binary ID: {data.binary_id}"
-            )
+                logger.info(
+                    f"RevEng.AI: Analysis started successfully. Analysis ID: {data.analysis_id}, Binary ID: {data.binary_id}"
+                )
 
         return response

@@ -44,7 +44,7 @@ class SimilarityService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            analysis_id: int | None = self.safe_get_analysis_id_local()
+            analysis_id: int | None = self.netstore_service.get_analysis_id()
             if analysis_id is None:
                 logger.warning(
                     "failed to perform similarity request due to invalid analysis id"

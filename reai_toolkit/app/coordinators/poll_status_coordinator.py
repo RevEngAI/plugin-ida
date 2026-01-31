@@ -47,15 +47,16 @@ class AnalysisStatusCoordinator(BaseCoordinator):
         self.analysis_status_service.start_polling(
             analysis_id=analysis_id, thread_callback=self._on_complete
         )
-        self.safe_refresh()
+        self.refresh_disassembly_view()
 
     def _on_complete(self, generic_return: GenericApiReturn[int]) -> None:
         """
         Handle completion of analysis status polling.
         """
-        if not generic_return.success:
-            self.safe_error(message=generic_return.error_message or "failed to poll analysis status")
+        if generic_return.success is False:
+            self.show_error_dialog(generic_return.error_message or "failed to poll analysis status")
+            return
 
         self.analysis_sync_coord.sync_analysis()
 
-        self.safe_refresh()
+        self.refresh_disassembly_view()

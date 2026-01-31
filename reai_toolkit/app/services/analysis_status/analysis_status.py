@@ -4,7 +4,7 @@ import time
 from typing import Any, Callable
 
 from loguru import logger
-from revengai import AnalysesCoreApi, Configuration, Logs, StatusOutput
+from revengai import AnalysesCoreApi, BaseResponseStatus, Configuration, Logs, StatusOutput
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -40,9 +40,11 @@ class AnalysisStatusService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            analysis_status = analyses_client.get_analysis_status(analysis_id=analysis_id)
-            status = analysis_status.data
-            self.safe_put_analysis_status(status=status.analysis_status)
+            analysis_status: BaseResponseStatus = analyses_client.get_analysis_status(analysis_id=analysis_id)
+            status: StatusOutput | None = analysis_status.data
+            if status:
+                self.netstore_service.put_analysis_status(status.analysis_status)
+
             return analysis_status.data
 
     def _api_get_logs(self, analysis_id: int) -> Logs | None:

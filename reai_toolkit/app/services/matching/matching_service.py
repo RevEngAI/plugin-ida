@@ -60,7 +60,7 @@ class MatchingService(IThreadService):
             return_list: List[CollectionSearchResult] = []
 
             response = search_client.search_collections(
-                model_name=self.safe_get_model_name_local(),
+                model_name=self.netstore_service.get_model_name(),
                 partial_collection_name=text_input,
                 page_size=10,
                 page=1,
@@ -89,7 +89,7 @@ class MatchingService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             search_client = SearchApi(api_client)
 
-            model_name = self.safe_get_model_name_local()
+            model_name: str | None = self.netstore_service.get_model_name()
 
             return_list: List[BinarySearchResult] = []
 
@@ -152,12 +152,9 @@ class MatchingService(IThreadService):
             nonlocal valid_funcs
             try:
                 try:
-                    function_map: FunctionMapping = (
-                        self.safe_get_function_mapping_local()
-                    )
-                    inverse_map = (
-                        getattr(function_map, "inverse_function_map", {}) or {}
-                    )
+                    function_map: FunctionMapping | None = self.netstore_service.get_function_mapping()
+                    if function_map:
+                        inverse_map: dict[str, int] = function_map.inverse_function_map
                 except Exception as e:
                     logger.error(f"Error fetching function mapping: {e}")
                     valid_funcs = []
@@ -168,8 +165,8 @@ class MatchingService(IThreadService):
                         break
 
                     try:
-                        f = ida_funcs.get_func(start_ea)
-                        if not f:
+                        f: ida_funcs.func_t | None = ida_funcs.get_func(start_ea)
+                        if f is None:
                             continue
 
                         key = str(int(start_ea))
@@ -240,7 +237,7 @@ class MatchingService(IThreadService):
             functions_client = FunctionsCoreApi(api_client)
 
             result: FunctionMatchingResponse = functions_client.analysis_function_matching(
-                analysis_id=self.safe_get_analysis_id_local(),
+                analysis_id=self.netstore_service.get_analysis_id(),
                 analysis_function_matching_request=AnalysisFunctionMatchingRequest(
                     min_similarity=min_similarity,
                     results_per_function=nns,
