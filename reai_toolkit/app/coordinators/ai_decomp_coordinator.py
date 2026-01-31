@@ -58,7 +58,7 @@ class AiDecompCoordinator(BaseCoordinator):
     ) -> None:
         if response.success is False:
             if response.error_message:
-                self.safe_error(message=response.error_message)
+                self.show_error_dialog(message=response.error_message)
 
                 if self._decomp_view:
                     self._decomp_view.update_view_content(

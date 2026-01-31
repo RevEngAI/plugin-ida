@@ -3,17 +3,18 @@ import threading
 import time
 from typing import List, Optional
 
-import ida_kernwin
+from libbs.decompilers.ida.compat import execute_write
 
 from revengai import (
+    BaseResponse,
     Configuration,
+    FunctionMapping,
     FunctionRenameMap,
     FunctionsListRename,
     FunctionsRenamingHistoryApi,
 )
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
-from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.core.utils import (
     demangle,
 )
@@ -30,12 +31,12 @@ class RenameService(IThreadService):
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
 
-    def function_id_to_vaddr(self, function_id: int) -> Optional[int]:
-        maps = self.safe_get_function_mapping_local()
+    def function_id_to_vaddr(self, function_id: int) -> int | None:
+        maps: FunctionMapping | None = self.netstore_service.get_function_mapping()
         if maps is None:
             return None
-        id_vaddr_map = maps.function_map
-        vaddr = id_vaddr_map.get(str(function_id), None)
+        id_vaddr_map: dict[str, int] = maps.function_map
+        vaddr: int | None = id_vaddr_map.get(str(function_id), None)
         if vaddr is None:
             return None
         return vaddr
@@ -83,29 +84,16 @@ class RenameService(IThreadService):
             # Do before for execute sync, if fails may not be called.
             self._rename_q.task_done()
 
-    def _rename_remote_function_safe(self, matched_func_list) -> GenericApiReturn:
-        data = GenericApiReturn(success=False)
-
-        def _do():
-            nonlocal data
-            data = self.api_request_returning(
-                fn=lambda: self._rename_remote_function(function_list=matched_func_list)
-            )
-
-        ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST)
-        return data
-
     def _rename_function(self, function_list: List[RenameInput]) -> int:
         """
         Rename functions both locally and remotely.
         Returns the number of errors encountered during renaming.
         """
-
         total_errors = 0
-        new_func_list = []
+        new_func_list: list[RenameInput] = []
         for function in function_list:
             # Rename local function
-            success: bool = self.safe_set_name(ea=function.ea, new_name=function.new_name)
+            success: bool = self.update_function_name(ea=function.ea, new_name=function.new_name)
 
             if not success:
                 total_errors += 1
@@ -119,11 +107,11 @@ class RenameService(IThreadService):
                 matched_func_list.append(func)
             else:
                 # Fetch function ID
-                maps = self.safe_get_function_mapping_local()
+                maps: FunctionMapping | None = self.netstore_service.get_function_mapping()
                 if maps is None:
                     continue
-                vaddr_id_map = maps.inverse_function_map
-                function_id = vaddr_id_map.get(str(func.ea), None)
+                vaddr_id_map: dict[str, int] = maps.inverse_function_map
+                function_id: int | None = vaddr_id_map.get(str(func.ea), None)
                 if function_id is not None:
                     matched_func_list.append(
                         RenameInput(
@@ -136,18 +124,22 @@ class RenameService(IThreadService):
             return total_errors
 
         # Rename remote functions
-        response = self._rename_remote_function_safe(
-            matched_func_list=matched_func_list
+        response: BaseResponse = self._rename_remote_function(
+            matched_func_list
         )
 
-        if not response.success:
+        if not response.status:
             total_errors += len(matched_func_list)
 
         return total_errors
 
-    def _rename_remote_function(self, function_list: List[RenameInput]) -> None:
-        function_rename_list = []
+    @execute_write
+    def _rename_remote_function(self, function_list: list[RenameInput]) -> BaseResponse:
+        function_rename_list: list[FunctionRenameMap] = []
         for func in function_list:
+            if func.function_id is None:
+                continue
+
             function_rename_list.append(
                 FunctionRenameMap(
                     function_id=func.function_id,
@@ -160,7 +152,7 @@ class RenameService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             functions_api = FunctionsRenamingHistoryApi(api_client=api_client)
 
-            functions_api.batch_rename_function(
+            return functions_api.batch_rename_function(
                 functions_list_rename=FunctionsListRename(
                     functions=function_rename_list
                 )

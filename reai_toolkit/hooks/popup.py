@@ -1,9 +1,9 @@
 import ida_funcs
 import ida_kernwin as kw
 from loguru import logger
+from revengai import FunctionMapping
 
 from reai_toolkit.app.coordinator import Coordinator
-from reai_toolkit.app.components.tabs.similarity_tab import SimilarityTab
 
 DECOMP_ACTION_NAME = "revengai:toggle_ai_decomp"
 VIEW_ACTION_NAME = "revengai:function_portal_view"
@@ -147,22 +147,16 @@ def build_hooks(coordinator: Coordinator):
     func_matching_action = _register_function_matching_action(coordinator)
     func_similarity_action = _register_function_similarity_action(coordinator)
 
-    def _on_popup(widget, popup_handle):
+    def _on_popup(widget, popup_handle) -> None:
         try:
-            current_func_ea = kw.get_screen_ea()
-            current_func = ida_funcs.get_func(current_func_ea)
+            current_func_ea: int | None = kw.get_screen_ea()
+            current_func: ida_funcs.func_t | None = ida_funcs.get_func(current_func_ea)
 
-            func_map = (
-                coordinator.app.analysis_sync_service.safe_get_function_mapping_local()
+            func_map: FunctionMapping | None = (
+                coordinator.app.analysis_sync_service.netstore_service.get_function_mapping()
             )
 
-            has_portal_func = (
-                func_map is not None
-                and func_map.inverse_function_map.get(str(current_func.start_ea), None)
-                is not None
-            )
-
-            if has_portal_func:
+            if func_map and current_func and func_map.inverse_function_map.get(str(current_func.start_ea)):
                 kw.attach_action_to_popup(
                     widget, popup_handle, decomp_action, "RevEng.AI/", 0
                 )
@@ -179,9 +173,8 @@ def build_hooks(coordinator: Coordinator):
             logger.error(f"[RevEng.AI] attach_action_to_popup error: {e}")
 
     class Hooks(kw.UI_Hooks):
-        def finish_populating_widget_popup(self, widget, popup_handle):
+        def finish_populating_widget_popup(self, widget, popup_handle) -> None:
             _on_popup(widget, popup_handle)
-            return  # don’t return an int
 
-    h = Hooks()
+    h = Hooks() # type: ignore
     return h

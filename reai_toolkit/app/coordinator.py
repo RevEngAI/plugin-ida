@@ -1,5 +1,6 @@
 import ida_funcs
 import ida_kernwin
+from revengai import FunctionMapping
 
 from reai_toolkit.app.coordinators.about_coordinator import AboutCoordinator
 from reai_toolkit.app.coordinators.ai_decomp_coordinator import AiDecompCoordinator
@@ -105,17 +106,19 @@ class Coordinator(BaseCoordinator):
         """Run all necessary dialogs at startup."""
         pass
 
-    def redirect_analysis_portal(self):
-        binary_id = self.app.netstore_service.get_binary_id()
-        portal_url = self.app.config_service.portal_url + f"/analyses/{binary_id}"
-        QtGui.QDesktopServices.openUrl(QtCore.QUrl(portal_url))
+    def redirect_analysis_portal(self) -> None:
+        binary_id: int | None = self.app.netstore_service.get_binary_id()
+        if binary_id is not None:
+            portal_url: str = self.app.config_service.portal_url + f"/analyses/{binary_id}"
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(portal_url))
 
-    def redirect_function_portal(self):
-        func_map = self.app.analysis_sync_service.safe_get_function_mapping_local()
-        current_ea = ida_kernwin.get_screen_ea()
-        current_func = ida_funcs.get_func(current_ea)
-        function_id = func_map.inverse_function_map.get(
-            str(current_func.start_ea), None
-        )
-        portal_url = self.app.config_service.portal_url + f"/function/{function_id}"
-        QtGui.QDesktopServices.openUrl(QtCore.QUrl(portal_url))
+    def redirect_function_portal(self) -> None:
+        func_map: FunctionMapping | None = self.app.analysis_sync_service.netstore_service.get_function_mapping()
+        current_ea: int = ida_kernwin.get_screen_ea()
+        current_func: ida_funcs.func_t | None = ida_funcs.get_func(current_ea)
+        if func_map and current_func:
+            function_id: int | None = func_map.inverse_function_map.get(
+                str(current_func.start_ea), None
+            )
+            portal_url: str = self.app.config_service.portal_url + f"/function/{function_id}"
+            QtGui.QDesktopServices.openUrl(QtCore.QUrl(portal_url))

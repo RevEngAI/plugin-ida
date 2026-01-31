@@ -86,7 +86,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         self.analysis_sync_service.get_function_matches(
             callback=self._on_receive_function_map
         )
-        self.safe_refresh()
+        self.refresh_disassembly_view()
 
     def _on_complete(
         self, generic_return: GenericApiReturn[MatchedFunctionSummary]
@@ -95,14 +95,14 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         Handle completion of analysis syncing.
         """
         if generic_return.success:
-            self.safe_info(
+            self.show_info_dialog(
                 msg=f"Analysis data synced successfully. \n\nSynced {generic_return.data.matched_function_count} functions with remote analysis."
                 + f"\n{generic_return.data.unmatched_function_count} local functions not present in remote analysis."
             )
         else:
-            self.safe_error(message=generic_return.error_message)
+            self.show_error_dialog(message=generic_return.error_message)
 
-        self.safe_refresh()
+        self.refresh_disassembly_view()
 
     def _execute_sync(self, remote_mapping: FunctionMapping) -> None:
         self.analysis_sync_service.start_syncing(

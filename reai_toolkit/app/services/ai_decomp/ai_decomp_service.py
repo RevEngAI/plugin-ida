@@ -53,7 +53,7 @@ class AiDecompService(IThreadService):
         )
 
     def _get_function_id(self, start_ea: int) -> int | None:
-        function_map: FunctionMapping | None = self.safe_get_function_mapping_local()
+        function_map: FunctionMapping | None = self.netstore_service.get_function_mapping()
         if function_map is None:
             return
 

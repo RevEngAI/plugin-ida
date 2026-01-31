@@ -105,7 +105,7 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
     def _on_ui_ready(self):
         ida_kernwin.msg("[REAI] _on_ui_ready triggered\n")
         self._show_setup_if_needed()
-        self.coordinator.safe_refresh()
+        self.coordinator.refresh_disassembly_view()
 
     def _show_setup_if_needed(self):
         ida_kernwin.msg("[REAI] _show_setup_if_needed called\n")

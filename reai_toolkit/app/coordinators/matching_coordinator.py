@@ -35,7 +35,7 @@ class MatchingCoordinator(BaseCoordinator):
         function_id = None
 
         if restrict_function_id:
-            func_map: FunctionMapping | None = self.matching_service.safe_get_function_mapping_local()
+            func_map: FunctionMapping | None = self.matching_service.netstore_service.get_function_mapping()
             if func_map is None:
                 return
             
@@ -47,14 +47,14 @@ class MatchingCoordinator(BaseCoordinator):
             
             function_id: int | None = inverse_map.get(str(current_func.start_ea), None)
 
-        self.safe_info(msg="Fetching function information, this may take a while.")
+        self.show_info_dialog(msg="Fetching function information, this may take a while.")
         if self.matching_service.is_worker_running() is False:
             self.matching_service.start_function_fetch(
                 callback=self._launch_dialog, restrict_function_id=function_id
             )
 
     def _launch_dialog(self, functions: list[ValidFunction]) -> None:
-        func_map: FunctionMapping | None = self.matching_service.safe_get_function_mapping_local()
+        func_map: FunctionMapping | None = self.matching_service.netstore_service.get_function_mapping()
         if func_map is None:
             return
 
