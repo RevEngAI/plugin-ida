@@ -1,6 +1,6 @@
 import ida_name
 
-from libbs.decompilers.ida.compat import execute_read, execute_write
+from libbs.decompilers.ida.compat import execute_read
 from revengai import MatchedFunctionSuggestion
 
 from reai_toolkit.app.components.dialogs.base_dialog import DialogBase

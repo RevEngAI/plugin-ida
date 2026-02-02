@@ -45,7 +45,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         subset: FunctionMapping
         success, subset = importFuncsWindow.open_modal() # type: ignore
         if success:
-            self._execute_sync(subset)
+            self._execute_sync_task(subset)
 
     def is_authed(self) -> bool:
         return self.app.auth_service.is_authenticated()
@@ -104,7 +104,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
 
         self.refresh_disassembly_view()
 
-    def _execute_sync(self, remote_mapping: FunctionMapping) -> None:
+    def _execute_sync_task(self, remote_mapping: FunctionMapping) -> None:
         self.analysis_sync_service.start_syncing(
             remote_mapping, callback=self._on_complete
         )
@@ -133,4 +133,4 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         if self._attach_to_existing_analysis:
             self.run_dialog(matched_functions, remote_mapping)
         else:
-            self._execute_sync(remote_mapping)
+            self._execute_sync_task(remote_mapping)
