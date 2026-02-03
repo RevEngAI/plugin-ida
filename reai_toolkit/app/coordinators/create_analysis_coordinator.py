@@ -37,20 +37,18 @@ class CreateAnalysisCoordinator(BaseCoordinator):
 
     def is_authed(self) -> bool:
         return self.app.auth_service.is_authenticated()
-
+    
     def _on_complete(self, service_response: GenericApiReturn) -> None:
         """Handle completion of analysis creation."""
-        if service_response.success:
+        if service_response.success and isinstance(service_response.data, AnalysisCreateResponse):
             self.safe_info(
                 msg="Analysis created successfully, please wait while it is processed."
             )
+            # Should have analysis id - refresh to update menu options
+            self.safe_refresh()
+
+            # Call Sync Task to poll status
+            self.analysis_status_coord.poll_status(analysis_id=service_response.data.analysis_id)
         else:
-            self.safe_error(message=service_response.error_message)
-
-        data: AnalysisCreateResponse = service_response.data
-
-        # Should have analysis id - refresh to update menu options
-        self.safe_refresh()
-
-        # Call Sync Task to poll status
-        self.analysis_status_coord.poll_status(analysis_id=data.analysis_id)
+            error_message: str = service_response.error_message or "Unknown error"
+            self.safe_error(error_message)

@@ -42,7 +42,7 @@ class AnalysisStatusCoordinator(BaseCoordinator):
         """Check if the analysis sync worker is active."""
         return self.analysis_status_service.is_worker_running()
 
-    def poll_status(self, analysis_id: str) -> None:
+    def poll_status(self, analysis_id: int) -> None:
         """Poll the status of an analysis until completion."""
         self.analysis_status_service.start_polling(
             analysis_id=analysis_id, thread_callback=self._on_complete
@@ -54,7 +54,7 @@ class AnalysisStatusCoordinator(BaseCoordinator):
         Handle completion of analysis status polling.
         """
         if not generic_return.success:
-            self.safe_error(message=generic_return.error_message)
+            self.safe_error(message=generic_return.error_message or "failed to poll analysis status")
 
         self.analysis_sync_coord.sync_analysis()
 
