@@ -40,7 +40,10 @@ class AutoUnstripService(IThreadService):
         self.start_worker(self._poll_unstrip_status)
 
     def _poll_unstrip_status(self, stop_event: threading.Event) -> None:
-        analysis_id = self.safe_get_analysis_id_local()
+        analysis_id: int | None = self.netstore_service.get_analysis_id()
+        if analysis_id is None:
+            logger.error("failed to poll unstrip status as unable to retrieve analysis_id from netstore")
+            return
 
         while not stop_event.is_set():
             logger.info("RevEng.AI: Polling auto unstrip status...")

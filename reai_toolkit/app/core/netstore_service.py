@@ -26,9 +26,11 @@ import zlib
 from typing import Any, Iterator, Optional
 
 import ida_netnode
-from revengai.models import FunctionMapping
+from libbs.decompilers.ida.compat import execute_read, execute_write
 
-from reai_toolkit.app.core.shared_schema import IgnoredFunctions
+from revengai.models.function_mapping import FunctionMapping
+import reai_toolkit.hooks.globals as menu_hook_globals
+
 
 # ----- config -----
 NAME = "$ REAI_DB"
@@ -380,114 +382,99 @@ class SimpleNetStore:
             it = nxt
         return cnt
 
+    @execute_write
     def put_binary_id(self, binary_id: int) -> bool:
         _CACHE["binary_id"] = None
-        ok = self.put_global("binary_id", binary_id)
-        return ok
+        success: bool = self.put_global("binary_id", binary_id)
+        if success:
+            menu_hook_globals.BINARY_ID = binary_id
+        return success
 
-    def get_binary_id(self) -> Optional[int]:
-        id = _CACHE.get("binary_id", None)
-        if not id:
+    @execute_read
+    def get_binary_id(self) -> int | None:
+        id: int | None = _CACHE.get("binary_id", None)
+        if id is None:
             id = self.get_global("binary_id", default=None)
             _CACHE["binary_id"] = id
-        if type(id) is int:
-            return id
-        if type(id) is str and id.isdigit():
-            return int(id)
-        return None
+        
+        return id
 
-    # Analysis ID helpers
+    @execute_write
     def put_analysis_id(self, analysis_id: int) -> bool:
         _CACHE["analysis_id"] = None
-        return self.put_global("analysis_id", analysis_id)
+        success: bool =  self.put_global("analysis_id", analysis_id)
+        if success:
+            menu_hook_globals.ANALYSIS_ID = analysis_id
+        return success
 
-    def get_analysis_id(self) -> Optional[int]:
-        id = _CACHE.get("analysis_id", None)
-        if not id:
-            id = self.get_global("analysis_id", default=None)
+    @execute_read
+    def get_analysis_id(self) -> int | None:
+        id: int | None = _CACHE.get("analysis_id", None)
+        if id is None:
+            id = self.get_global("analysis_id")
             _CACHE["analysis_id"] = id
-        if type(id) is int:
-            return id
-        if type(id) is str and id.isdigit():
-            return int(id)
-        return None
+        
+        return id
 
+    @execute_write
     def put_model_id(self, model_id: int) -> bool:
         _CACHE["model_id"] = None
-        return self.put_global("model_id", model_id)
+        success: bool = self.put_global("model_id", model_id)
+        if success:
+            menu_hook_globals.MODEL_ID = model_id
+        return success
 
-    def get_model_id(self) -> Optional[int]:
-        id = _CACHE.get("model_id", None)
-        if not id:
-            id = self.get_global("model_id", default=None)
+    @execute_read
+    def get_model_id(self) -> int | None:
+        id: int | None = _CACHE.get("model_id", None)
+        if id is None:
+            id = self.get_global("model_id")
             _CACHE["model_id"] = id
-        if type(id) is int:
-            return id
-        if type(id) is str and id.isdigit():
-            return int(id)
-        return None
+        
+        return id
 
+    @execute_write
     def put_model_name(self, model_name: str) -> bool:
         _CACHE["model_name"] = None
         return self.put_global("model_name", model_name)
 
-    def get_model_name(self) -> Optional[str]:
-        name = _CACHE.get("model_name", None)
+    @execute_read
+    def get_model_name(self) -> str | None:
+        name: str | None = _CACHE.get("model_name")
         if not name:
-            name = self.get_global("model_name", default=None)
+            name = self.get_global("model_name")
             _CACHE["model_name"] = name
-        if type(name) is str:
-            return name
-        return None
+        
+        return name
 
-    # Track current portal functions
+    @execute_write
     def put_function_mapping(self, function_mapping: FunctionMapping) -> bool:
         _CACHE["function_mapping"] = None
         return self.put_global("function_mapping", function_mapping.model_dump())
 
-    def get_function_mapping(self) -> Optional[FunctionMapping]:
-        data = _CACHE.get("function_mapping", None)
-        if not data:
+    @execute_read
+    def get_function_mapping(self) -> FunctionMapping | None:
+        data: dict | None = _CACHE.get("function_mapping", None)
+        if data is None:
             data = self.get_global("function_mapping", default=None)
             _CACHE["function_mapping"] = data
-        if type(data) is dict:
+        if isinstance(data, dict):
             try:
                 return FunctionMapping.model_validate(data)
             except Exception:
-                return None
+                pass
+            
         return None
 
-    def put_ignored_functions(self, ignored_functions: IgnoredFunctions) -> bool:
-        _CACHE["ignored_functions"] = None
-        return self.put_global("ignored_functions", ignored_functions.model_dump())
+    @execute_read
+    def get_analysis_status(self) -> str | None:
+        return self.get_global("analysis_status")
 
-    def get_ignored_functions(self) -> Optional[IgnoredFunctions]:
-        data = _CACHE.get("ignored_functions", None)
-        if not data:
-            data = self.get_global("ignored_functions", default=None)
-            _CACHE["ignored_functions"] = data
-        if type(data) is dict:
-            try:
-                return IgnoredFunctions.model_validate(data)
-            except Exception:
-                return None
-        return None
-
-    def get_analysis_status(self) -> Optional[str]:
-        status = self.get_global("analysis_status", default=None)
-        if type(status) is str:
-            return status
-        return None
-
+    @execute_write
     def put_analysis_status(self, status: str) -> bool:
         return self.put_global("analysis_status", status)
 
-    #### BROKEN (put is failing) ####
-    def put_ai_decomp_cache(self, func_ea: int, ai_decompilation: str) -> bool:
-        return self.put_func(func_ea, "ai_decomp", ai_decompilation)
+    @execute_read
+    def get_ai_decomp_cache(self, func_ea: int) -> str | None:
+        return self.get_func(func_ea, "ai_decomp")
 
-    def get_ai_decomp_cache(self, func_ea: int) -> Optional[str]:
-        data = self.get_func(func_ea, "ai_decomp", default=None)
-        if type(data) is str:
-            return data
-        return None

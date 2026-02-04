@@ -2,9 +2,10 @@ import threading
 from typing import Any, Callable, Generator, List, Optional
 
 import ida_funcs
-import ida_kernwin as kw
 import idautils
 import idc
+from libbs.decompilers.ida.compat import execute_read
+
 from loguru import logger
 from revengai import (
     AnalysisFunctionMatchingRequest,
@@ -60,7 +61,7 @@ class MatchingService(IThreadService):
             return_list: List[CollectionSearchResult] = []
 
             response = search_client.search_collections(
-                model_name=self.safe_get_model_name_local(),
+                model_name=self.netstore_service.get_model_name(),
                 partial_collection_name=text_input,
                 page_size=10,
                 page=1,
@@ -89,7 +90,7 @@ class MatchingService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             search_client = SearchApi(api_client)
 
-            model_name = self.safe_get_model_name_local()
+            model_name: str | None = self.netstore_service.get_model_name()
 
             return_list: List[BinarySearchResult] = []
 
@@ -143,86 +144,59 @@ class MatchingService(IThreadService):
             args=(restrict_function_id,),
         )
 
+    @execute_read
     def _fetch_valid_functions(
         self, stop_event: threading.Event, restrict_function_id: Optional[int] = None
     ) -> None:
-        valid_funcs: List[ValidFunction] = []
+        valid_funcs: list[ValidFunction] = []
 
-        def _main_thread_task():
-            nonlocal valid_funcs
-            try:
+        function_map: FunctionMapping | None = self.netstore_service.get_function_mapping()
+        if function_map:
+            inverse_map: dict[str, int] = function_map.inverse_function_map
+
+            for start_ea in idautils.Functions():
+                if stop_event.is_set():
+                    break
+
                 try:
-                    function_map: FunctionMapping = (
-                        self.safe_get_function_mapping_local()
-                    )
-                    inverse_map = (
-                        getattr(function_map, "inverse_function_map", {}) or {}
-                    )
-                except Exception as e:
-                    logger.error(f"Error fetching function mapping: {e}")
-                    valid_funcs = []
-                    return
-
-                for start_ea in idautils.Functions():
-                    if stop_event.is_set():
-                        break
-
-                    try:
-                        f = ida_funcs.get_func(start_ea)
-                        if not f:
-                            continue
-
-                        key = str(int(start_ea))
-                        if key not in inverse_map:
-                            continue
-
-                        function_id = inverse_map[key]
-
-                        if (
-                            restrict_function_id is not None
-                            and function_id != restrict_function_id
-                        ):
-                            continue
-
-                        mangled = idc.get_func_name(start_ea) or ""
-                        demangled = self.demangle(mangled or "") or mangled
-
-                        valid_funcs.append(
-                            ValidFunction(
-                                function_id=function_id,
-                                mangled_name=mangled,
-                                demangled_name=demangled,
-                                vaddr=f.start_ea,
-                            )
-                        )
-
-                    except Exception as inner:
-                        logger.error(
-                            f"Error processing function at {start_ea}: {inner}"
-                        )
+                    f: ida_funcs.func_t | None = ida_funcs.get_func(start_ea)
+                    if f is None:
                         continue
 
-                # Success
-                return
+                    key = str(int(start_ea))
+                    if key not in inverse_map:
+                        continue
 
-            except Exception as e:
-                logger.error(f"Error fetching valid functions: {e}")
-                valid_funcs = []
-                return
+                    function_id = inverse_map[key]
 
-        # --- run on main thread ---
+                    if (
+                        restrict_function_id is not None
+                        and function_id != restrict_function_id
+                    ):
+                        continue
+
+                    mangled = idc.get_func_name(start_ea) or ""
+                    demangled = self.demangle(mangled or "") or mangled
+
+                    valid_funcs.append(
+                        ValidFunction(
+                            function_id=function_id,
+                            mangled_name=mangled,
+                            demangled_name=demangled,
+                            vaddr=f.start_ea,
+                        )
+                    )
+
+                except Exception as inner:
+                    logger.error(
+                        f"Error processing function at {start_ea}: {inner}"
+                    )
+                    continue
+
         try:
-            kw.execute_sync(_main_thread_task, kw.MFF_READ)
-        except Exception as e:
-            logger.error(f"Error executing function fetch on main thread: {e}")
-            valid_funcs = []
-
-        # Always call callback safely
-        try:
-            self._call_callback(valid_funcs or [])
+            self._call_callback(valid_funcs)
         except Exception as cb_err:
             logger.error(f"Error in function fetch callback: {cb_err}")
-            pass
         finally:
             self._thread_callback = None
 
@@ -240,7 +214,7 @@ class MatchingService(IThreadService):
             functions_client = FunctionsCoreApi(api_client)
 
             result: FunctionMatchingResponse = functions_client.analysis_function_matching(
-                analysis_id=self.safe_get_analysis_id_local(),
+                analysis_id=self.netstore_service.get_analysis_id(),
                 analysis_function_matching_request=AnalysisFunctionMatchingRequest(
                     min_similarity=min_similarity,
                     results_per_function=nns,

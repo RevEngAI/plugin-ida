@@ -1,12 +1,10 @@
 import hashlib
 import json
 from pathlib import Path
-from typing import Optional
 
-from libbs.decompilers.ida.compat import execute_read
+from libbs.decompilers.ida.compat import execute_read, execute_write
 
 import ida_funcs
-import ida_kernwin as kw
 import idaapi
 import idautils
 import idc
@@ -35,7 +33,7 @@ def get_function_boundaries_hash(inclusive_end: bool = False) -> str:
 
     # Collect (start, end) for each function
     for start_ea in idautils.Functions():
-        f = ida_funcs.get_func(start_ea)
+        f: ida_funcs.func_t | None = ida_funcs.get_func(start_ea)
         if f is None:
             continue
         # end_ea is exclusive, so if you want inclusive, subtract 1
@@ -63,20 +61,14 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
     return h.hexdigest()
 
 
+@execute_write
 def demangle(mangled_name: str, attr: int = idc.INF_SHORT_DN) -> str:
-    demangled_name = None
-
-    def _do():
-        nonlocal demangled_name
-        demangled_name = idc.demangle_name(mangled_name, idc.get_inf_attr(attr))
-
-    kw.execute_sync(_do, idaapi.MFF_FAST)
-
+    demangled_name: str | None = idc.demangle_name(mangled_name, idc.get_inf_attr(attr))
     return demangled_name if demangled_name else mangled_name
 
 
 @execute_read
-def collect_symbols_from_ida(inclusive_end: bool = False) -> Optional[Symbols]:
+def collect_symbols_from_ida(inclusive_end: bool = False) -> Symbols | None:
     base: int = idaapi.get_imagebase() or 0
     funcs: list[FunctionBoundary] = []
 

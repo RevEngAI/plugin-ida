@@ -1,7 +1,7 @@
 from logging import Logger
 
-from loguru import logger
-import ida_kernwin
+from libbs.decompilers.ida.compat import execute_ui
+
 from revengai.models.get_ai_decompilation_task import GetAiDecompilationTask
 
 from reai_toolkit.app.app import App
@@ -38,6 +38,7 @@ class AiDecompCoordinator(BaseCoordinator):
             self._decomp_hooks.unhook()
             self._decomp_hooks = None
 
+    @execute_ui
     def run_dialog(self) -> None:
         self._decomp_view = self.factory.ai_decomp(on_closed=self._on_pane_closed)
         self._decomp_view.Create(self._decomp_view.TITLE)
@@ -58,7 +59,7 @@ class AiDecompCoordinator(BaseCoordinator):
     ) -> None:
         if response.success is False:
             if response.error_message:
-                self.safe_error(message=response.error_message)
+                self.show_error_dialog(message=response.error_message)
 
                 if self._decomp_view:
                     self._decomp_view.update_view_content(
@@ -72,7 +73,7 @@ class AiDecompCoordinator(BaseCoordinator):
 
         # Open a dialog to show the decompilation result
         if self._decomp_view is None:
-            ida_kernwin.execute_sync(self.run_dialog, ida_kernwin.MFF_FAST)
+            self.run_dialog()
 
         if response.data is None or response.data.decompilation is None:
             return

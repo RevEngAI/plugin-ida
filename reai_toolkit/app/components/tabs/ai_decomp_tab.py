@@ -2,6 +2,7 @@ from typing import Any, Callable, Optional
 from loguru import logger
 
 import ida_kernwin as kw
+from libbs.decompilers.ida.compat import execute_ui
 
 from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets
 
@@ -85,22 +86,18 @@ class AIDecompView(kw.PluginForm):
         self._parent_window = None
 
     # --- public API ------------------------------------------------
+    @execute_ui
     def update_view_content(self, code: str) -> None:
-        def _apply() -> None:
-            if not self._editor:
-                return
+        if not self._editor:
+            return
 
-            self._editor.blockSignals(True)
-            try:
-                self._editor.setPlainText(code)
-            finally:
-                self._editor.blockSignals(False)
-
-        # ensure we’re on IDA’s UI thread
+        self._editor.blockSignals(True)
         try:
-            kw.execute_sync(_apply, kw.MFF_FAST)
-        except Exception:
-            _apply()  # best-effort fallback
+            self._editor.setPlainText(code)
+        finally:
+            self._editor.blockSignals(False)
+
+
 
     def clear(self) -> None:
         self.update_view_content("")

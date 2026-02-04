@@ -45,7 +45,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         subset: FunctionMapping
         success, subset = importFuncsWindow.open_modal() # type: ignore
         if success:
-            self._execute_sync(subset)
+            self._execute_sync_task(subset)
 
     def is_authed(self) -> bool:
         return self.app.auth_service.is_authenticated()
@@ -86,7 +86,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         self.analysis_sync_service.get_function_matches(
             callback=self._on_receive_function_map
         )
-        self.safe_refresh()
+        self.refresh_disassembly_view()
 
     def _on_complete(
         self, generic_return: GenericApiReturn[MatchedFunctionSummary]
@@ -95,16 +95,16 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         Handle completion of analysis syncing.
         """
         if generic_return.success:
-            self.safe_info(
+            self.show_info_dialog(
                 msg=f"Analysis data synced successfully. \n\nSynced {generic_return.data.matched_function_count} functions with remote analysis."
                 + f"\n{generic_return.data.unmatched_function_count} local functions not present in remote analysis."
             )
         else:
-            self.safe_error(message=generic_return.error_message)
+            self.show_error_dialog(message=generic_return.error_message)
 
-        self.safe_refresh()
+        self.refresh_disassembly_view()
 
-    def _execute_sync(self, remote_mapping: FunctionMapping) -> None:
+    def _execute_sync_task(self, remote_mapping: FunctionMapping) -> None:
         self.analysis_sync_service.start_syncing(
             remote_mapping, callback=self._on_complete
         )
@@ -133,4 +133,4 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         if self._attach_to_existing_analysis:
             self.run_dialog(matched_functions, remote_mapping)
         else:
-            self._execute_sync(remote_mapping)
+            self._execute_sync_task(remote_mapping)

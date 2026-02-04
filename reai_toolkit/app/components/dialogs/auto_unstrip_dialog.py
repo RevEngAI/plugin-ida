@@ -1,7 +1,6 @@
-from typing import Optional
-
-import ida_kernwin
 import ida_name
+
+from libbs.decompilers.ida.compat import execute_read
 from revengai import MatchedFunctionSuggestion
 
 from reai_toolkit.app.components.dialogs.base_dialog import DialogBase
@@ -20,16 +19,12 @@ else:
     )
 
 
-def get_safe_name(ea: int) -> Optional[str]:
-    name = None
+@execute_read
+def get_function_name(ea: int) -> str | None:
+    name: str | None = ida_name.get_name(ea=ea)
+    if name is None:
+        name = "<unnamed>"
 
-    def _do():
-        nonlocal name
-        name = ida_name.get_name(ea=ea)
-        if name is None:
-            name = "<unnamed>"
-
-    ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST)
     return name
 
 
@@ -91,7 +86,7 @@ class AutoUnstripDialog(DialogBase):
             table.setItem(row, 0, addr_item)
 
             # 3. current name cell
-            current_name = get_safe_name(m.function_vaddr) or "<unnamed>"
+            current_name = get_function_name(m.function_vaddr) or "<unnamed>"
             cur_item = QtWidgets.QTableWidgetItem(current_name)
             cur_item.setFlags(flags)
             cur_item.setToolTip(current_name)

@@ -1,7 +1,6 @@
 import threading
 from typing import Callable
 
-import ida_kernwin
 from libbs.decompilers.ida.compat import execute_write, execute_read
 import idc
 
@@ -11,6 +10,8 @@ import idaapi
 from loguru import logger
 from revengai import (
     AnalysesCoreApi,
+    BaseResponseAnalysisFunctionMapping,
+    BaseResponseBasic,
     Configuration,
 )
 
@@ -46,7 +47,7 @@ class AnalysisSyncService(IThreadService):
         )
 
     def get_function_matches(self, callback: Callable[[FunctionMapping], None]) -> None:
-        analysis_id: int | None = self.safe_get_analysis_id_local()
+        analysis_id: int | None = self.netstore_service.get_analysis_id()
         if analysis_id is None:
             return
 
@@ -77,11 +78,11 @@ class AnalysisSyncService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            analysis_details = analyses_client.get_analysis_basic_info(analysis_id=analysis_id)
+            analysis_details: BaseResponseBasic = analyses_client.get_analysis_basic_info(analysis_id)
             model_id = analysis_details.data.model_id
-            self.safe_put_model_id(model_id=model_id)
+            self.netstore_service.put_model_id(model_id)
             model_name = analysis_details.data.model_name
-            self.safe_put_model_name_local(model_name=model_name)
+            self.netstore_service.put_model_name(model_name)
 
             local_base_address: int = self._get_current_base_address()
 
@@ -109,12 +110,15 @@ class AnalysisSyncService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            function_map = analyses_client.get_analysis_function_map(analysis_id=analysis_id)
-            func_map: FunctionMapping = function_map.data.function_maps
-            self.safe_put_function_mapping(func_map=func_map)
+            function_map: BaseResponseAnalysisFunctionMapping = analyses_client.get_analysis_function_map(analysis_id=analysis_id)
+            if function_map.data:
+                func_map: FunctionMapping = function_map.data.function_maps
+                self.netstore_service.put_function_mapping(func_map)
+
             return func_map
 
-    def _match_functions(
+    @execute_write
+    def _perform_function_sync(
         self,
         func_map: FunctionMapping,
     ) -> GenericApiReturn[MatchedFunctionSummary]:
@@ -135,7 +139,7 @@ class AnalysisSyncService(IThreadService):
             old_name: str | None = idc.get_func_name(local_vaddr)
             if new_name:
                 if new_name != old_name:
-                    self.safe_set_name(local_vaddr, new_name, check_user_flags=True)
+                    self.update_function_name(local_vaddr, new_name, check_user_flags=True)
                     self.tag_function_as_renamed(new_name)
 
                 matched_function_count += 1
@@ -156,22 +160,17 @@ class AnalysisSyncService(IThreadService):
             ),
         )
 
-    def _safe_match_functions(
+    def _match_functions(
         self, func_map: FunctionMapping
     ) -> GenericApiReturn[MatchedFunctionSummary]:
-        data = GenericApiReturn(success=False, error_message="Failed to match functions.")
-
-        def _do():
-            try:
-                nonlocal data
-                data = self._match_functions(func_map=func_map)
-            except Exception as e:
-                logger.error(f"RevEng.AI: Exception during function sync: {e}")
-                data = GenericApiReturn(
-                    success=False, error_message=f"Exception during function sync: {e}"
-                )
-
-        ida_kernwin.execute_sync(_do, ida_kernwin.MFF_FAST)
+        
+        try:
+            data: GenericApiReturn[MatchedFunctionSummary] = self._perform_function_sync(func_map=func_map)
+        except Exception as e:
+            logger.error(f"RevEng.AI: Exception during function sync: {e}")
+            data = GenericApiReturn(
+                success=False, error_message=f"Exception during function sync: {e}"
+            )
 
         return data
 
@@ -179,8 +178,9 @@ class AnalysisSyncService(IThreadService):
         """
         Syncs the analysis data until completion or failure.
         """
-        response: GenericApiReturn[MatchedFunctionSummary] = self._safe_match_functions(func_map=func_map)
+        response: GenericApiReturn[MatchedFunctionSummary] = self._match_functions(func_map)
         if response.success is False:
+            logger.error(f"failed to sync analysis data due to {response.error_message}")
             return
 
         self.data_types_service.import_data_types({int(k): v for k, v in func_map.function_map.items()})

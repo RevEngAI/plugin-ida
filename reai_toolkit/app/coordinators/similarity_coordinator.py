@@ -36,7 +36,7 @@ class SimilarityCoordinator(BaseCoordinator):
     def find_similar_functions(self) -> None:
         logger.debug("find_similar_functions called")
         func_map: FunctionMapping | None = (
-            self._similarity_service.safe_get_function_mapping_local()
+            self._similarity_service.netstore_service.get_function_mapping()
         )
         if func_map is None:
             return

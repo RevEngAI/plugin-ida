@@ -35,16 +35,14 @@ class AutoUnstripCoordinator(BaseCoordinator):
 
     def run_dialog(self) -> None:
         if self.auto_unstrip_service.is_worker_running():
-            self.safe_info(msg="Auto-unstrip is already running.")
+            self.show_info_dialog(msg="Auto-unstrip is already running.")
             return
 
         if self.last_response:
             self._open_auto_unstrip_dialog()
             return
-        self.safe_info(msg="Starting auto-unstrip process, may take a while.")
+        self.show_info_dialog(msg="Starting auto-unstrip process, may take a while.")
         self.auto_unstrip_service.start_unstrip_polling(callback=self._on_complete)
-
-        pass
 
     def _open_auto_unstrip_dialog(self) -> None:
         self.factory.auto_unstrip(response=self.last_response.data).open_modal()
@@ -53,7 +51,7 @@ class AutoUnstripCoordinator(BaseCoordinator):
         print("Auto-unstrip process completed.")
 
         if not response.success:
-            self.safe_error(message=response.error_message)
+            self.show_error_dialog(message=response.error_message)
             return
 
         rename_list = []
@@ -76,4 +74,4 @@ class AutoUnstripCoordinator(BaseCoordinator):
 
         ida_kernwin.execute_ui_requests([self._open_auto_unstrip_dialog])
 
-        self.safe_refresh()
+        self.refresh_disassembly_view()

@@ -222,6 +222,7 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t("reai:ping", "Ping", _handlers["ping"])
     )
+
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t("reai:about", "About", _handlers["about"])
     )
@@ -245,7 +246,7 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
             _handlers["existing_analysis"],
         )
     )
-    #
+    
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t(
             "reai:detach_analysis", "Detach", _handlers["detach_analysis"]
@@ -280,12 +281,15 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Analysis/", "reai:analyse", ida_kernwin.SETMENU_APP
     )
+
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Analysis/", "reai:existing_analysis", ida_kernwin.SETMENU_APP
     )
+
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Analysis/", "reai:detach_analysis", ida_kernwin.SETMENU_APP
     )
+
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Analysis/", "reai:sync_and_poll", ida_kernwin.SETMENU_APP
     )
@@ -303,11 +307,14 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Configure", "reai:auth", ida_kernwin.SETMENU_APP
     )
+
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Help", "reai:help", ida_kernwin.SETMENU_APP
     )
+
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "About", "reai:about", ida_kernwin.SETMENU_APP
     )
+
     ida_kernwin.refresh_idaview_anyway()
     return _handlers
