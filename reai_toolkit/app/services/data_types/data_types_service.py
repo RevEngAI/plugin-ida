@@ -1,9 +1,8 @@
-from revengai import Configuration, FunctionMapping
+from revengai import Configuration
 from revengai.exceptions import NotFoundException
 
 from loguru import logger
 
-from revengai.models.matched_function import MatchedFunction
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from revengai import (
     FunctionsDataTypesApi,

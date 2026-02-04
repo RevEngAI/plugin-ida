@@ -13,7 +13,7 @@ from revengai.models import (
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
-from reai_toolkit.app.core.utils import collect_symbols_from_ida, sha256_file
+from reai_toolkit.app.core.utils import sha256_file
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 
 
