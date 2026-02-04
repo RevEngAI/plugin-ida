@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from reai_toolkit.app.app import App
     from reai_toolkit.app.factory import DialogFactory
 
-from revengai.models import AnalysisRecord
+from revengai.models.analysis_record import AnalysisRecord
 
 
 class ExistingAnalysesCoordinator(BaseCoordinator):

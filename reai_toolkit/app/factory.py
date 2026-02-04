@@ -1,7 +1,7 @@
 from collections.abc import Callable
 from typing import Any
 
-from revengai.models import AutoUnstripResponse
+from revengai.models.auto_unstrip_response import AutoUnstripResponse
 
 from reai_toolkit.app.app import App
 from reai_toolkit.app.components.dialogs import ErrorDialog

@@ -1,6 +1,5 @@
 from logging import Logger
 
-import ida_kernwin
 from libbs.decompilers.ida.compat import execute_ui
 
 from revengai.models.get_ai_decompilation_task import GetAiDecompilationTask

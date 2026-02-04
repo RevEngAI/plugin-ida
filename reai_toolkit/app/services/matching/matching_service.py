@@ -2,7 +2,6 @@ import threading
 from typing import Any, Callable, Generator, List, Optional
 
 import ida_funcs
-import ida_kernwin as kw
 import idautils
 import idc
 from libbs.decompilers.ida.compat import execute_read

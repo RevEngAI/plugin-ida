@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List, Optional
 
 from pydantic import BaseModel
-from revengai.models import FunctionMatch
+from revengai.models.function_match import FunctionMatch
 
 
 class ValidFunction(BaseModel):
