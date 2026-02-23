@@ -27,7 +27,7 @@ class SimilarityService(IThreadService):
         self,
         func_id: int,
         vaddr: int,
-        callback: Callable[[int, int, list[MatchedFunction]], None],
+        callback: Callable[[int, int, list[MatchedFunction], int], None],
     ) -> None:
         self.start_worker(
             target=self._perform_function_similarity_request,
@@ -39,7 +39,7 @@ class SimilarityService(IThreadService):
         stop_event: threading.Event,
         func_id: int,
         vaddr: int,
-        callback: Callable[[int, int, list[MatchedFunction]], None],
+        callback: Callable[[int, int, list[MatchedFunction], int], None],
     ) -> None:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
@@ -92,7 +92,7 @@ class SimilarityService(IThreadService):
                     if response.matches:
                         matches = response.matches[0].matched_functions
 
-                    return callback(func_id, vaddr, matches)
+                    return callback(func_id, vaddr, matches, analysis_id)
 
                 time.sleep(sleep_interval)
                 elapsed += sleep_interval
