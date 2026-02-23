@@ -76,6 +76,8 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
         super().__init__(parent)
         self._data: list[MatchedFunction] = []
         self._func_id: int | None = None
+        self._analysis_id: int | None = None
+        self._portal_url: str = "https://portal.reveng.ai"
 
     def rowCount(self, parent=QtCore.QModelIndex()) -> int:
         return len(self._data)
@@ -107,7 +109,7 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
                 return None  # Button column - handled by delegate
 
         elif role == QtCore.Qt.ItemDataRole.UserRole:
-            return f"https://portal.reveng.ai/function/{self._func_id}/compare?id={match.function_id}"
+            return f"{self._portal_url}/analyses/{self._analysis_id}?fn={self._func_id}&view=matching&matchingMode=single&alt={match.function_id}"
 
         elif role == QtCore.Qt.ItemDataRole.TextAlignmentRole:
             if col == SimilarityTableColumns.SIMILARITY:
@@ -149,10 +151,12 @@ class SimilarityTableModel(QtCore.QAbstractTableModel):
             return self.COLUMNS[section]
         return None
 
-    def set_data(self, func_id: int, data: list[MatchedFunction]) -> None:
+    def set_data(self, func_id: int, data: list[MatchedFunction], analysis_id: int, portal_url: str) -> None:
         self.beginResetModel()
         self._func_id = func_id
         self._data = data
+        self._analysis_id = analysis_id
+        self._portal_url = portal_url
         self.endResetModel()
 
     def clear(self) -> None:
@@ -266,7 +270,7 @@ class SimilarityTab(kw.PluginForm):
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(url))
 
     def _on_fetch_finished(
-        self, func_id: int, func_addr: int, data: list[MatchedFunction]
+        self, func_id: int, func_addr: int, data: list[MatchedFunction], analysis_id: int, portal_url: str
     ) -> None:
         """Handle successful API response (called on main thread)."""
         # Ignore results if user has moved to a different function
@@ -274,7 +278,7 @@ class SimilarityTab(kw.PluginForm):
             return
 
         if self._model:
-            self._model.set_data(func_id, data)
+            self._model.set_data(func_id, data, analysis_id, portal_url)
 
         func_name = idaapi.get_func_name(func_addr) or f"sub_{func_addr:X}"
 
@@ -295,6 +299,8 @@ class SimilarityTab(kw.PluginForm):
         func_id: int,
         func_addr: int,
         data: list[MatchedFunction],
+        analysis_id: int,
+        portal_url: str,
         force: bool = False,
     ) -> None:
         if not force and func_addr == self._current_func_addr:
@@ -313,4 +319,4 @@ class SimilarityTab(kw.PluginForm):
         if self._model:
             self._model.clear()
 
-        self._on_fetch_finished(func_id, func_addr, data)
+        self._on_fetch_finished(func_id, func_addr, data, analysis_id, portal_url)

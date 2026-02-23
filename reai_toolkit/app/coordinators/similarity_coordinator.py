@@ -70,26 +70,26 @@ class SimilarityCoordinator(BaseCoordinator):
             self._hook = None
 
     def _launch_similarity_tab(
-        self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction]
+        self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction], analysis_id: int
     ) -> None:
         def _show_tab() -> None:
             self._similarity_tab = SimilarityTab(self._on_pane_closed)  # type: ignore
             self._similarity_tab.Create()
             self._similarity_tab.update_for_function(
-                local_func_id, local_vaddr, functions
+                local_func_id, local_vaddr, functions, analysis_id, self.app.config_service.portal_url
             )
 
         kw.execute_ui_requests([_show_tab])
 
     def _update_similarity_tab(
-        self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction]
+        self, local_func_id: int, local_vaddr: int, functions: list[MatchedFunction], analysis_id: int
     ) -> None:
         def _update_tab() -> None:
             if self._similarity_tab is None:
                 return
 
             self._similarity_tab.update_for_function(
-                local_func_id, local_vaddr, functions
+                local_func_id, local_vaddr, functions, analysis_id, self.app.config_service.portal_url
             )
 
         kw.execute_ui_requests([_update_tab])
