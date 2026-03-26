@@ -121,11 +121,13 @@ class AnalyseDialog(DialogBase):
         if AnalyseDialog.cached_symbols is None:
             return
 
-        # Pass only the subset of function boundaries selected by the user
+        # Send all boundaries but mark which ones to include in analysis
+        for entry in AnalyseDialog.cached_function_boundaries.values():
+            entry["boundary"].include_in_analysis = entry["enabled"]
+
         AnalyseDialog.cached_symbols.function_boundaries = [
             x["boundary"]
             for x in AnalyseDialog.cached_function_boundaries.values()
-            if x["enabled"]
         ]
 
         self.upload_service.start_analysis(
