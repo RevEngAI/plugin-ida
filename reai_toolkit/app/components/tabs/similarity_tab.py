@@ -7,7 +7,7 @@ from loguru import logger
 
 from revengai.models.matched_function import MatchedFunction
 
-from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets
+from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets, Signal
 
 
 TAB_TITLE = "RevEng.AI — Function Similarity"
@@ -22,7 +22,7 @@ class SimilarityTableColumns(IntEnum):
 
 
 class ButtonDelegate(QtWidgets.QStyledItemDelegate):
-    clicked = QtCore.Signal(QtCore.QModelIndex)
+    clicked = Signal(QtCore.QModelIndex)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
