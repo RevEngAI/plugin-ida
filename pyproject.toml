@@ -1,6 +1,6 @@
 [project]
 name = "reai_toolkit"
-version = "3.5.1"
+version = "3.5.2"
 description = "RevEng.AI Toolkit plugin for IDA"
 requires-python = ">=3.10"
 
@@ -9,7 +9,7 @@ dependencies = [
   "requests>=2.32",
   "loguru>=0.7",
   "pydantic",
-  "revengai>=3.51.0",
+  "revengai>=3.82.2",
   "libbs>=2.16.5",
 ]
 
