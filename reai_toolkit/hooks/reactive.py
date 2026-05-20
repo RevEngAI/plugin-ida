@@ -42,7 +42,7 @@ class AiDecompFunctionViewHooks(kw.UI_Hooks):
 
     # AiDecompCoordinator - cannot import due to circular dependency
 
-    def __init__(self, coordinator, debounce_ms: int = 200):
+    def __init__(self, coordinator, debounce_ms: int = 500):
         super().__init__()
         self.coordinator = coordinator
         self._debounce_ms = debounce_ms
