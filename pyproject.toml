@@ -19,6 +19,7 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["reai_toolkit*"]
+exclude = ["screenshots*", "tests*", "docker*", "stubs*"]
 
 # -------------------------------
 # Astral uv configuration
