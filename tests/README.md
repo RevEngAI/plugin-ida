@@ -66,8 +66,3 @@ EOF
   gcc -O0 -fno-omit-frame-pointer -o /out/hello.elf /tmp/hello.c && chmod 644 /out/hello.elf'
 ```
 
-## CI
-
-`.github/workflows/tests.yaml` runs the whole suite as a single job on the
-`reveng-ida` self-hosted runner (IDA + idalib preinstalled): `uv sync` → build
-vendor → `uv run pytest`. Licensing comes from repository secrets.
