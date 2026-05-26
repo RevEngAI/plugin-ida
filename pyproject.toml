@@ -9,9 +9,17 @@ dependencies = [
   "requests>=2.32",
   "loguru>=0.7",
   "pydantic",
-  "revengai>=3.51.0",
+  "revengai>=3.82.2",
   "libbs>=2.16.5",
 ]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["reai_toolkit*"]
+exclude = ["screenshots*", "tests*", "docker*", "stubs*"]
 
 # -------------------------------
 # Astral uv configuration
@@ -20,6 +28,7 @@ dependencies = [
 [dependency-groups]
 dev = [
   "pytest>=8.3",
+  "pytest-mock>=3.14",
   "types-requests",
   "pyqt5-stubs",
   "idapro>=0.0.5",
@@ -54,3 +63,6 @@ mypy_path = ["stubs"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+markers = [
+    "idalib: tests that require an activated idalib (IDA Pro headless). Run with `pytest -m idalib`. In CI these run on the `ida` self-hosted runner image (IDA + idalib preinstalled, licensing provided by the runner environment).",
+]
