@@ -181,7 +181,13 @@ class AnalysisSyncService(IThreadService):
         response: GenericApiReturn[MatchedFunctionSummary] = self._match_functions(func_map)
         if response.success is False:
             logger.error(f"failed to sync analysis data due to {response.error_message}")
+            on_complete_callback(response)
             return
 
-        self.data_types_service.import_data_types({int(k): v for k, v in func_map.function_map.items()})
+        data_types_error: str | None = self.data_types_service.import_data_types(
+            {int(k): v for k, v in func_map.function_map.items()}
+        )
+        if data_types_error and response.data is not None:
+            response.data.data_types_error = data_types_error
+
         on_complete_callback(response)

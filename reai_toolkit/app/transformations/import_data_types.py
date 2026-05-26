@@ -60,7 +60,13 @@ class ImportDataTypes:
 
                 tagged_dependency: TaggedDependency | None = lookup.get(dependency.actual_instance.name)
                 if tagged_dependency:
-                    self.process_dependency(tagged_dependency, lookup)
+                    try:
+                        self.process_dependency(tagged_dependency, lookup)
+                    except Exception as e:
+                        logger.warning(
+                            f"RevEng.AI: skipped dependency {tagged_dependency.name!r}: {e!r}"
+                        )
+                        tagged_dependency.processed = True
 
             func: FunctionTypeOutput | None = data_types.func_types
             if func:
@@ -70,7 +76,12 @@ class ImportDataTypes:
                 else:
                     ea: int = func.addr
 
-                self.update_function(func, ea)
+                try:
+                    self.update_function(func, ea)
+                except Exception as e:
+                    logger.warning(
+                        f"RevEng.AI: skipped data types for {func.name} at ea=0x{ea:x}: {e!r}"
+                    )
 
 
     def process_dependency(
