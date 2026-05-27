@@ -9,9 +9,9 @@ from revengai import (
     FunctionsAIDecompilationApi,
 )
 from revengai.models.comments_data import CommentsData
+from revengai.models.decompilation_data import DecompilationData
 from revengai.models.summary_data import SummaryData
 from revengai.models.task_status import TaskStatus
-from revengai.models.tokenised_data import TokenisedData
 from revengai.models.workflow_progress import WorkflowProgress
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -27,10 +27,10 @@ MAX_REQUEUE_ATTEMPTS = 2
 class AiDecompService(IThreadService):
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration) -> None:
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
-        self._on_decomp: Callable[[GenericApiReturn[TokenisedData]], None] | None = None
+        self._on_decomp: Callable[[GenericApiReturn[DecompilationData]], None] | None = None
         self._on_summary: Callable[[GenericApiReturn[SummaryData]], None] | None = None
         self._on_comments: Callable[[GenericApiReturn[CommentsData]], None] | None = None
-        self._decomp_cache: dict[int, TokenisedData] = {}
+        self._decomp_cache: dict[int, DecompilationData] = {}
         self._summary_cache: dict[int, SummaryData] = {}
 
     def thread_in_progress(self) -> bool:
@@ -39,7 +39,7 @@ class AiDecompService(IThreadService):
     def start_ai_decomp_task(
         self,
         ea: int,
-        on_decomp: Callable[[GenericApiReturn[TokenisedData]], None],
+        on_decomp: Callable[[GenericApiReturn[DecompilationData]], None],
         on_summary: Callable[[GenericApiReturn[SummaryData]], None],
         on_comments: Callable[[GenericApiReturn[CommentsData]], None],
     ) -> None:
@@ -94,43 +94,66 @@ class AiDecompService(IThreadService):
         except Exception as e:
             return None, f"Unexpected error fetching AI decompilation status: {e}"
 
-    def _fetch_tokenised(
+    def _fetch_decompilation(
         self, function_id: int
-    ) -> tuple[TokenisedData | None, str | None]:
+    ) -> tuple[DecompilationData | None, str | None]:
         try:
             with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-                tokenised = FunctionsAIDecompilationApi(
+                decomp = FunctionsAIDecompilationApi(
                     api_client
-                ).get_ai_decompilation_tokenised(function_id=function_id)
+                ).get_ai_decompilation(function_id=function_id)
+            return decomp, None
         except ApiException as e:
             return None, _format_api_error(e)
         except Exception as e:
-            return None, f"Unexpected error fetching tokenised AI decompilation: {e}"
-
-        if tokenised.tokenised_decompilation is None:
-            return None, "Tokenised AI decompilation returned no content."
-        return tokenised, None
+            logger.error(
+                f"RevEng.AI: failed to parse AI decompilation response for function {function_id}: {e}"
+            )
+            return None, f"Unexpected error fetching AI decompilation: {e}"
 
     def _run_decomp_phase(
         self, function_id: int, stop_event: threading.Event
-    ) -> TokenisedData | None:
+    ) -> DecompilationData | None:
         cached = self._decomp_cache.get(function_id)
         if cached is not None:
             self._safe_dispatch(
                 stop_event,
                 self._on_decomp,
-                GenericApiReturn[TokenisedData](success=True, data=cached),
+                GenericApiReturn[DecompilationData](success=True, data=cached),
             )
             return cached
 
-        queued_ok, queue_err = self._queue_decompilation(function_id)
-        if not queued_ok:
+        decomp, fetch_err = self._fetch_decompilation(function_id)
+        if decomp is None:
             self._safe_dispatch(
                 stop_event,
                 self._on_decomp,
-                GenericApiReturn[TokenisedData](success=False, error_message=queue_err),
+                GenericApiReturn[DecompilationData](success=False, error_message=fetch_err),
             )
             return None
+
+        status = str(decomp.status)
+
+        if status == TaskStatus.COMPLETED.value and decomp.decompilation:
+            self._decomp_cache[function_id] = decomp
+            self._safe_dispatch(
+                stop_event,
+                self._on_decomp,
+                GenericApiReturn[DecompilationData](success=True, data=decomp),
+            )
+            return decomp
+
+        if status == TaskStatus.UNINITIALISED.value:
+            queued_ok, queue_err = self._queue_decompilation(function_id)
+            if not queued_ok:
+                self._safe_dispatch(
+                    stop_event,
+                    self._on_decomp,
+                    GenericApiReturn[DecompilationData](
+                        success=False, error_message=queue_err
+                    ),
+                )
+                return None
 
         polled_ok, poll_err = self._poll_workflow(
             function_id=function_id,
@@ -144,28 +167,31 @@ class AiDecompService(IThreadService):
                 self._safe_dispatch(
                     stop_event,
                     self._on_decomp,
-                    GenericApiReturn[TokenisedData](
+                    GenericApiReturn[DecompilationData](
                         success=False, error_message=poll_err
                     ),
                 )
             return None
 
-        tokenised, fetch_err = self._fetch_tokenised(function_id)
-        if tokenised is None:
+        final, final_err = self._fetch_decompilation(function_id)
+        if final is None or not final.decompilation:
             self._safe_dispatch(
                 stop_event,
                 self._on_decomp,
-                GenericApiReturn[TokenisedData](success=False, error_message=fetch_err),
+                GenericApiReturn[DecompilationData](
+                    success=False,
+                    error_message=final_err or "AI decompilation returned no content.",
+                ),
             )
             return None
 
-        self._decomp_cache[function_id] = tokenised
+        self._decomp_cache[function_id] = final
         self._safe_dispatch(
             stop_event,
             self._on_decomp,
-            GenericApiReturn[TokenisedData](success=True, data=tokenised),
+            GenericApiReturn[DecompilationData](success=True, data=final),
         )
-        return tokenised
+        return final
 
     def _fetch_summary(
         self, function_id: int
@@ -369,12 +395,12 @@ class AiDecompService(IThreadService):
             self._safe_dispatch(
                 stop_event,
                 self._on_decomp,
-                GenericApiReturn[TokenisedData](success=True, data=None),
+                GenericApiReturn[DecompilationData](success=True, data=None),
             )
             return
 
-        tokenised = self._run_decomp_phase(function_id, stop_event)
-        if tokenised is None:
+        decomp = self._run_decomp_phase(function_id, stop_event)
+        if decomp is None:
             return
 
         self._run_summary_phase(function_id, stop_event)

@@ -2,9 +2,9 @@ from logging import Logger
 
 from libbs.decompilers.ida.compat import execute_ui
 from revengai.models.comments_data import CommentsData
+from revengai.models.decompilation_data import DecompilationData
 from revengai.models.inline_comment import InlineComment
 from revengai.models.summary_data import SummaryData
-from revengai.models.tokenised_data import TokenisedData
 
 from reai_toolkit.app.app import App
 from reai_toolkit.app.components.tabs.ai_decomp_tab import AIDecompView
@@ -29,7 +29,7 @@ class AiDecompCoordinator(BaseCoordinator):
         self._decomp_view: AIDecompView | None = None
         self._decomp_hooks: AiDecompFunctionViewHooks | None = None
         self._current_func_vaddr: int | None = None
-        self._current_tokenised: TokenisedData | None = None
+        self._current_decomp: DecompilationData | None = None
         self._current_summary: SummaryData | None = None
         self._current_comments: CommentsData | None = None
 
@@ -49,7 +49,7 @@ class AiDecompCoordinator(BaseCoordinator):
         self._decomp_view.Create(self._decomp_view.TITLE)
 
     def start_decompilation(self, ea: int) -> None:
-        self._current_tokenised = None
+        self._current_decomp = None
         self._current_summary = None
         self._current_comments = None
         self._current_func_vaddr = ea
@@ -67,7 +67,7 @@ class AiDecompCoordinator(BaseCoordinator):
         )
 
     def _on_decomp_complete(
-        self, response: GenericApiReturn[TokenisedData]
+        self, response: GenericApiReturn[DecompilationData]
     ) -> None:
         if response.success is False:
             if response.error_message:
@@ -82,7 +82,7 @@ class AiDecompCoordinator(BaseCoordinator):
                     self.disable_function_tracking()
             return
 
-        if response.data is None or response.data.tokenised_decompilation is None:
+        if response.data is None or response.data.decompilation is None:
             return
 
         if self._decomp_view is None:
@@ -91,7 +91,7 @@ class AiDecompCoordinator(BaseCoordinator):
         if self._decomp_view is None:
             return
 
-        self._current_tokenised = response.data
+        self._current_decomp = response.data
         self._rerender()
 
     def _on_summary_complete(
@@ -117,10 +117,10 @@ class AiDecompCoordinator(BaseCoordinator):
         self._rerender()
 
     def _rerender(self) -> None:
-        if self._decomp_view is None or self._current_tokenised is None:
+        if self._decomp_view is None or self._current_decomp is None:
             return
         rendered = render_view(
-            tokenised=self._current_tokenised,
+            decomp=self._current_decomp,
             summary=self._current_summary,
             comments=self._current_comments,
         )
@@ -133,19 +133,13 @@ class AiDecompCoordinator(BaseCoordinator):
 
 
 def render_view(
-    tokenised: TokenisedData,
+    decomp: DecompilationData,
     summary: SummaryData | None,
     comments: CommentsData | None,
 ) -> str:
-    code: str = tokenised.tokenised_decompilation or ""
+    code: str = decomp.decompilation or ""
 
     header_parts: list[str] = []
-    if not code.startswith("/*") and tokenised.predicted_function_name:
-        header_parts.append(
-            _format_summary_as_comment(
-                f"Suggested function name: {tokenised.predicted_function_name}"
-            )
-        )
     if summary is not None and summary.ai_summary:
         header_parts.append(_format_summary_as_comment(summary.ai_summary))
 
