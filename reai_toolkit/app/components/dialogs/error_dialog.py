@@ -1,5 +1,5 @@
 from reai_toolkit.app.components.dialogs.base_dialog import DialogBase
-from reai_toolkit.app.core.qt_compat import QT_VER, QtGui, QtWidgets
+from reai_toolkit.app.core.qt_compat import QT_VER, QtCore, QtGui, QtWidgets
 
 if QT_VER == 6:
     from reai_toolkit.app.components.forms.error.error_panel_ui_uic6 import (
@@ -31,8 +31,10 @@ class ErrorDialog(DialogBase):
         px = QtGui.QPixmap(logo_path)
         self.ui.logoArea.setPixmap(px)
 
-        # Set the error message
         self.ui.errorMessage.setText(f"```{error_message}```")
+        self.ui.errorMessage.setTextInteractionFlags(
+            QtCore.Qt.TextSelectableByMouse | QtCore.Qt.TextSelectableByKeyboard
+        )
+        self.ui.errorMessage.setCursor(QtCore.Qt.IBeamCursor)
 
-        # Wire buttons
         self.ui.okButton.clicked.connect(self.accept)

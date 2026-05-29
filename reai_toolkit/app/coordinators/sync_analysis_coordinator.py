@@ -94,13 +94,15 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         """
         Handle completion of analysis syncing.
         """
-        if generic_return.success:
+        if not generic_return.success:
+            self.show_error_dialog(message=generic_return.error_message)
+        elif generic_return.data is not None and generic_return.data.data_types_error:
+            self.show_error_dialog(message=generic_return.data.data_types_error)
+        else:
             self.show_info_dialog(
                 msg=f"Analysis data synced successfully. \n\nSynced {generic_return.data.matched_function_count} functions with remote analysis."
                 + f"\n{generic_return.data.unmatched_function_count} local functions not present in remote analysis."
             )
-        else:
-            self.show_error_dialog(message=generic_return.error_message)
 
         self.refresh_disassembly_view()
 

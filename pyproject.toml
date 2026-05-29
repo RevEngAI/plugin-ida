@@ -9,7 +9,7 @@ dependencies = [
   "requests>=2.32",
   "loguru>=0.7",
   "pydantic",
-  "revengai>=3.85.1",
+  "revengai>=3.86.3",
   "libbs>=2.16.5",
 ]
 
@@ -63,6 +63,7 @@ mypy_path = ["stubs"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+addopts = "--import-mode=importlib"
 markers = [
     "idalib: tests that require an activated idalib (IDA Pro headless). Run with `pytest -m idalib`. In CI these run on the `ida` self-hosted runner image (IDA + idalib preinstalled, licensing provided by the runner environment).",
 ]

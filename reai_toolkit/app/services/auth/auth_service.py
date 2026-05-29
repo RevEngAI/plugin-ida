@@ -1,7 +1,7 @@
 from typing import Tuple
 
 from loguru import logger
-from revengai import ApiClient, ApiException, AuthenticationUsersApi, Configuration
+from revengai import ApiClient, ApiException, ConfigApi, Configuration
 
 from reai_toolkit.app.core.config_service import ConfigService
 from reai_toolkit.app.core.utils import parse_exception
@@ -79,10 +79,8 @@ class AuthService:
         with ApiClient(configuration=self.sdk_config) as api_client:
             if hasattr(self.sdk_config, "user_agent"):
                 api_client.user_agent = self.sdk_config.user_agent
-            user_response_client = AuthenticationUsersApi(api_client)
-
             try:
-                user_response_client.get_requester_user_info()
+                ConfigApi(api_client).get_config()
                 logger.info("RevEng.AI: User authenticated successfully.")
                 self._is_authed = True
                 return True, ""
