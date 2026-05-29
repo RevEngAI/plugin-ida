@@ -139,35 +139,13 @@ class UploadService(IThreadService):
         force_overwrite: bool = False,
     ) -> BaseResponseUploadResponse:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-            post_params: list[Tuple[str, object]] = [
-                ("upload_file_type", upload_file_type),
-                ("force_overwrite", force_overwrite),
-            ]
-            query_params: list[Tuple[str, str]] = []
-            if packed_password is not None:
-                query_params.append(("packed_password", packed_password))
-
-            method, url, header_params, body, post_params = api_client.param_serialize(
-                method="POST",
-                resource_path="/v2/upload",
-                query_params=query_params,
-                header_params={
-                    "Accept": "application/json",
-                    "Content-Type": "multipart/form-data",
-                },
-                post_params=post_params,
-                files={"file": file},
-                auth_settings=["APIKey"],
+            analyses_client = AnalysesCoreApi(api_client)
+            return analyses_client.upload_file(
+                upload_file_type=UploadFileType(upload_file_type),
+                force_overwrite=force_overwrite,
+                packed_password=packed_password,
+                file=file,
             )
-            response_data = api_client.call_api(method, url, header_params, body, post_params)
-            response_data.read()
-            return api_client.response_deserialize(
-                response_data=response_data,
-                response_types_map={
-                    "200": "BaseResponseUploadResponse",
-                    "422": "BaseResponse",
-                },
-            ).data
 
     def upload_user_file(
         self,

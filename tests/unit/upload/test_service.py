@@ -13,60 +13,45 @@ def service():
 
 
 @pytest.fixture
-def api_client(mocker):
-    client = MagicMock()
-    client.param_serialize.return_value = ("POST", "url", {}, None, [])
-    response_data = MagicMock()
-    client.call_api.return_value = response_data
-    client.response_deserialize.return_value = MagicMock(data="parsed-upload-response")
-
-    ctx = mocker.patch.object(svc_mod.UploadService, "yield_api_client")
-    ctx.return_value.__enter__.return_value = client
-    ctx.return_value.__exit__.return_value = False
-    return client
+def sdk(mocker):
+    mocker.patch.object(UploadService, "yield_api_client")
+    api_class = mocker.patch.object(svc_mod, "AnalysesCoreApi")
+    api_inst = MagicMock()
+    api_inst.upload_file.return_value = "parsed-upload-response"
+    api_class.return_value = api_inst
+    return api_inst
 
 
-def test_upload_file_routes_file_into_files_not_form_params(service, api_client):
+def test_upload_file_passes_tuple_to_sdk(service, sdk):
     result = service._upload_file_req(
         upload_file_type=UploadFileType.BINARY,
         file=("binary.elf", b"\x7fELF\x02\x01"),
         force_overwrite=True,
     )
 
-    api_client.param_serialize.assert_called_once()
-    kwargs = api_client.param_serialize.call_args.kwargs
-
-    assert kwargs["resource_path"] == "/v2/upload"
-    assert kwargs["method"] == "POST"
-    assert kwargs["files"] == {"file": ("binary.elf", b"\x7fELF\x02\x01")}
-
-    post_param_keys = [k for k, _ in kwargs["post_params"]]
-    assert "file" not in post_param_keys
-    assert ("upload_file_type", UploadFileType.BINARY) in kwargs["post_params"]
-    assert ("force_overwrite", True) in kwargs["post_params"]
-
-    assert kwargs["auth_settings"] == ["APIKey"]
-    assert kwargs["header_params"]["Content-Type"] == "multipart/form-data"
+    sdk.upload_file.assert_called_once_with(
+        upload_file_type=UploadFileType.BINARY,
+        force_overwrite=True,
+        packed_password=None,
+        file=("binary.elf", b"\x7fELF\x02\x01"),
+    )
     assert result == "parsed-upload-response"
 
 
-def test_upload_file_passes_packed_password_as_query(service, api_client):
+def test_upload_file_forwards_packed_password(service, sdk):
     service._upload_file_req(
         upload_file_type=UploadFileType.BINARY,
         file=("x", b""),
         packed_password="hunter2",
     )
 
-    kwargs = api_client.param_serialize.call_args.kwargs
-    assert ("packed_password", "hunter2") in kwargs["query_params"]
+    assert sdk.upload_file.call_args.kwargs["packed_password"] == "hunter2"
 
 
-def test_upload_file_omits_packed_password_when_none(service, api_client):
+def test_upload_file_defaults_force_overwrite_false(service, sdk):
     service._upload_file_req(
         upload_file_type=UploadFileType.BINARY,
         file=("x", b""),
-        packed_password=None,
     )
 
-    kwargs = api_client.param_serialize.call_args.kwargs
-    assert kwargs["query_params"] == []
+    assert sdk.upload_file.call_args.kwargs["force_overwrite"] is False
