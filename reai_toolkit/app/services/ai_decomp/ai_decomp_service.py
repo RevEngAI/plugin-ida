@@ -193,6 +193,34 @@ class AiDecompService(IThreadService):
         )
         return final
 
+    def _queue_summary(self, function_id: int) -> tuple[bool, str | None]:
+        try:
+            with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+                FunctionsAIDecompilationApi(
+                    api_client
+                ).regenerate_ai_decompilation_summary(function_id=function_id)
+            return True, None
+        except ApiException as e:
+            if e.status == 409:
+                return True, None
+            return False, _format_api_error(e)
+        except Exception as e:
+            return False, f"Unexpected error queuing AI decompilation summary: {e}"
+
+    def _fetch_summary_status(
+        self, function_id: int
+    ) -> tuple[WorkflowProgress | None, str | None]:
+        try:
+            with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+                progress = FunctionsAIDecompilationApi(
+                    api_client
+                ).get_ai_decompilation_summary_status(function_id=function_id)
+            return progress, None
+        except ApiException as e:
+            return None, _format_api_error(e)
+        except Exception as e:
+            return None, f"Unexpected error fetching AI decompilation summary status: {e}"
+
     def _fetch_summary(
         self, function_id: int
     ) -> tuple[SummaryData | None, str | None]:
@@ -228,11 +256,63 @@ class AiDecompService(IThreadService):
             )
             return
 
-        self._summary_cache[function_id] = summary
+        status = str(summary.task_status)
+
+        if status == TaskStatus.COMPLETED.value:
+            self._summary_cache[function_id] = summary
+            self._safe_dispatch(
+                stop_event,
+                self._on_summary,
+                GenericApiReturn[SummaryData](success=True, data=summary),
+            )
+            return
+
+        if status == TaskStatus.UNINITIALISED.value:
+            queued_ok, queue_err = self._queue_summary(function_id)
+            if not queued_ok:
+                self._safe_dispatch(
+                    stop_event,
+                    self._on_summary,
+                    GenericApiReturn[SummaryData](
+                        success=False, error_message=queue_err
+                    ),
+                )
+                return
+
+        polled_ok, poll_err = self._poll_workflow(
+            function_id=function_id,
+            stop_event=stop_event,
+            status_fn=self._fetch_summary_status,
+            requeue_fn=self._queue_summary,
+            label="AI Summary",
+        )
+        if not polled_ok:
+            if poll_err is not None:
+                self._safe_dispatch(
+                    stop_event,
+                    self._on_summary,
+                    GenericApiReturn[SummaryData](
+                        success=False, error_message=poll_err
+                    ),
+                )
+            return
+
+        final, final_err = self._fetch_summary(function_id)
+        if final is None:
+            self._safe_dispatch(
+                stop_event,
+                self._on_summary,
+                GenericApiReturn[SummaryData](
+                    success=False, error_message=final_err
+                ),
+            )
+            return
+
+        self._summary_cache[function_id] = final
         self._safe_dispatch(
             stop_event,
             self._on_summary,
-            GenericApiReturn[SummaryData](success=True, data=summary),
+            GenericApiReturn[SummaryData](success=True, data=final),
         )
 
     def _queue_comments(self, function_id: int) -> tuple[bool, str | None]:
