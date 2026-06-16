@@ -241,6 +241,29 @@ def test_summary_phase_dispatches_on_completed_decomp(service, sdk):
 
     on_summary.assert_called_once()
     assert on_summary.call_args[0][0].data.ai_summary == "It does X."
+    sdk.regenerate_ai_decompilation_summary.assert_not_called()
+    sdk.get_ai_decompilation_summary_status.assert_not_called()
+
+
+def test_summary_phase_regenerates_when_uninitialised(service, sdk):
+    sdk.get_ai_decompilation.return_value = _dd(code="ok")
+    sdk.get_ai_decompilation_summary.side_effect = [
+        _summary(status=TaskStatus.UNINITIALISED.value),
+        _summary(ai="ready"),
+    ]
+    sdk.regenerate_ai_decompilation_summary.return_value = MagicMock(status=True)
+    sdk.get_ai_decompilation_summary_status.side_effect = [
+        _wp(TaskStatus.RUNNING),
+        _wp(TaskStatus.COMPLETED),
+    ]
+
+    _, on_summary, _ = _run(service)
+
+    sdk.regenerate_ai_decompilation_summary.assert_called_once()
+    on_summary.assert_called_once()
+    payload = on_summary.call_args[0][0]
+    assert payload.success is True
+    assert payload.data.ai_summary == "ready"
 
 
 def test_comments_phase_skips_regenerate_when_completed(service, sdk):
