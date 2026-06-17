@@ -91,6 +91,7 @@ class MatchingService(IThreadService):
             search_client = SearchApi(api_client)
 
             model_name: str | None = self.netstore_service.get_model_name()
+            current_binary_id: int | None = self.netstore_service.get_binary_id()
 
             return_list: List[BinarySearchResult] = []
 
@@ -100,6 +101,7 @@ class MatchingService(IThreadService):
                 page_size=5,
                 page=1,
                 model_name=model_name,
+                exclude_binary_id=current_binary_id,
             )
 
             return_list.extend(response.data.results)
@@ -110,6 +112,7 @@ class MatchingService(IThreadService):
                 page_size=5,
                 page=1,
                 model_name=model_name,
+                exclude_binary_id=current_binary_id,
             )
 
             return_list.extend(response.data.results)
