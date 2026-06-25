@@ -1,6 +1,5 @@
 from unittest.mock import MagicMock
 
-import pytest
 from revengai import ApiException
 
 from reai_toolkit.app.interfaces import base_service as base_mod

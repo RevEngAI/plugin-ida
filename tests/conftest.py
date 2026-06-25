@@ -34,15 +34,13 @@ if "IDADIR" not in os.environ:
     except (OSError, KeyError, ValueError):
         pass
 
-_ida_usr = os.path.join(tempfile.gettempdir(), "ida-tests-usr")
-os.makedirs(_ida_usr, exist_ok=True)
-
 if "IDA_LICENSE" not in os.environ:
+    _ida_usr = os.path.join(tempfile.gettempdir(), "ida-tests-usr")
+    os.makedirs(_ida_usr, exist_ok=True)
     _reg = os.path.expanduser("~/.idapro/ida.reg")
     if os.path.isfile(_reg):
         shutil.copy(_reg, os.path.join(_ida_usr, "ida.reg"))
-
-os.environ["IDAUSR"] = _ida_usr
+    os.environ["IDAUSR"] = _ida_usr
 
 try:
     import idapro  # noqa: F401  boots the IDA kernel so ida_* imports resolve
