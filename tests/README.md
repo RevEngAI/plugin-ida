@@ -17,8 +17,8 @@ same so they exercise the exact dependency set that ships. `tests/conftest.py`:
    `IDADIR`).
 2. Points `IDAUSR` at a hermetic temp dir so IDA's plugin scanner does not
    inject other plugins' stale `vendor/` dirs onto `sys.path`.
-3. Leaves that `IDAUSR` empty — licensing is provided by the runner
-   image/environment, not seeded here.
+3. Seeds the node-locked registration (`~/.idapro/ida.reg`) into that hermetic
+   `IDAUSR` so idalib can boot.
 4. `import idapro` (boots the headless kernel).
 5. Prepends `reai_toolkit/vendor/` and the repo root to `sys.path`.
 

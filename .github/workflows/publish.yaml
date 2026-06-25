@@ -46,6 +46,24 @@ jobs:
       - name: Install build tools
         run: python -m pip install --upgrade pip setuptools wheel
 
+      - name: Stamp release version into ida-plugin.json
+        run: |
+          python - <<'PY'
+          import json, os
+
+          version = os.environ["RELEASE_TAG"].lstrip("v")
+          with open("ida-plugin.json") as fh:
+              meta = json.load(fh)
+          meta["plugin"]["version"] = version
+          with open("ida-plugin.json", "w") as fh:
+              json.dump(meta, fh, indent=2)
+              fh.write("\n")
+          print(f"Stamped ida-plugin.json version = {version}")
+          PY
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        shell: bash
+
       - name: Build vendor dependencies
         run: |
           rm -rf screenshots

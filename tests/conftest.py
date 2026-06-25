@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import sys
 import tempfile
 
@@ -35,6 +36,11 @@ if "IDADIR" not in os.environ:
 
 _ida_usr = os.path.join(tempfile.gettempdir(), "ida-tests-usr")
 os.makedirs(_ida_usr, exist_ok=True)
+
+if "IDA_LICENSE" not in os.environ:
+    _reg = os.path.expanduser("~/.idapro/ida.reg")
+    if os.path.isfile(_reg):
+        shutil.copy(_reg, os.path.join(_ida_usr, "ida.reg"))
 
 os.environ["IDAUSR"] = _ida_usr
 

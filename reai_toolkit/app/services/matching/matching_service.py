@@ -338,7 +338,7 @@ class MatchingService(IThreadService):
 
         yield SummaryEvent(
             ok=len(errors) == 0,
-            completed=response.data.progress,
+            completed=response.data.progress if response.success and response.data else 0,
             total=len(final_results),
             errors=errors,
             results=final_results,
