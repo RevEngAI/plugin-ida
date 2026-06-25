@@ -1,3 +1,4 @@
+import faulthandler
 import json
 import os
 import shutil
@@ -5,6 +6,8 @@ import sys
 import tempfile
 
 import pytest
+
+faulthandler.enable()
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
