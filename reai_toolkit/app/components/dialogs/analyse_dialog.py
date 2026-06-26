@@ -8,7 +8,7 @@ from revengai import Symbols
 from revengai.models.function_boundary import FunctionBoundary
 
 from reai_toolkit.app.components.dialogs.base_dialog import DialogBase
-from reai_toolkit.app.core.qt_compat import QT_VER, QtGui, QtWidgets
+from reai_toolkit.app.core.qt_compat import QT_VER, QtCore, QtGui, QtWidgets
 from reai_toolkit.app.services.auth.auth_service import AuthService
 from reai_toolkit.app.services.upload.upload_service import UploadService
 from reai_toolkit.app.core.utils import collect_symbols_from_ida
@@ -96,6 +96,9 @@ class AnalyseDialog(DialogBase):
         self.ui.radioButton_2.clicked.connect(self._on_public_click)  # Public
         self.ui.radioButton_2.setChecked(True)
 
+        self.ui.horizontalLayout.setSpacing(24)
+        self.ui.horizontalLayout.addStretch(1)
+
         self._apply_tier_restrictions()
 
         # Hook up button to subset functions submitted for upload
@@ -113,6 +116,21 @@ class AnalyseDialog(DialogBase):
         self.ui.radioButton.setEnabled(False)
         self.ui.radioButton.setToolTip(ENTHUSIAST_PRIVATE_TOOLTIP)
         self.ui.labelScope.setToolTip(ENTHUSIAST_PRIVATE_TOOLTIP)
+        # Qt suppresses tooltip display for disabled widgets, so surface it via
+        # an event filter instead.
+        self.ui.radioButton.installEventFilter(self)
+
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if (
+            obj is self.ui.radioButton
+            and event.type() == QtCore.QEvent.Type.ToolTip
+            and not self.ui.radioButton.isEnabled()
+        ):
+            QtWidgets.QToolTip.showText(
+                event.globalPos(), ENTHUSIAST_PRIVATE_TOOLTIP, self.ui.radioButton
+            )
+            return True
+        return super().eventFilter(obj, event)
 
     def pick_debug_file(self) -> None:
         filters = (
