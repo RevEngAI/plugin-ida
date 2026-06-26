@@ -16,6 +16,7 @@ ACTIONS = {
 
 EXTRA = {
     "binary_upload": {"status": "yes"},
+    "disable_private_analyses": {"status": "yes"},
     "view_analysis_logs": {"status": "yes"},
     "fs_collection_filter": {"status": "yes"},
     "fs_binary_filter": {"status": "yes"},
