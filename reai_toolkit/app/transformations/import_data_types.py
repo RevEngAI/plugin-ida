@@ -9,9 +9,9 @@ from revengai import (
     Enumeration,
     FunctionDataTypesList,
     FunctionHeader,
-    FunctionInfoInputFuncDepsInner,
-    FunctionInfoOutput,
-    FunctionTypeOutput,
+    FunctionInfoFuncDepsInner,
+    FunctionInfo,
+    FunctionType,
     Structure,
     TypeDefinition,
 )
@@ -37,7 +37,7 @@ class ImportDataTypes:
         lookup: dict[str, TaggedDependency] = {}
 
         for function in functions.items:
-            data_types: FunctionInfoOutput | None = function.data_types
+            data_types: FunctionInfo | None = function.data_types
 
             if data_types is None:
                 continue
@@ -53,7 +53,7 @@ class ImportDataTypes:
                 if dep.actual_instance.name not in lookup:
                     lookup.update({dep.actual_instance.name: TaggedDependency(dep.actual_instance)}) # type: ignore
 
-            dependency: FunctionInfoInputFuncDepsInner
+            dependency: FunctionInfoFuncDepsInner
             for dependency in data_types.func_deps:
                 if dependency.actual_instance is None:
                     continue
@@ -68,7 +68,7 @@ class ImportDataTypes:
                         )
                         tagged_dependency.processed = True
 
-            func: FunctionTypeOutput | None = data_types.func_types
+            func: FunctionType | None = data_types.func_types
             if func:
                 # If we obtained data types from a matched function, we need to make sure we map it to the original effective address.
                 if matched_function_mapping:
@@ -130,7 +130,7 @@ class ImportDataTypes:
             name=imported_typedef.name, type_=normalized_type
         )
 
-    def update_function(self, func: FunctionTypeOutput, ea: int) -> None:
+    def update_function(self, func: FunctionType, ea: int) -> None:
         base_address: int = self.deci.binary_base_addr
         rva: int = ea - base_address
 

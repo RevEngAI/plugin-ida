@@ -1,6 +1,6 @@
 [project]
 name = "reai_toolkit"
-version = "3.6.1"
+version = "0.0.1"
 description = "RevEng.AI Toolkit plugin for IDA"
 requires-python = ">=3.10"
 
@@ -9,7 +9,7 @@ dependencies = [
   "requests>=2.32",
   "loguru>=0.7",
   "pydantic",
-  "revengai>=3.93.0",
+  "revengai>=3.96.4",
   "libbs>=2.16.5",
 ]
 
@@ -63,7 +63,7 @@ mypy_path = ["stubs"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--import-mode=importlib"
+addopts = "--import-mode=importlib -s"
 markers = [
     "idalib: tests that require an activated idalib (IDA Pro headless). Run with `pytest -m idalib`. In CI these run on the `ida` self-hosted runner image (IDA + idalib preinstalled, licensing provided by the runner environment).",
 ]

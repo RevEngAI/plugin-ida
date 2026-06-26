@@ -1,9 +1,13 @@
+import faulthandler
 import json
 import os
+import shutil
 import sys
 import tempfile
 
 import pytest
+
+faulthandler.enable()
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -35,6 +39,14 @@ if "IDADIR" not in os.environ:
 
 _ida_usr = os.path.join(tempfile.gettempdir(), "ida-tests-usr")
 os.makedirs(_ida_usr, exist_ok=True)
+
+for _reg in (
+    os.path.join(os.environ.get("IDADIR", ""), "ida.reg"),
+    os.path.expanduser("~/.idapro/ida.reg"),
+):
+    if _reg and os.path.isfile(_reg):
+        shutil.copy(_reg, os.path.join(_ida_usr, "ida.reg"))
+        break
 
 os.environ["IDAUSR"] = _ida_usr
 
