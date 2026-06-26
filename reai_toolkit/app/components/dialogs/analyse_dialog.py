@@ -8,7 +8,8 @@ from revengai import Symbols
 from revengai.models.function_boundary import FunctionBoundary
 
 from reai_toolkit.app.components.dialogs.base_dialog import DialogBase
-from reai_toolkit.app.core.qt_compat import QT_VER, QtGui, QtWidgets
+from reai_toolkit.app.core.qt_compat import QT_VER, QtCore, QtGui, QtWidgets
+from reai_toolkit.app.services.auth.auth_service import AuthService
 from reai_toolkit.app.services.upload.upload_service import UploadService
 from reai_toolkit.app.core.utils import collect_symbols_from_ida
 from reai_toolkit.app.components.dialogs.select_functions_dialog import (
@@ -24,6 +25,12 @@ else:
     from reai_toolkit.app.components.forms.analyse.analyse_panel_ui_uic5 import (
         Ui_AuthPanel,
     )
+
+
+ENTHUSIAST_PRIVATE_TOOLTIP = (
+    "Private analyses are not available on the Enthusiast tier. "
+    "Upgrade your plan to create private analyses."
+)
 
 
 class AnalyseDialog(DialogBase):
@@ -50,6 +57,7 @@ class AnalyseDialog(DialogBase):
         self,
         *,
         upload_service: UploadService,
+        auth_service: AuthService,
         callback: Callable[..., Any],
         parent: QtWidgets.QWidget | None = None,
     ) -> None:
@@ -57,6 +65,7 @@ class AnalyseDialog(DialogBase):
         self.setWindowTitle("RevEng.AI — Analyse")
         self.setModal(False)
         self.upload_service: UploadService = upload_service
+        self.auth_service: AuthService = auth_service
         self.callback: Callable[..., Any] = callback
         self.file_path: str = idaapi.get_input_file_path()
         self.file_name: str = idaapi.get_root_filename()
@@ -87,8 +96,41 @@ class AnalyseDialog(DialogBase):
         self.ui.radioButton_2.clicked.connect(self._on_public_click)  # Public
         self.ui.radioButton_2.setChecked(True)
 
+        self.ui.horizontalLayout.setSpacing(24)
+        self.ui.horizontalLayout.addStretch(1)
+
+        self._apply_tier_restrictions()
+
         # Hook up button to subset functions submitted for upload
         self.ui.selectFuncs.clicked.connect(self._on_functions_click)
+
+    def _apply_tier_restrictions(self) -> None:
+        """
+        Enthusiast-tier users cannot create private analyses, so disable the
+        Private scope option, force Public, and explain why on hover.
+        """
+        if not self.auth_service.is_enthusiast():
+            return
+
+        self._on_public_click()
+        self.ui.radioButton.setEnabled(False)
+        self.ui.radioButton.setToolTip(ENTHUSIAST_PRIVATE_TOOLTIP)
+        self.ui.labelScope.setToolTip(ENTHUSIAST_PRIVATE_TOOLTIP)
+        # Qt suppresses tooltip display for disabled widgets, so surface it via
+        # an event filter instead.
+        self.ui.radioButton.installEventFilter(self)
+
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        if (
+            obj is self.ui.radioButton
+            and event.type() == QtCore.QEvent.Type.ToolTip
+            and not self.ui.radioButton.isEnabled()
+        ):
+            QtWidgets.QToolTip.showText(
+                event.globalPos(), ENTHUSIAST_PRIVATE_TOOLTIP, self.ui.radioButton
+            )
+            return True
+        return super().eventFilter(obj, event)
 
     def pick_debug_file(self) -> None:
         filters = (

@@ -36,6 +36,7 @@ class DialogFactory:
 
         return AnalyseDialog(
             upload_service=self.app.upload_service,
+            auth_service=self.app.auth_service,
             parent=self.parent,
             callback=service_callback,
         )

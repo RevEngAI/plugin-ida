@@ -24,6 +24,9 @@
     "data_types_sync": {
       "status": "yes"
     },
+    "disable_private_analyses": {
+      "status": "yes"
+    },
     "fs_binary_filter": {
       "status": "yes"
     },
