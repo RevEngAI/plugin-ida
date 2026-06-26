@@ -1,10 +1,12 @@
 from typing import Tuple
 
 from loguru import logger
-from revengai import ApiClient, ApiException, ConfigApi, Configuration
+from revengai import ApiClient, ApiException, ConfigApi, Configuration, IAMUsersApi, User
 
 from reai_toolkit.app.core.config_service import ConfigService
 from reai_toolkit.app.core.utils import parse_exception
+
+ENTHUSIAST_TIER = "ENTHUSIAST"
 
 
 class AuthService:
@@ -22,6 +24,7 @@ class AuthService:
         self._ida_version = ida_version
         self._plugin_version = plugin_version
         self._is_authed: bool = False
+        self._user: User | None = None
 
     def get_sdk_config(self) -> Configuration | None:
         """
@@ -83,6 +86,7 @@ class AuthService:
                 ConfigApi(api_client).get_config()
                 logger.info("RevEng.AI: User authenticated successfully.")
                 self._is_authed = True
+                self.get_me(force_refresh=True)
                 return True, ""
 
             except ApiException as e:
@@ -118,3 +122,36 @@ class AuthService:
         """
 
         return self._is_authed
+
+    def get_me(self, force_refresh: bool = False) -> User | None:
+        """
+        Fetch the authenticated user from /v2/iam/me, or None on failure.
+        Result is cached; pass force_refresh=True to re-fetch.
+        No exceptions are raised.
+        """
+
+        if self._user is not None and not force_refresh:
+            return self._user
+
+        if self.sdk_config is None:
+            self.build_sdk_config()
+
+        with ApiClient(configuration=self.sdk_config) as api_client:
+            if hasattr(self.sdk_config, "user_agent"):
+                api_client.user_agent = self.sdk_config.user_agent
+            try:
+                self._user = IAMUsersApi(api_client).get_me()
+            except Exception as e:
+                logger.error(f"RevEng.AI: Failed to fetch current user: {e}")
+                self._user = None
+
+        return self._user
+
+    def is_enthusiast(self) -> bool:
+        """
+        Return whether the authenticated user is on the Enthusiast tier.
+        Enthusiast-tier users cannot create private analyses.
+        """
+
+        user = self.get_me()
+        return user is not None and user.tier == ENTHUSIAST_TIER

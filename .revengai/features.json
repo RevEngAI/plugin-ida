@@ -6,6 +6,9 @@
     "analyse_binary": {
       "status": "yes"
     },
+    "disable_private_analyses": {
+      "status": "yes"
+    },
     "apply_existing_analysis": {
       "status": "yes"
     },
