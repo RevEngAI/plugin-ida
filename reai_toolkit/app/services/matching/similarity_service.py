@@ -4,17 +4,18 @@ import time
 
 from loguru import logger
 from revengai import (
-    BaseResponseBasic,
+    ApiException,
     Configuration,
+    GetMatchesOutputBody,
+    GetMatchesStatusOutputBody,
+    StartMatchingForFunctionsInputBody,
+    TaskStatus,
 )
 
 from reai_toolkit.app.core import SimpleNetStore
 from reai_toolkit.app.interfaces.thread_service import IThreadService
-from revengai import FunctionMatchingResponse
-from revengai.models.function_matching_request import FunctionMatchingRequest
 from revengai.models.matched_function import MatchedFunction
 from revengai.api.functions_core_api import FunctionsCoreApi
-from revengai.api.analyses_core_api import AnalysesCoreApi
 
 
 class SimilarityService(IThreadService):
@@ -41,56 +42,62 @@ class SimilarityService(IThreadService):
         vaddr: int,
         callback: Callable[[int, int, list[MatchedFunction], int], None],
     ) -> None:
+        analysis_id: int | None = self.netstore_service.get_analysis_id()
+        if analysis_id is None:
+            logger.warning(
+                "failed to perform similarity request due to invalid analysis id"
+            )
+            return
+
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-            analyses_client = AnalysesCoreApi(api_client)
-
-            analysis_id: int | None = self.netstore_service.get_analysis_id()
-            if analysis_id is None:
-                logger.warning(
-                    "failed to perform similarity request due to invalid analysis id"
-                )
-                return
-
-            analysis_details: BaseResponseBasic = (
-                analyses_client.get_analysis_basic_info(analysis_id=analysis_id)
-            )
-            if analysis_details.data is None:
-                logger.warning(
-                    "failed to perform similarity request due to invalid model id"
-                )
-                return
-
-            model_id = analysis_details.data.model_id
-            request: FunctionMatchingRequest = FunctionMatchingRequest(
-                model_id=model_id,
-                function_ids=[func_id],
-                results_per_function=16,
-                min_similarity=70,
-            )
             api: FunctionsCoreApi = FunctionsCoreApi(api_client)
+
+            try:
+                api.start_functions_matching(
+                    StartMatchingForFunctionsInputBody(
+                        function_ids=[func_id],
+                        results_per_function=16,
+                        min_similarity=70,
+                    )
+                )
+            except ApiException as e:
+                logger.error(
+                    f"failed to start similarity request due to {e}"
+                )
+                return
 
             timeout: float = 60.0
             elapsed: float = 0.0
             sleep_interval: float = 0.5
 
             while stop_event.is_set() is False and elapsed < timeout:
-                response: FunctionMatchingResponse = api.batch_function_matching(
-                    request
-                )
-
-                if response.error_message:
+                try:
+                    status: GetMatchesStatusOutputBody = (
+                        api.get_functions_matching_status(function_ids=[func_id])
+                    )
+                except ApiException as e:
                     logger.error(
-                        f"failed to perform similarity request due to {response.error_message}"
+                        f"failed to perform similarity request due to {e}"
                     )
                     return
 
                 logger.info(
-                    f"Fetching function similarity result for {func_id}, progress: {response.progress}"
+                    f"Fetching function similarity result for {func_id}, status: {status.status}"
                 )
-                if response.progress == 100:
+
+                if status.status == TaskStatus.FAILED:
+                    logger.error(
+                        "failed to perform similarity request due to matching failure"
+                    )
+                    return
+
+                if status.status == TaskStatus.COMPLETED:
+                    result: GetMatchesOutputBody = api.get_functions_matches(
+                        function_ids=[func_id]
+                    )
                     matches: list[MatchedFunction] = []
-                    if response.matches:
-                        matches = response.matches[0].matched_functions
+                    if result.matches:
+                        matches = result.matches[0].matched_functions
 
                     return callback(func_id, vaddr, matches, analysis_id)
 

@@ -1,13 +1,15 @@
 from revengai import (
-    AnalysisFunctionMatchingRequest,
     BinarySearchResult,
     CollectionSearchResult,
     FunctionMapping,
     FunctionMatch,
-    FunctionMatchingFilters,
-    FunctionMatchingResponse,
+    GetMatchesOutputBody,
+    GetMatchesStatusOutputBody,
+    MatchFilters,
+    StartMatchingForFunctionsInputBody,
+    StartMatchingOutputBody,
+    TaskStatus,
 )
-from revengai.models.function_matching_request import FunctionMatchingRequest
 from revengai.models.matched_function import MatchedFunction
 
 
@@ -17,28 +19,38 @@ def test_function_match_fields():
     )
 
 
-def test_matching_response_fields():
-    assert {"progress", "status", "matches", "error_message"} <= set(
-        FunctionMatchingResponse.model_fields
+def test_start_matching_input_fields():
+    assert {"filters", "function_ids", "min_similarity", "results_per_function"} <= set(
+        StartMatchingForFunctionsInputBody.model_fields
     )
 
 
-def test_matching_filters_fields():
+def test_match_filters_fields():
     assert {"binary_ids", "collection_ids", "debug_types"} <= set(
-        FunctionMatchingFilters.model_fields
+        MatchFilters.model_fields
     )
 
 
-def test_analysis_matching_request_fields():
-    assert {"min_similarity", "filters", "results_per_function", "page", "page_size"} <= set(
-        AnalysisFunctionMatchingRequest.model_fields
+def test_get_matches_output_fields():
+    assert {"status", "matches"} <= set(GetMatchesOutputBody.model_fields)
+
+
+def test_get_matches_status_output_fields():
+    assert {"status", "step", "step_index", "steps_total", "messages"} <= set(
+        GetMatchesStatusOutputBody.model_fields
     )
 
 
-def test_function_matching_request_fields():
-    assert {"model_id", "function_ids", "min_similarity", "results_per_function"} <= set(
-        FunctionMatchingRequest.model_fields
+def test_start_matching_output_fields():
+    assert {"status", "step", "step_index", "steps_total", "messages"} <= set(
+        StartMatchingOutputBody.model_fields
     )
+
+
+def test_task_status_values():
+    assert {"UNINITIALISED", "PENDING", "RUNNING", "COMPLETED", "FAILED"} <= {
+        s.value for s in TaskStatus
+    }
 
 
 def test_matched_function_fields():

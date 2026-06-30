@@ -1,7 +1,12 @@
 from unittest.mock import MagicMock
 
 import pytest
-from revengai import FunctionMatch, FunctionMatchingResponse
+from revengai import (
+    FunctionMatch,
+    GetMatchesOutputBody,
+    GetMatchesStatusOutputBody,
+    ProgressMessage,
+)
 
 from reai_toolkit.app.services.matching import matching_service as svc_mod
 from reai_toolkit.app.services.matching.matching_service import MatchingService
@@ -10,6 +15,11 @@ from reai_toolkit.app.services.matching.schema import (
     StartEvent,
     SummaryEvent,
 )
+
+
+@pytest.fixture(autouse=True)
+def no_sleep(mocker):
+    mocker.patch.object(svc_mod.time, "sleep", lambda *_: None)
 
 
 @pytest.fixture
@@ -50,9 +60,21 @@ def _match(function_id: int) -> FunctionMatch:
     )
 
 
-def _response(status="COMPLETED", progress=100, matches=None) -> FunctionMatchingResponse:
-    return FunctionMatchingResponse.model_construct(
-        status=status, progress=progress, matches=matches or [], error_message=None
+def _status(
+    status="COMPLETED", step_index=1, steps_total=1, messages=None
+) -> GetMatchesStatusOutputBody:
+    return GetMatchesStatusOutputBody.model_construct(
+        status=status,
+        step="match",
+        step_index=step_index,
+        steps_total=steps_total,
+        messages=messages or [],
+    )
+
+
+def _matches(matches=None) -> GetMatchesOutputBody:
+    return GetMatchesOutputBody.model_construct(
+        status="COMPLETED", matches=matches or []
     )
 
 
@@ -96,8 +118,9 @@ def test_search_binaries_queries_name_and_sha_excluding_current(service, search_
 
 
 def test_perform_matching_emits_start_batch_summary_and_filters_results(service, core_api):
-    core_api.analysis_function_matching.return_value = _response(
-        matches=[_match(1), _match(2), _match(3)]
+    core_api.get_functions_matching_status.return_value = _status()
+    core_api.get_functions_matches.return_value = _matches(
+        [_match(1), _match(2), _match(3)]
     )
 
     events = list(
@@ -115,29 +138,28 @@ def test_perform_matching_emits_start_batch_summary_and_filters_results(service,
 
 
 def test_perform_matching_uses_nns_1_for_multiple_functions(service, core_api):
-    core_api.analysis_function_matching.return_value = _response(matches=[_match(1)])
+    core_api.get_functions_matching_status.return_value = _status()
+    core_api.get_functions_matches.return_value = _matches([_match(1)])
 
     list(service.perform_matching([1, 2], analysis_func_count=10, min_similarity=90))
 
-    req = core_api.analysis_function_matching.call_args.kwargs[
-        "analysis_function_matching_request"
-    ]
-    assert req.results_per_function == 1
+    body = core_api.start_functions_matching.call_args.args[0]
+    assert body.results_per_function == 1
 
 
 def test_perform_matching_uses_nns_10_for_single_function(service, core_api):
-    core_api.analysis_function_matching.return_value = _response(matches=[_match(1)])
+    core_api.get_functions_matching_status.return_value = _status()
+    core_api.get_functions_matches.return_value = _matches([_match(1)])
 
     list(service.perform_matching([1], analysis_func_count=10, min_similarity=90))
 
-    req = core_api.analysis_function_matching.call_args.kwargs[
-        "analysis_function_matching_request"
-    ]
-    assert req.results_per_function == 10
+    body = core_api.start_functions_matching.call_args.args[0]
+    assert body.results_per_function == 10
 
 
-def test_perform_matching_debug_all_sets_all_debug_types(service, core_api):
-    core_api.analysis_function_matching.return_value = _response(matches=[])
+def test_perform_matching_debug_all_sets_system_and_user(service, core_api):
+    core_api.get_functions_matching_status.return_value = _status()
+    core_api.get_functions_matches.return_value = _matches([])
 
     list(
         service.perform_matching(
@@ -145,16 +167,20 @@ def test_perform_matching_debug_all_sets_all_debug_types(service, core_api):
         )
     )
 
-    req = core_api.analysis_function_matching.call_args.kwargs[
-        "analysis_function_matching_request"
-    ]
-    assert req.filters.debug_types == ["USER", "EXTERNAL", "SYSTEM"]
+    body = core_api.start_functions_matching.call_args.args[0]
+    assert body.filters.debug_types == ["USER", "SYSTEM"]
 
 
-def test_perform_matching_error_status_yields_failure_summary(service, core_api):
-    err = _response(status="ERROR", progress=0)
-    err.error_message = "matching exploded"
-    core_api.analysis_function_matching.return_value = err
+def test_perform_matching_failed_status_yields_failure_summary(service, core_api):
+    core_api.get_functions_matching_status.return_value = _status(
+        status="FAILED",
+        step_index=0,
+        messages=[
+            ProgressMessage.model_construct(
+                level="ERROR", step="match", text="matching exploded", timestamp=None
+            )
+        ],
+    )
 
     events = list(
         service.perform_matching([1], analysis_func_count=10, min_similarity=90)
@@ -164,10 +190,26 @@ def test_perform_matching_error_status_yields_failure_summary(service, core_api)
     assert isinstance(summary, SummaryEvent)
     assert summary.ok is False
     assert "matching exploded" in summary.errors
+    core_api.get_functions_matches.assert_not_called()
 
 
-def test_perform_matching_api_failure_yields_failure_summary(service, core_api):
-    core_api.analysis_function_matching.side_effect = RuntimeError("down")
+def test_perform_matching_polls_until_completed(service, core_api):
+    core_api.get_functions_matching_status.side_effect = [
+        _status(status="RUNNING", step_index=0, steps_total=2),
+        _status(status="COMPLETED", step_index=2, steps_total=2),
+    ]
+    core_api.get_functions_matches.return_value = _matches([_match(1)])
+
+    events = list(
+        service.perform_matching([1], analysis_func_count=10, min_similarity=90)
+    )
+
+    assert core_api.get_functions_matching_status.call_count == 2
+    assert events[-1].ok is True
+
+
+def test_perform_matching_start_failure_yields_failure_summary(service, core_api):
+    core_api.start_functions_matching.side_effect = RuntimeError("down")
 
     events = list(
         service.perform_matching([1], analysis_func_count=10, min_similarity=90)
@@ -175,3 +217,4 @@ def test_perform_matching_api_failure_yields_failure_summary(service, core_api):
 
     assert isinstance(events[-1], SummaryEvent)
     assert events[-1].ok is False
+    core_api.get_functions_matching_status.assert_not_called()

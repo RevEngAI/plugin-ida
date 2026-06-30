@@ -2,7 +2,7 @@ import threading
 from unittest.mock import MagicMock
 
 import pytest
-from revengai import FunctionMatchingResponse
+from revengai import GetMatchesOutputBody, GetMatchesStatusOutputBody
 from revengai.models.function_match import FunctionMatch
 from revengai.models.matched_function import MatchedFunction
 
@@ -34,27 +34,27 @@ def service(netstore):
 @pytest.fixture
 def sdk(mocker):
     mocker.patch.object(SimilarityService, "yield_api_client")
-    analyses = mocker.patch.object(svc_mod, "AnalysesCoreApi").return_value
     functions = mocker.patch.object(svc_mod, "FunctionsCoreApi").return_value
-    analyses.get_analysis_basic_info.return_value = MagicMock(
-        data=MagicMock(model_id=5)
-    )
-    return analyses, functions
+    return functions
 
 
 def _matched(function_id: int) -> MatchedFunction:
     return MatchedFunction.model_construct(function_id=function_id, similarity=0.9)
 
 
-def _response(progress: int, matched=None) -> FunctionMatchingResponse:
+def _status(status: str) -> GetMatchesStatusOutputBody:
+    return GetMatchesStatusOutputBody.model_construct(
+        status=status, step="match", step_index=0, steps_total=1, messages=[]
+    )
+
+
+def _matches(matched=None) -> GetMatchesOutputBody:
     matches = (
         [FunctionMatch.model_construct(function_id=FUNC_ID, matched_functions=matched)]
         if matched is not None
         else []
     )
-    return FunctionMatchingResponse.model_construct(
-        progress=progress, error_message=None, matches=matches
-    )
+    return GetMatchesOutputBody.model_construct(status="COMPLETED", matches=matches)
 
 
 def _run(service):
@@ -64,9 +64,9 @@ def _run(service):
 
 
 def test_complete_invokes_callback_with_matches(service, sdk):
-    _, functions = sdk
-    functions.batch_function_matching.return_value = _response(
-        100, matched=[_matched(2), _matched(3)]
+    sdk.get_functions_matching_status.return_value = _status("COMPLETED")
+    sdk.get_functions_matches.return_value = _matches(
+        matched=[_matched(2), _matched(3)]
     )
 
     cb = _run(service)
@@ -83,36 +83,26 @@ def test_missing_analysis_id_skips(service, sdk, netstore):
     cb = _run(service)
 
     cb.assert_not_called()
+    sdk.start_functions_matching.assert_not_called()
 
 
-def test_missing_basic_info_data_skips(service, sdk):
-    analyses, _ = sdk
-    analyses.get_analysis_basic_info.return_value = MagicMock(data=None)
-
-    cb = _run(service)
-
-    cb.assert_not_called()
-
-
-def test_error_message_aborts_without_callback(service, sdk):
-    _, functions = sdk
-    resp = _response(50)
-    resp.error_message = "similarity failed"
-    functions.batch_function_matching.return_value = resp
+def test_failed_status_aborts_without_callback(service, sdk):
+    sdk.get_functions_matching_status.return_value = _status("FAILED")
 
     cb = _run(service)
 
     cb.assert_not_called()
+    sdk.get_functions_matches.assert_not_called()
 
 
-def test_polls_until_progress_complete(service, sdk):
-    _, functions = sdk
-    functions.batch_function_matching.side_effect = [
-        _response(50),
-        _response(100, matched=[_matched(9)]),
+def test_polls_until_status_complete(service, sdk):
+    sdk.get_functions_matching_status.side_effect = [
+        _status("RUNNING"),
+        _status("COMPLETED"),
     ]
+    sdk.get_functions_matches.return_value = _matches(matched=[_matched(9)])
 
     cb = _run(service)
 
-    assert functions.batch_function_matching.call_count == 2
+    assert sdk.get_functions_matching_status.call_count == 2
     cb.assert_called_once()
