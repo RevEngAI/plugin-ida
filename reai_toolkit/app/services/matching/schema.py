@@ -21,13 +21,6 @@ class MatchEventType(str, Enum):
     SUMMARY = "summary"
 
 
-# API_PROGRESS_STATUS
-class APIProgressStatus(str, Enum):
-    STARTED = "STARTED"
-    COMPLETED = "COMPLETED"
-    ERROR = "ERROR"
-
-
 # -------------------------
 # Event Models
 # -------------------------

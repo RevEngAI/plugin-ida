@@ -1,4 +1,5 @@
 import threading
+import time
 from typing import Any, Callable, Generator, List, Optional
 
 import ida_funcs
@@ -8,23 +9,25 @@ from libbs.decompilers.ida.compat import execute_read
 
 from loguru import logger
 from revengai import (
-    AnalysisFunctionMatchingRequest,
     BinarySearchResult,
     CollectionSearchResult,
     Configuration,
     FunctionMapping,
-    FunctionMatchingResponse,
-    FunctionMatchingFilters,
     FunctionMatch,
     FunctionsCoreApi,
+    GetMatchesOutputBody,
+    GetMatchesStatusOutputBody,
+    MatchFilters,
+    ProgressMessage,
     SearchApi,
+    StartMatchingForFunctionsInputBody,
+    TaskStatus,
 )
 
 from reai_toolkit.app.core import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.matching.schema import (
-    APIProgressStatus,
     BatchDoneEvent,
     MatchEvent,
     StartEvent,
@@ -203,35 +206,66 @@ class MatchingService(IThreadService):
         finally:
             self._thread_callback = None
 
-    def _match_request(
-        self,
-        nns: int,
-        min_similarity: int,
-        binary_ids: Optional[List[int]] = None,
-        collection_ids: Optional[List[int]] = None,
-        debug_flags: Optional[List[str]] = None,
-        page: int = 1,
-        page_size: int = 1000,
-    ) -> FunctionMatchingResponse:
-        with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-            functions_client = FunctionsCoreApi(api_client)
+    _POLL_INTERVAL: float = 1.0
+    _POLL_TIMEOUT: float = 1200.0
 
-            result: FunctionMatchingResponse = functions_client.analysis_function_matching(
-                analysis_id=self.netstore_service.get_analysis_id(),
-                analysis_function_matching_request=AnalysisFunctionMatchingRequest(
+    @staticmethod
+    def _debug_types(user_debug_only: bool, debug_all: bool) -> Optional[List[str]]:
+        if user_debug_only:
+            return ["USER"]
+        if debug_all:
+            return ["USER", "SYSTEM"]
+        return None
+
+    @staticmethod
+    def _progress_pct(body: GetMatchesStatusOutputBody) -> int:
+        if body.steps_total and body.steps_total > 0:
+            return int((body.step_index / body.steps_total) * 100)
+        return 0
+
+    @staticmethod
+    def _messages_text(messages: Optional[List[ProgressMessage]]) -> str:
+        if not messages:
+            return "Function matching failed."
+        errs = [m.text for m in messages if (m.level or "").upper() == "ERROR"]
+        return "; ".join(errs or [messages[-1].text])
+
+    def _start_matching(
+        self,
+        function_ids: List[int],
+        min_similarity: int,
+        results_per_function: int,
+        binary_ids: Optional[List[int]],
+        collection_ids: Optional[List[int]],
+        debug_types: Optional[List[str]],
+    ) -> None:
+        with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+            FunctionsCoreApi(api_client).start_functions_matching(
+                StartMatchingForFunctionsInputBody(
+                    function_ids=function_ids,
                     min_similarity=min_similarity,
-                    results_per_function=nns,
-                    page_size=page_size,
-                    page=page,
-                    filters=FunctionMatchingFilters(
+                    results_per_function=results_per_function,
+                    filters=MatchFilters(
                         binary_ids=binary_ids,
                         collection_ids=collection_ids,
-                        debug_types=debug_flags,
+                        debug_types=debug_types,
                     ),
-                ),
+                )
             )
 
-            return result
+    def _matching_status(
+        self, function_ids: List[int]
+    ) -> GetMatchesStatusOutputBody:
+        with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+            return FunctionsCoreApi(api_client).get_functions_matching_status(
+                function_ids=function_ids
+            )
+
+    def _get_matches(self, function_ids: List[int]) -> GetMatchesOutputBody:
+        with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+            return FunctionsCoreApi(api_client).get_functions_matches(
+                function_ids=function_ids
+            )
 
     def perform_matching(
         self,
@@ -244,101 +278,101 @@ class MatchingService(IThreadService):
         debug_all: bool = False,
     ) -> Generator[MatchEvent, None, None]:
         nns = 1 if len(function_ids) > 1 else 10
+        debug_types = self._debug_types(user_debug_only, debug_all)
 
-        debug_flags = []
-        if user_debug_only:
-            debug_flags.append("USER")
-        elif debug_all:
-            debug_flags.extend(["USER", "EXTERNAL", "SYSTEM"])
-
-        # Prep progress tracking
         total = 100
         errors: List[str] = []
 
-        # Initial "start" event
         yield StartEvent(total=total)
 
-        while True:
-            response: GenericApiReturn[FunctionMatchingResponse] = (
+        start: GenericApiReturn[None] = self.api_request_returning(
+            lambda: self._start_matching(
+                function_ids=function_ids,
+                min_similarity=min_similarity,
+                results_per_function=nns,
+                binary_ids=binary_ids,
+                collection_ids=collection_ids,
+                debug_types=debug_types,
+            )
+        )
+        if not start.success:
+            yield BatchDoneEvent(
+                completed=0, total=total, ok=False, error=start.error_message
+            )
+            yield SummaryEvent(
+                ok=False,
+                completed=0,
+                total=0,
+                errors=[start.error_message],
+                results=[],
+            )
+            return
+
+        completed_pct = 0
+        done = False
+        elapsed = 0.0
+        while elapsed < self._POLL_TIMEOUT:
+            status: GenericApiReturn[GetMatchesStatusOutputBody] = (
                 self.api_request_returning(
-                    lambda: self._match_request(
-                        nns=nns,
-                        min_similarity=min_similarity,
-                        binary_ids=binary_ids,
-                        collection_ids=collection_ids,
-                        debug_flags=debug_flags,
-                    )
+                    lambda: self._matching_status(function_ids)
                 )
             )
-
-            if response.success:
-                if response.data.status == APIProgressStatus.COMPLETED:
-                    yield BatchDoneEvent(
-                        completed=response.data.progress,
-                        total=total,
-                        ok=True,
-                    )
-                    break
-                elif response.data.status == APIProgressStatus.ERROR:
-                    yield BatchDoneEvent(
-                        completed=response.data.progress,
-                        total=total,
-                        ok=False,
-                        error=response.data.error_message,
-                    )
-                    errors.append(response.data.error_message)
-                    break
-                else:
-                    yield BatchDoneEvent(
-                        completed=response.data.progress,
-                        total=total,
-                        ok=True,
-                    )
-
-            else:
+            if not status.success:
+                errors.append(status.error_message)
                 yield BatchDoneEvent(
-                    completed=0, total=total, ok=False, error=response.error_message
+                    completed=completed_pct,
+                    total=total,
+                    ok=False,
+                    error=status.error_message,
                 )
-                errors.append(response.error_message)
                 break
 
-        matches: List[FunctionMatch] = []
-        if analysis_func_count >= 1000:
-            for page in range(1, (analysis_func_count // 1000) + 2):
-                print(f"Fetching matching results page {page}...")
-                paged_response: GenericApiReturn[FunctionMatchingResponse] = (
-                    self.api_request_returning(
-                        lambda: self._match_request(
-                            nns=nns,
-                            min_similarity=min_similarity,
-                            binary_ids=binary_ids,
-                            collection_ids=collection_ids,
-                            debug_flags=debug_flags,
-                            page=page,
-                        )
-                    )
+            completed_pct = self._progress_pct(status.data)
+
+            if status.data.status == TaskStatus.COMPLETED:
+                yield BatchDoneEvent(completed=total, total=total, ok=True)
+                done = True
+                break
+            if status.data.status == TaskStatus.FAILED:
+                message = self._messages_text(status.data.messages)
+                errors.append(message)
+                yield BatchDoneEvent(
+                    completed=completed_pct,
+                    total=total,
+                    ok=False,
+                    error=message,
                 )
+                break
 
-                if (
-                    paged_response.success
-                    and paged_response.data.status == APIProgressStatus.COMPLETED
-                ):
-                    print(len(paged_response.data.matches))
-                    matches.extend(paged_response.data.matches)
-                else:
-                    break
-
+            yield BatchDoneEvent(completed=completed_pct, total=total, ok=True)
+            time.sleep(self._POLL_INTERVAL)
+            elapsed += self._POLL_INTERVAL
         else:
-            matches = response.data.matches if response.success else []
+            timeout_msg = (
+                f"Function matching timed out after {self._POLL_TIMEOUT:.0f}s."
+            )
+            errors.append(timeout_msg)
+            yield BatchDoneEvent(
+                completed=completed_pct, total=total, ok=False, error=timeout_msg
+            )
 
-        # Reduce final results - based on iput function list
+        matches: List[FunctionMatch] = []
+        if done:
+            fetch: GenericApiReturn[GetMatchesOutputBody] = self.api_request_returning(
+                lambda: self._get_matches(function_ids)
+            )
+            if fetch.success:
+                matches = fetch.data.matches or []
+            else:
+                errors.append(fetch.error_message)
+
         final_results: List[FunctionMatch] = [
             match for match in matches if match.function_id in function_ids
         ]
 
         yield SummaryEvent(
             ok=len(errors) == 0,
-            completed=response.data.progress if response.success and response.data else 0,
+            completed=completed_pct,
             total=len(final_results),
             errors=errors,
             results=final_results,
