@@ -25,6 +25,16 @@ EXTRA = {
     "fs_similarity_filter": {"status": "yes"},
     "upload_function_names": {"status": "yes"},
     "hook_function_rename": {"status": "yes"},
+    "upload_data_types": {
+        "status": "partial",
+        "notes": (
+            "Hooks variable rename and type changes and pushes them to RevEng.AI. "
+            "Register-allocated local variables are not synced: libbs/declib does not "
+            "extract register vars and the RevEng data-types schema has no register-variable "
+            "field (only function arguments and stack variables). Function arguments, stack "
+            "variables, return type, and referenced type definitions are synced."
+        ),
+    },
     "data_types_sync": {"status": "yes"},
     "comment_sync": {"status": "partial"},
     "search": {"status": "yes"},

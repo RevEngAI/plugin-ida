@@ -66,6 +66,7 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         self._popup_hooks = None
         self._menu_handlers = None
         self._artifact_hooks = None
+        self._artifact_start_attempts = 0
 
     def init(self):
         self.app = App(__IDA_VERSION__, __PLUGIN_VERSION__)
@@ -96,8 +97,15 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
 
         # Fallback timer in case the events are missed
         idaapi.register_timer(1000, lambda: (self._show_setup_if_needed(), -1)[1])
+        idaapi.register_timer(1500, self._artifact_hook_timer)
 
         return idaapi.PLUGIN_KEEP
+
+    def _artifact_hook_timer(self) -> int:
+        if self._artifact_hooks is None or self._artifact_hooks.start():
+            return -1
+        self._artifact_start_attempts += 1
+        return -1 if self._artifact_start_attempts >= 30 else 1000
 
     def _on_idb_loaded(self, is_new_database, idc_script):
         ida_kernwin.msg(
