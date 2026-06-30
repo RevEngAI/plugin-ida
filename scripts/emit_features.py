@@ -35,6 +35,7 @@ EXTRA = {
             "variables, return type, and referenced type definitions are synced."
         ),
     },
+    "upload_variable_rename_or_type_change": {"status": "yes"},
     "data_types_sync": {"status": "yes"},
     "comment_sync": {"status": "partial"},
     "search": {"status": "yes"},
