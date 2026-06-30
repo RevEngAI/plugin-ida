@@ -35,6 +35,7 @@ from loguru import logger
 from reai_toolkit.app.app import App
 from reai_toolkit.app.coordinator import Coordinator
 from reai_toolkit.app.factory import DialogFactory
+from reai_toolkit.hooks.artifacts import ArtifactChangeHooks
 from reai_toolkit.hooks.menu import register_menu_hooks
 from reai_toolkit.hooks.popup import build_hooks
 from reai_toolkit.hooks.reactive import FuncChangeHooks
@@ -64,6 +65,7 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         self._func_hooks = None
         self._popup_hooks = None
         self._menu_handlers = None
+        self._artifact_hooks = None
 
     def init(self):
         self.app = App(__IDA_VERSION__, __PLUGIN_VERSION__)
@@ -77,6 +79,8 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         # Reactive function change hooks
         self._func_hooks = FuncChangeHooks(self.app)
         self._func_hooks.hook()
+
+        self._artifact_hooks = ArtifactChangeHooks(self.app)
 
         # Popup menu hooks
         self._popup_hooks = build_hooks(self.coordinator)
@@ -106,6 +110,8 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         ida_kernwin.msg("[REAI] _on_ui_ready triggered\n")
         self._show_setup_if_needed()
         self.coordinator.refresh_disassembly_view()
+        if self._artifact_hooks is not None:
+            self._artifact_hooks.start()
 
     def _show_setup_if_needed(self):
         ida_kernwin.msg("[REAI] _show_setup_if_needed called\n")
@@ -122,6 +128,8 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         pass
 
     def term(self):
+        if self._artifact_hooks is not None:
+            self._artifact_hooks.stop()
         ida_kernwin.msg("[REAI] term.\n")
 
 

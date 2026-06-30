@@ -35,8 +35,8 @@ jobs:
         with:
           python-version: '3.14'
 
-      - name: Install packaging
-        run: pip install packaging
+      - name: Install tooling
+        run: pip install packaging uv
 
       - name: Inspect existing bump PR
         id: existing
@@ -74,6 +74,10 @@ jobs:
       - name: Already up to date
         if: env.ABORT != 'true' && steps.bump.outputs.changed != 'true'
         run: echo "revengai is already at ${{ steps.bump.outputs.current_sdk }}; nothing to do."
+
+      - name: Sync uv lockfile
+        if: env.ABORT != 'true' && steps.bump.outputs.changed == 'true'
+        run: uv lock --upgrade-package revengai
 
       - name: Open or update bump PR
         if: env.ABORT != 'true' && steps.bump.outputs.changed == 'true'

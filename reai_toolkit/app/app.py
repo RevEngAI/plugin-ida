@@ -16,6 +16,7 @@ from reai_toolkit.app.services.rename.rename_service import RenameService
 from reai_toolkit.app.services.upload.upload_service import UploadService
 from reai_toolkit.app.services.data_types.data_types_service import ImportDataTypesService
 from reai_toolkit.app.services.matching.similarity_service import SimilarityService
+from reai_toolkit.app.services.variable_sync.variable_sync_service import VariableSyncService
 
 
 class App:
@@ -52,6 +53,9 @@ class App:
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.rename_service = RenameService(
+            netstore_service=self.netstore_service, sdk_config=sdk_config
+        )
+        self.variable_sync_service = VariableSyncService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.auto_unstrip_service = AutoUnstripService(
