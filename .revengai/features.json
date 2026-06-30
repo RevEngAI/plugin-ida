@@ -54,6 +54,10 @@
     "search": {
       "status": "yes"
     },
+    "upload_data_types": {
+      "notes": "Hooks variable rename and type changes and pushes them to RevEng.AI. Register-allocated local variables are not synced: libbs/declib does not extract register vars and the RevEng data-types schema has no register-variable field (only function arguments and stack variables). Function arguments, stack variables, return type, and referenced type definitions are synced.",
+      "status": "partial"
+    },
     "upload_function_names": {
       "status": "yes"
     },

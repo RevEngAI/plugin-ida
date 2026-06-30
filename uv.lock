@@ -820,7 +820,7 @@ requires-dist = [
     { name = "loguru", specifier = ">=0.7" },
     { name = "pydantic" },
     { name = "requests", specifier = ">=2.32" },
-    { name = "revengai", specifier = ">=3.97.0" },
+    { name = "revengai", specifier = ">=3.100.0" },
 ]
 
 [package.metadata.requires-dev]
@@ -855,7 +855,7 @@ wheels = [
 
 [[package]]
 name = "revengai"
-version = "3.97.0"
+version = "3.100.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "lazy-imports" },
@@ -864,9 +864,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "urllib3" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/6f/d3/c58fa5d188c7c3a786fddf5f5731510051b1af874a717b2129332ff92d74/revengai-3.97.0.tar.gz", hash = "sha256:e7469b5bb980730079a085613d68944084970c78134bce57427963f7eda8edd2", size = 360931, upload-time = "2026-06-26T08:21:37.858Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d5/e7/a071390b2ddfbffbf10567e92f748f68e5dcec2f1aef9d7d24a18506bddc/revengai-3.100.0.tar.gz", hash = "sha256:947041949f4fd0feb1bb61cdc4b344ffbe3ef535bb3f0d9637f98c88b43c6f9a", size = 361553, upload-time = "2026-06-29T10:46:52.563Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/33/27/82c0d57e450e2ea49069a88e02ee61f8d43e2649f4377624ebc204dfc25b/revengai-3.97.0-py3-none-any.whl", hash = "sha256:ed83ee08a79962d54e06234778dafa17529854d4e795d7b304356ecf9ae73cb5", size = 939510, upload-time = "2026-06-26T08:21:36.336Z" },
+    { url = "https://files.pythonhosted.org/packages/76/63/e0f17b77c3924e813a1331e881fe0d2e8aef97a3b4f80f9ab1c346301906/revengai-3.100.0-py3-none-any.whl", hash = "sha256:454ada33cbc89605914c28c65295aa5cc92126dd40faf4236cb76fe942801743", size = 941110, upload-time = "2026-06-29T10:46:50.969Z" },
 ]
 
 [[package]]
