@@ -27,7 +27,7 @@ EXTRA = {
     "hook_function_rename": {"status": "yes"},
     "upload_data_types": {
         "status": "partial",
-        "notes": (
+        "note": (
             "Hooks variable rename and type changes and pushes them to RevEng.AI. "
             "Register-allocated local variables are not synced: libbs/declib does not "
             "extract register vars and the RevEng data-types schema has no register-variable "
