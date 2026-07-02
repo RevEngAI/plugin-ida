@@ -9,7 +9,6 @@ ACTIONS = {
     "reai:analyse": ("analyse_binary", "yes"),
     "reai:existing_analysis": ("apply_existing_analysis", "yes"),
     "reai:sync_and_poll": ("check_analysis_status", "yes"),
-    "reai:autounstrip": ("binary_auto_analysis", "yes"),
     "reai:function_match": ("rename_from_similar_function", "yes"),
     "revengai:toggle_ai_decomp": ("function_decompilation", "yes"),
 }

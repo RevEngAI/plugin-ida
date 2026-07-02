@@ -3,20 +3,45 @@
 ################################################################################
 ## Form generated from reading UI file 'about_panel_qt5.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.9.1
+## Created by: Qt User Interface Compiler version 6.10.0
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
 
 from PySide6.QtCore import (
     QCoreApplication,
+    QDate,
+    QDateTime,
+    QLocale,
     QMetaObject,
+    QObject,
+    QPoint,
+    QRect,
     QSize,
+    QTime,
+    QUrl,
+    Qt,
 )
 from PySide6.QtGui import (
+    QBrush,
+    QColor,
+    QConicalGradient,
+    QCursor,
+    QFont,
+    QFontDatabase,
+    QGradient,
+    QIcon,
+    QImage,
+    QKeySequence,
+    QLinearGradient,
+    QPainter,
+    QPalette,
     QPixmap,
+    QRadialGradient,
+    QTransform,
 )
 from PySide6.QtWidgets import (
+    QApplication,
     QFrame,
     QGroupBox,
     QHBoxLayout,
@@ -26,6 +51,7 @@ from PySide6.QtWidgets import (
     QSpacerItem,
     QTextBrowser,
     QVBoxLayout,
+    QWidget,
 )
 
 
@@ -174,9 +200,7 @@ class Ui_AboutPanel(object):
                 "AboutPanel", "Documentation for the options in the menu bar", None
             )
         )
-        self.groupEndpoints.setTitle(
-            QCoreApplication.translate("AboutPanel", "RevEng.AI", None)
-        )
+        self.groupEndpoints.setTitle(QCoreApplication.translate("AboutPanel", "RevEng.AI", None))
         self.textBrowser.setHtml(
             QCoreApplication.translate(
                 "AboutPanel",
@@ -201,24 +225,22 @@ class Ui_AboutPanel(object):
                 '<li style="" style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-weight:600;">Detach</span><br />Detach from portal analysis.</li>\n'
                 '<li style="" style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-weight:600;">Check status</span><br />Checks the status of a running analysis.</li></ul>\n'
                 '<h3 style=" margin-top:14px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:'
-                '0px;"><a name="auto-unstrip"></a><span style=" font-size:large; font-weight:600;">A</span><span style=" font-size:large; font-weight:600;">uto Unstrip</span></h3>\n'
-                '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">This option will run an automatic unstrip process on the current binary using the RevEng.AI API.<br />The process uses a high confidence threshold to rename functions and variables.<br />This option is only available when an analysis is attached and has completed processing.</p>\n'
-                '<h3 style=" margin-top:14px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><a name="function-matching"></a><span style=" font-size:large; font-weight:600;">F</span><span style=" font-size:large; font-weight:600;">unction Matching</span></h3>\n'
-                '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">Run a function match'
-                " against the RevEng.AI API to identify functions that were not renamed during the automatic unstrip process.<br />This option is configurable to run against specific target binaries by using specific filters.<br />This option is only available when an analysis is attached and has completed processing.</p>\n"
+                '0px;"><a name="function-matching"></a><span style=" font-size:large; font-weight:600;">F</span><span style=" font-size:large; font-weight:600;">unction Matching</span></h3>\n'
+                '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">Run a function match against the RevEng.AI API to identify functions that were not renamed.<br />This option is configurable to run against specific target binaries by using specific filters.<br />This option is only available when an analysis is attached and has completed processing.</p>\n'
                 '<h3 style=" margin-top:14px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><a name="configure"></a><span style=" font-size:large; font-weight:600;">C</span><span style=" font-size:large; font-weight:600;">onfigure</span></h3>\n'
-                '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">Configure the API endpoint and API key.</p>\n'
-                '<h3 style=" margin-top:14px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><a name="help"></a><span style=" font-size:large; font-weight:600;">H</span><span style=" font-size:large; font-weight:600;">elp'
-                "</span></h3>\n"
+                '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">Configure the AP'
+                "I endpoint and API key.</p>\n"
+                '<h3 style=" margin-top:14px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><a name="help"></a><span style=" font-size:large; font-weight:600;">H</span><span style=" font-size:large; font-weight:600;">elp</span></h3>\n'
                 '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">Display this page.</p>\n'
                 '<h3 style=" margin-top:14px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><a name="about"></a><span style=" font-size:large; font-weight:600;">A</span><span style=" font-size:large; font-weight:600;">bout</span></h3>\n'
                 '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">Display plugin version.</p>\n'
                 "<hr />\n"
-                '<h3 style=" margin-top:14px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><a name="secondary-click-on-a-function"></a><span style=" font-size:large; font-weight:600;">S</span><span style=" font-size:large; font-weight:600;">econdary click on a function</span></h3>\n'
-                '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-bl'
-                'ock-indent:0; text-indent:0px;">Documentation for the options available on secondary click on a specific function.</p>\n'
+                '<h3 style=" margin-top:14px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><'
+                'a name="secondary-click-on-a-function"></a><span style=" font-size:large; font-weight:600;">S</span><span style=" font-size:large; font-weight:600;">econdary click on a function</span></h3>\n'
+                '<p style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;">Documentation for the options available on secondary click on a specific function.</p>\n'
                 '<ul style="margin-top: 0px; margin-bottom: 0px; margin-left: 0px; margin-right: 0px; -qt-list-indent: 1;"><li style="" style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-weight:600;">AI Decompilation</span><br />Decompile function using the RevEng.AI proprietary decompiler.</li>\n'
-                '<li style="" style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-weight:600;">Match function</span><br />Run a match against the RevEng.AI API for this function.<br />Only available for non-debug functions. </li></ul></body></html>',
+                '<li style="" style=" margin-top:12px; margin-bottom:12px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px;"><span style=" font-weight:600;">Match function</span><br />Run a match against the RevEng.AI API'
+                " for this function.<br />Only available for non-debug functions. </li></ul></body></html>",
                 None,
             )
         )
@@ -230,9 +252,7 @@ class Ui_AboutPanel(object):
             QCoreApplication.translate("AboutPanel", "Join our Discord", None)
         )
         # endif // QT_CONFIG(tooltip)
-        self.btnDiscord.setText(
-            QCoreApplication.translate("AboutPanel", "Discord", None)
-        )
+        self.btnDiscord.setText(QCoreApplication.translate("AboutPanel", "Discord", None))
         # if QT_CONFIG(tooltip)
         self.btnEmail.setToolTip(
             QCoreApplication.translate("AboutPanel", "Contact us via email", None)

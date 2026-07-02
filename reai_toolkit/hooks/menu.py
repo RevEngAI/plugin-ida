@@ -141,21 +141,6 @@ class ExistingAnalysesH(ida_kernwin.action_handler_t):
         return ida_kernwin.AST_ENABLE
 
 
-class AutoUnstripH(ida_kernwin.action_handler_t):
-    def __init__(self, coordinator: Coordinator) -> None:
-        super().__init__()
-        self.coordinator: Coordinator = coordinator
-
-    def activate(self, ctx) -> int:
-        self.coordinator.auto_unstripc.run_dialog()
-        return 1
-
-    def update(self, ctx) -> int:
-        if menu_hook_globals.MODEL_ID is None:
-            return ida_kernwin.AST_DISABLE
-        return ida_kernwin.AST_ENABLE
-
-
 class MatchingH(ida_kernwin.action_handler_t):
     def __init__(self, coordinator: Coordinator) -> None:
         super().__init__()
@@ -192,7 +177,6 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         "help": VersionH(version=plugin_version),
         "auth": AuthH(coordinator),
         "analyse": AnalyseH(coordinator),
-        "autounstrip": AutoUnstripH(coordinator),
         "sync_and_poll": SyncH(coordinator),
         "function_match": MatchingH(coordinator),
         "existing_analysis": ExistingAnalysesH(coordinator),
@@ -206,7 +190,6 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         "reai:detach_analysis",
         "reai:sync_and_poll",
         "reai:view_analysis",
-        "reai:autounstrip",
         "reai:function_match",
         "reai:auth",
         "reai:help",
@@ -267,12 +250,6 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
 
     ida_kernwin.register_action(
         ida_kernwin.action_desc_t(
-            "reai:autounstrip", "Auto Unstrip", _handlers["autounstrip"]
-        )
-    )
-
-    ida_kernwin.register_action(
-        ida_kernwin.action_desc_t(
             "reai:function_match", "Function Matching", _handlers["function_match"]
         )
     )
@@ -297,9 +274,6 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         MENU_ROOT + "Analysis/", "reai:view_analysis", ida_kernwin.SETMENU_APP
     )
 
-    ida_kernwin.attach_action_to_menu(
-        MENU_ROOT + "Auto Unstrip", "reai:autounstrip", ida_kernwin.SETMENU_APP
-    )
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Function Matching", "reai:function_match", ida_kernwin.SETMENU_APP
     )

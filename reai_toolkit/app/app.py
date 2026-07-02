@@ -5,9 +5,6 @@ from reai_toolkit.app.services.analysis_status.analysis_status import (
 )
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
 from reai_toolkit.app.services.auth.auth_service import AuthService
-from reai_toolkit.app.services.auto_unstrip.auto_unstrip_service import (
-    AutoUnstripService,
-)
 from reai_toolkit.app.services.existing_analyses.existing_analyses_service import (
     ExistingAnalysesService,
 )
@@ -56,9 +53,6 @@ class App:
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.variable_sync_service = VariableSyncService(
-            netstore_service=self.netstore_service, sdk_config=sdk_config
-        )
-        self.auto_unstrip_service = AutoUnstripService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.ai_decomp_service = AiDecompService(
