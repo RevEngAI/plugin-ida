@@ -5,9 +5,6 @@ from revengai import FunctionMapping
 from reai_toolkit.app.coordinators.about_coordinator import AboutCoordinator
 from reai_toolkit.app.coordinators.ai_decomp_coordinator import AiDecompCoordinator
 from reai_toolkit.app.coordinators.auth_coordinator import AuthCoordinator
-from reai_toolkit.app.coordinators.auto_unstrip_coordinator import (
-    AutoUnstripCoordinator,
-)
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.coordinators.create_analysis_coordinator import (
     CreateAnalysisCoordinator,
@@ -69,15 +66,6 @@ class Coordinator(BaseCoordinator):
                 existing_analyses_service=app.existing_analyses_service,
                 analysis_sync_coord=self.sync_analysisc,
             )
-        )
-
-        self.auto_unstripc: AutoUnstripCoordinator = AutoUnstripCoordinator(
-            app=app,
-            factory=factory,
-            log=log,
-            auto_unstrip_service=app.auto_unstrip_service,
-            rename_service=app.rename_service,
-            data_types_service=app.data_types_service
         )
 
         self.ai_decompc: AiDecompCoordinator = AiDecompCoordinator(
