@@ -67,6 +67,7 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         self._menu_handlers = None
         self._artifact_hooks = None
         self._artifact_start_attempts = 0
+        self._setup_handled = False
 
     def init(self):
         self.app = App(__IDA_VERSION__, __PLUGIN_VERSION__)
@@ -122,6 +123,10 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
             self._artifact_hooks.start()
 
     def _show_setup_if_needed(self):
+        if self._setup_handled:
+            return
+        self._setup_handled = True
+
         ida_kernwin.msg("[REAI] _show_setup_if_needed called\n")
         self.app.auth_service.verify()
         if self.app.auth_service.is_authenticated():
@@ -129,8 +134,11 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
             ida_kernwin.refresh_idaview_anyway()
             return
 
-        self.coordinator.authc.run_dialog()
-        ida_kernwin.refresh_idaview_anyway()
+        def _open_setup():
+            self.coordinator.authc.run_dialog()
+            ida_kernwin.refresh_idaview_anyway()
+
+        ida_kernwin.execute_ui_requests([_open_setup])
 
     def run(self, arg):  # not used
         pass
