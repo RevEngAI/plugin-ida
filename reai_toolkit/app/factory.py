@@ -51,6 +51,11 @@ class DialogFactory:
 
         return AIDecompView(on_closed=on_closed)
 
+    def chat(self, on_closed: Callable[..., Any]):
+        from reai_toolkit.app.components.tabs.chat_tab import ChatPanel
+
+        return ChatPanel(on_closed=on_closed)
+
     def function_matching(
         self, valid_functions: list[ValidFunction], func_map: dict[str, int]
     ):

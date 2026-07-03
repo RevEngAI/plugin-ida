@@ -9,6 +9,7 @@ DECOMP_ACTION_NAME = "revengai:toggle_ai_decomp"
 VIEW_ACTION_NAME = "revengai:function_portal_view"
 MATCHING_ACTION_NAME = "revengai:function_matching_view"
 SIMILARITY_ACTION_NAME = "revengai:function_similarity_view"
+CHAT_ACTION_NAME = "revengai:ask_about_function"
 
 _HANDLERS = {}
 
@@ -140,12 +141,46 @@ def _register_function_similarity_action(coordinator: Coordinator):
     return SIMILARITY_ACTION_NAME
 
 
+class AskAboutFunctionH(kw.action_handler_t):
+    """Opens the Agent Chat panel prefilled with the current function context."""
+
+    def __init__(self, coordinator: Coordinator):
+        super().__init__()
+        self.coordinator: Coordinator = coordinator
+
+    def activate(self, ctx):
+        self.coordinator.chatc.run_dialog(prefill_context=True)
+        return 1
+
+    def update(self, ctx):
+        return kw.AST_ENABLE_FOR_WIDGET
+
+
+def _register_chat_action(coordinator: Coordinator):
+    try:
+        kw.unregister_action(CHAT_ACTION_NAME)
+    except Exception:
+        pass
+    h = AskAboutFunctionH(coordinator)
+    _HANDLERS[CHAT_ACTION_NAME] = h
+    desc = kw.action_desc_t(
+        CHAT_ACTION_NAME,
+        "Ask RevEng.AI about this function",
+        h,
+        None,
+        "Open the RevEng.AI Agent Chat for this function",
+    )
+    kw.register_action(desc)
+    return CHAT_ACTION_NAME
+
+
 def build_hooks(coordinator: Coordinator):
     """Attach our action directly to all popups (IDA 9.1 compatible)."""
     decomp_action = _register_decomp_action(coordinator)
     func_view_action = _register_function_view_action(coordinator)
     func_matching_action = _register_function_matching_action(coordinator)
     func_similarity_action = _register_function_similarity_action(coordinator)
+    chat_action = _register_chat_action(coordinator)
 
     def _on_popup(widget, popup_handle) -> None:
         try:
@@ -168,6 +203,9 @@ def build_hooks(coordinator: Coordinator):
                 )
                 kw.attach_action_to_popup(
                     widget, popup_handle, func_similarity_action, "RevEng.AI/", 0
+                )
+                kw.attach_action_to_popup(
+                    widget, popup_handle, chat_action, "RevEng.AI/", 0
                 )
         except Exception as e:
             logger.error(f"[RevEng.AI] attach_action_to_popup error: {e}")

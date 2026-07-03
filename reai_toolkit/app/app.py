@@ -5,6 +5,7 @@ from reai_toolkit.app.services.analysis_status.analysis_status import (
 )
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
 from reai_toolkit.app.services.auth.auth_service import AuthService
+from reai_toolkit.app.services.chat.chat_service import ChatService
 from reai_toolkit.app.services.existing_analyses.existing_analyses_service import (
     ExistingAnalysesService,
 )
@@ -62,6 +63,9 @@ class App:
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.similarity_service = SimilarityService(
+            netstore_service=self.netstore_service, sdk_config=sdk_config
+        )
+        self.chat_service = ChatService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
 
