@@ -46,6 +46,10 @@ The builds for latest stable version of the RevEng.AI IDA plugin can be download
 
 We support the following IDA versions and platforms: `8.5`, `9.0`, `9.1`, `9.2` and Python version from `3.10` to `3.14`.
 
+### Requirements
+The package `PyQt5` must be installed.
+> python -m pip install PyQt5
+
 ### Setup
 
 1. **Download** the plugin code for your platform and Python version from the [Releases](https://github.com/revengai/plugin-ida/releases/latest) page.
