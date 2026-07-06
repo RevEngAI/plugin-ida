@@ -26,6 +26,7 @@ and use it for Binary Code Similarity to help you Reverse Engineer stripped bina
   - [Auto Unstrip](#auto-unstrip)
   - [Function Matching](#function-matching)
   - [AI Decompilation](#ai-decompilation)
+  - [Agent Chat](#agent-chat-experimental)
 - [Contributing](#contributing)
   - [Reporting Bugs](#reporting-bugs)
 - [Known Issues](#known-issues)
@@ -37,6 +38,7 @@ and use it for Binary Code Similarity to help you Reverse Engineer stripped bina
 * Automatically rename all functions above a confidence threshold
 * Show similar functions and their names for one selected function
 * AI Decompilation of selected functions
+* Agent Chat (experimental): ask an AI agent about a function and have it decompile, rename, and navigate the binary for you
 
 ## Installation
 
@@ -156,6 +158,35 @@ The window will show you the AI generated decompilation of the selected function
 natural language explanation of what the function does.
 
 The window can be pinned and will update as you select different functions.
+
+### Agent Chat (Experimental)
+
+> [!WARNING]
+> **Experimental / proof-of-concept.** The Agent Chat is an early feature under active development. Its behaviour,
+> available tools, and output quality may change between releases, and it can be unstable.
+
+The Agent Chat lets you talk to a RevEng.AI agent about the current binary in natural language. The agent can look up
+function information, run AI decompilation, propose and apply function names, and link directly to functions in your
+analysis.
+
+Open it by `Right-Click`ing a function in the disassembly and selecting `RevEng.AI -> Ask RevEng.AI about this function`.
+The context chip at the top of the panel tracks the function currently under your cursor, so questions are answered in
+the context of what you are looking at.
+
+Ask it anything about a function and it will pull the relevant details and explain them in plain language:
+
+![Agent Chat - Ask about a function](screenshots/agent-chat-ask.png)
+
+The agent can decompile functions on demand and explain what they do. AI decompilations open in the docked
+`Decompiled View`, and any function the agent references becomes a clickable link that jumps you straight to it in the
+disassembly:
+
+![Agent Chat - AI decompilation and jump links](screenshots/agent-chat-decompile.png)
+
+It can also suggest descriptive names for stripped functions and apply them across the binary. Renamed functions appear
+immediately in the `Functions` list:
+
+![Agent Chat - Rename functions](screenshots/agent-chat-rename.png)
 
 ## Contributing
 
