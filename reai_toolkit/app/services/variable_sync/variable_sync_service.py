@@ -8,7 +8,7 @@ from libbs.decompilers.ida.compat import execute_read
 from loguru import logger
 
 from revengai import (
-    Argument,
+    FunctionArgument,
     BaseResponseFunctionDataTypesList,
     BatchUpdateDataTypesInputBody,
     BatchUpdateDataTypesItem,
@@ -24,7 +24,7 @@ from revengai import (
 )
 from revengai import ApiException
 from revengai.models.function_header import FunctionHeader as SdkFunctionHeader
-from revengai.models.stack_variable import StackVariable as SdkStackVariable
+from revengai.models.function_stack_variable import FunctionStackVariable as SdkStackVariable
 from revengai.models.structure_member import StructureMember
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -161,7 +161,7 @@ class VariableSyncService(IThreadService):
 
         header = func.header
         args = {
-            hex(offset): Argument(
+            hex(offset): FunctionArgument(
                 offset=offset, name=arg.name or "", type=arg.type or "", size=arg.size or 0
             )
             for offset, arg in (header.args or {}).items()

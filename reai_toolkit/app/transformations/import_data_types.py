@@ -5,7 +5,7 @@ from libbs.api import DecompilerInterface
 from libbs.decompilers.ida.compat import execute_ui
 from loguru import logger
 from revengai import (
-    Argument,
+    FunctionArgument,
     Enumeration,
     FunctionDataTypesList,
     FunctionHeader,
@@ -160,7 +160,7 @@ class ImportDataTypes:
         self.update_function_arguments(imported_header.args, target_function)
 
     def update_function_arguments(
-        self, imported_args: dict[str, Argument], target_function: libbs.artifacts.Function
+        self, imported_args: dict[str, FunctionArgument], target_function: libbs.artifacts.Function
     ) -> None:
         if target_function.header is None:
             return
