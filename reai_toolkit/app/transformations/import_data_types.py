@@ -9,7 +9,7 @@ from revengai import (
     Enumeration,
     FunctionDataTypesList,
     FunctionHeader,
-    FunctionInfoFuncDepsInner,
+    V2FunctionInfoFuncDepsInner,
     FunctionInfo,
     FunctionType,
     Structure,
@@ -53,7 +53,7 @@ class ImportDataTypes:
                 if dep.actual_instance.name not in lookup:
                     lookup.update({dep.actual_instance.name: TaggedDependency(dep.actual_instance)}) # type: ignore
 
-            dependency: FunctionInfoFuncDepsInner
+            dependency: V2FunctionInfoFuncDepsInner
             for dependency in data_types.func_deps:
                 if dependency.actual_instance is None:
                     continue
