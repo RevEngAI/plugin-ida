@@ -333,14 +333,21 @@ class ChatPanel(kw.PluginForm):
             return
 
         sb = self._transcript.verticalScrollBar()
+        prev = sb.value() if sb is not None else 0
         at_bottom = sb is None or sb.value() >= sb.maximum() - 4
         md = render_transcript_markdown(state)
-        if hasattr(self._transcript, "setMarkdown"):
-            self._transcript.setMarkdown(md)
-        else:
-            self._transcript.setPlainText(md)
-        if at_bottom and sb is not None:
-            sb.setValue(sb.maximum())
+        # Rebuilding the whole document resets the scrollbar to the top, so only
+        # do it when the content actually changed, and afterwards keep the reader
+        # where they were: pinned to the bottom if they were following the stream,
+        # otherwise restored to their previous position instead of snapping up.
+        if md != self._last_rendered_md:
+            self._last_rendered_md = md
+            if hasattr(self._transcript, "setMarkdown"):
+                self._transcript.setMarkdown(md)
+            else:
+                self._transcript.setPlainText(md)
+            if sb is not None:
+                sb.setValue(sb.maximum() if at_bottom else prev)
 
         running = state.run_status == "running"
         if self._send_btn is not None:
