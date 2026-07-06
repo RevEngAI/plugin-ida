@@ -6,6 +6,7 @@ from reai_toolkit.app.coordinators.about_coordinator import AboutCoordinator
 from reai_toolkit.app.coordinators.ai_decomp_coordinator import AiDecompCoordinator
 from reai_toolkit.app.coordinators.auth_coordinator import AuthCoordinator
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
+from reai_toolkit.app.coordinators.chat_coordinator import ChatCoordinator
 from reai_toolkit.app.coordinators.create_analysis_coordinator import (
     CreateAnalysisCoordinator,
 )
@@ -88,6 +89,14 @@ class Coordinator(BaseCoordinator):
             factory=factory,
             log=log,
             similarity_service=app.similarity_service
+        )
+
+        self.chatc: ChatCoordinator = ChatCoordinator(
+            app=app,
+            factory=factory,
+            log=log,
+            chat_service=app.chat_service,
+            ai_decomp_coord=self.ai_decompc,
         )
 
     def run_dialog(self):

@@ -156,6 +156,22 @@ class MatchingH(ida_kernwin.action_handler_t):
         return ida_kernwin.AST_ENABLE
 
 
+class AgentChatH(ida_kernwin.action_handler_t):
+    def __init__(self, coordinator: Coordinator) -> None:
+        super().__init__()
+        self.coordinator: Coordinator = coordinator
+
+    def activate(self, ctx) -> int:
+        self.coordinator.chatc.run_dialog()
+        return 1
+
+    def update(self, ctx) -> int:
+        is_authed: bool = self.coordinator.app.auth_service.is_authenticated()
+        if is_authed is False or menu_hook_globals.ANALYSIS_ID is None:
+            return ida_kernwin.AST_DISABLE
+        return ida_kernwin.AST_ENABLE
+
+
 def _safe_detach(aid: str, path: str) -> None:
     try:
         ida_kernwin.detach_action_from_menu(path, aid)
@@ -182,6 +198,7 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         "existing_analysis": ExistingAnalysesH(coordinator),
         "detach_analysis": DetachAnalysisH(coordinator),
         "view_analysis": ViewAnalysisH(coordinator),
+        "agent_chat": AgentChatH(coordinator),
     }
 
     all_aids: list[str] = [
@@ -191,6 +208,7 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         "reai:sync_and_poll",
         "reai:view_analysis",
         "reai:function_match",
+        "reai:agent_chat",
         "reai:auth",
         "reai:help",
         "reai:about",
@@ -254,6 +272,12 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
         )
     )
 
+    ida_kernwin.register_action(
+        ida_kernwin.action_desc_t(
+            "reai:agent_chat", "Agent Chat", _handlers["agent_chat"]
+        )
+    )
+
     ida_kernwin.create_menu("reai:menubar", MENU_TITLE, "View")
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Analysis/", "reai:analyse", ida_kernwin.SETMENU_APP
@@ -276,6 +300,10 @@ def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
 
     ida_kernwin.attach_action_to_menu(
         MENU_ROOT + "Function Matching", "reai:function_match", ida_kernwin.SETMENU_APP
+    )
+
+    ida_kernwin.attach_action_to_menu(
+        MENU_ROOT + "Agent Chat", "reai:agent_chat", ida_kernwin.SETMENU_APP
     )
 
     ida_kernwin.attach_action_to_menu(
