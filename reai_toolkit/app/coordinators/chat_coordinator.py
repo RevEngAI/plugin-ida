@@ -39,6 +39,7 @@ from reai_toolkit.app.services.chat.schema import (
     ConversationContextDTO,
     FunctionRef,
 )
+from reai_toolkit.hooks.reactive import ChatContextHooks
 
 if TYPE_CHECKING:
     from reai_toolkit.app.coordinators.ai_decomp_coordinator import AiDecompCoordinator
@@ -64,6 +65,7 @@ class ChatCoordinator(BaseCoordinator):
         self._conversation_id: Optional[str] = None
         self._last_event_id: Optional[int] = None
         self._last_context: Optional[ConversationContextDTO] = None
+        self._context_hooks: Optional[ChatContextHooks] = None
 
     @execute_ui
     def run_dialog(self, prefill_context: bool = False) -> None:
@@ -71,6 +73,7 @@ class ChatCoordinator(BaseCoordinator):
             self._panel = self.factory.chat(on_closed=self._on_pane_closed)
             self._wire_panel(self._panel)
             self._panel.Create(self._panel.TITLE)
+            self._enable_context_tracking()
         self._panel.focus()
         self._update_context_chip()
         if prefill_context:
@@ -99,8 +102,22 @@ class ChatCoordinator(BaseCoordinator):
     def _on_pane_closed(self) -> None:
         if self._panel is not None:
             self._panel.stop_stream_worker()
+        self._disable_context_tracking()
         self._panel = None
         self.log.info("Agent Chat panel closed.")
+
+    def _enable_context_tracking(self) -> None:
+        if self._context_hooks is None:
+            self._context_hooks = ChatContextHooks(self)
+            self._context_hooks.hook()
+
+    def _disable_context_tracking(self) -> None:
+        if self._context_hooks is not None:
+            self._context_hooks.unhook()
+            self._context_hooks = None
+
+    def on_screen_function_changed(self, ea: int) -> None:
+        self._update_context_chip(ea)
 
     def send(self, text: str) -> None:
         content = (text or "").strip()
@@ -228,6 +245,7 @@ class ChatCoordinator(BaseCoordinator):
                 return
             refs: list[FunctionRef] = []
             applied = False
+            last_ea: Optional[int] = None
             for fid in func_ids:
                 ea = func_map.function_map.get(str(fid))
                 if ea is None:
@@ -241,10 +259,13 @@ class ChatCoordinator(BaseCoordinator):
                     applied = True
                 refs.append(FunctionRef(ea=ea, name=name))
                 self.jump_to(ea)
+                last_ea = ea
             if refs:
                 self._attach_function_links(tool_call_id, refs)
             if applied:
                 self.refresh_disassembly_view()
+            if last_ea is not None and self._ai_decomp_coord is not None:
+                self._ai_decomp_coord.follow_function(last_ea)
 
         threading.Thread(target=_work, daemon=True).start()
 
@@ -268,23 +289,16 @@ class ChatCoordinator(BaseCoordinator):
         name = (ev.tool_name or "").lower()
         if not any(hint in name for hint in AI_DECOMP_TOOL_HINTS):
             return
-        ctx_fid = self._last_context.function_id if self._last_context else None
-        if ctx_fid is None:
-            return
-        target_ids = [i for u in (ev.updated or []) if u.type == "function" for i in u.ids]
-        if target_ids and ctx_fid not in target_ids:
-            return
-        ea = self._resolve_ea_for_function(ctx_fid)
-        if ea is None:
-            return
-        self._ai_decomp_coord.start_decompilation(ea)
-
-    @execute_read
-    def _resolve_ea_for_function(self, function_id: int) -> Optional[int]:
+        if not self._ai_decomp_coord.is_tracking():
+            self._ai_decomp_coord.ensure_tracking()
         func_map = self.app.netstore_service.get_function_mapping()
         if func_map is None:
-            return None
-        return func_map.function_map.get(str(function_id))
+            return
+        target_ids = [i for u in (ev.updated or []) if u.type == "function" for i in u.ids]
+        for fid in target_ids:
+            ea = func_map.function_map.get(str(fid))
+            if ea is not None:
+                self._ai_decomp_coord.prefetch_decompilation(ea)
 
     def _render(self) -> None:
         if self._panel is not None:
@@ -317,16 +331,18 @@ class ChatCoordinator(BaseCoordinator):
             self.log.debug(f"Failed to resolve chat context: {e}")
         return ConversationContextDTO(analysis_id=analysis_id, function_id=function_id)
 
-    def _update_context_chip(self) -> None:
+    def _update_context_chip(self, ea: Optional[int] = None) -> None:
         if self._panel is not None:
-            self._panel.set_context_chip(self._resolve_context_chip_text())
+            self._panel.set_context_chip(self._resolve_context_chip_text(ea))
 
     @execute_read
-    def _resolve_context_chip_text(self) -> str:
+    def _resolve_context_chip_text(self, ea: Optional[int] = None) -> str:
         try:
             analysis_id = self.app.netstore_service.get_analysis_id()
-            func = ida_funcs.get_func(ida_kernwin.get_screen_ea())
-            name = ida_name.get_ea_name(func.start_ea) if func is not None else None
+            if ea is None:
+                func = ida_funcs.get_func(ida_kernwin.get_screen_ea())
+                ea = func.start_ea if func is not None else None
+            name = ida_name.get_ea_name(ea) if ea is not None else None
             bits = []
             if name:
                 bits.append(f"fn: {name}")

@@ -176,6 +176,7 @@ class ChatPanel(kw.PluginForm):
         self._render_timer: Optional[QtCore.QTimer] = None
         self._pending_state: Optional[ChatState] = None
         self._pending_confirm_id: Optional[str] = None
+        self._last_rendered_md: Optional[str] = None
 
     def Create(self, title) -> bool:
         flags = getattr(kw.PluginForm, "WOPN_DP_TAB", 0) | getattr(

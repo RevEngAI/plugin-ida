@@ -1,6 +1,8 @@
 from logging import Logger
 
-from libbs.decompilers.ida.compat import execute_ui
+import ida_funcs
+import ida_kernwin
+from libbs.decompilers.ida.compat import execute_read, execute_ui
 from revengai.models.comments_data import CommentsData
 from revengai.models.decompilation_data import DecompilationData
 from revengai.models.inline_comment import InlineComment
@@ -43,10 +45,18 @@ class AiDecompCoordinator(BaseCoordinator):
             self._decomp_hooks.unhook()
             self._decomp_hooks = None
 
+    def is_tracking(self) -> bool:
+        return self._decomp_hooks is not None
+
+    @execute_ui
+    def ensure_tracking(self) -> None:
+        self.enable_function_tracking()
+
     @execute_ui
     def run_dialog(self) -> None:
-        self._decomp_view = self.factory.ai_decomp(on_closed=self._on_pane_closed)
-        self._decomp_view.Create(self._decomp_view.TITLE)
+        if self._decomp_view is None:
+            self._decomp_view = self.factory.ai_decomp(on_closed=self._on_pane_closed)
+            self._decomp_view.Create(self._decomp_view.TITLE)
 
     def start_decompilation(self, ea: int) -> None:
         self._current_decomp = None
@@ -54,21 +64,51 @@ class AiDecompCoordinator(BaseCoordinator):
         self._current_comments = None
         self._current_func_vaddr = ea
 
-        if self._decomp_view:
-            self._decomp_view.update_view_content(
-                "Please wait, decompilation in progress..."
-            )
+        self.run_dialog()
 
+        cached = self.ai_decomp_service.peek_decomp(ea)
+        if self._decomp_view is not None:
+            if cached is not None and cached.decompilation:
+                self._current_decomp = cached
+                self._rerender()
+            else:
+                self._decomp_view.update_view_content(
+                    "Please wait, decompilation in progress..."
+                )
+
+        self._dispatch_task(ea)
+
+    def prefetch_decompilation(self, ea: int) -> None:
+        self._dispatch_task(ea)
+
+    def follow_function(self, ea: int, prefetch_if_closed: bool = False) -> None:
+        if self._decomp_view is not None:
+            if self._screen_function_start() == ea:
+                self.start_decompilation(ea)
+            else:
+                self.prefetch_decompilation(ea)
+        elif prefetch_if_closed:
+            self.prefetch_decompilation(ea)
+
+    @execute_read
+    def _screen_function_start(self) -> int | None:
+        func = ida_funcs.get_func(ida_kernwin.get_screen_ea())
+        return func.start_ea if func else None
+
+    def _dispatch_task(self, ea: int) -> None:
         self.ai_decomp_service.start_ai_decomp_task(
             ea=ea,
-            on_decomp=self._on_decomp_complete,
-            on_summary=self._on_summary_complete,
-            on_comments=self._on_comments_complete,
+            on_decomp=lambda response: self._on_decomp_complete(ea, response),
+            on_summary=lambda response: self._on_summary_complete(ea, response),
+            on_comments=lambda response: self._on_comments_complete(ea, response),
         )
 
     def _on_decomp_complete(
-        self, response: GenericApiReturn[DecompilationData]
+        self, ea: int, response: GenericApiReturn[DecompilationData]
     ) -> None:
+        if ea != self._current_func_vaddr:
+            return
+
         if response.success is False:
             if response.error_message:
                 self.show_error_dialog(message=response.error_message)
@@ -95,8 +135,10 @@ class AiDecompCoordinator(BaseCoordinator):
         self._rerender()
 
     def _on_summary_complete(
-        self, response: GenericApiReturn[SummaryData]
+        self, ea: int, response: GenericApiReturn[SummaryData]
     ) -> None:
+        if ea != self._current_func_vaddr:
+            return
         if not response.success:
             self.log.warning(f"AI summary fetch failed: {response.error_message}")
             return
@@ -106,8 +148,10 @@ class AiDecompCoordinator(BaseCoordinator):
         self._rerender()
 
     def _on_comments_complete(
-        self, response: GenericApiReturn[CommentsData]
+        self, ea: int, response: GenericApiReturn[CommentsData]
     ) -> None:
+        if ea != self._current_func_vaddr:
+            return
         if not response.success:
             self.log.warning(f"Inline comments fetch failed: {response.error_message}")
             return

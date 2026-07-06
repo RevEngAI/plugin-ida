@@ -32,6 +32,40 @@ class FuncChangeHooks(idaapi.IDB_Hooks):
             )
 
 
+class ChatContextHooks(kw.UI_Hooks):
+    def __init__(self, coordinator):
+        super().__init__()
+        self.coordinator = coordinator
+        self._last_func_start = None
+        self._is_hooked = False
+
+    def hook(self) -> bool:
+        if self._is_hooked:
+            return False
+        ok = super().hook()
+        if ok:
+            self._is_hooked = True
+            func = ida_funcs.get_func(kw.get_screen_ea())
+            self._last_func_start = func.start_ea if func else None
+        return ok
+
+    def unhook(self) -> None:
+        if self._is_hooked:
+            super().unhook()
+            self._is_hooked = False
+        self._last_func_start = None
+
+    def screen_ea_changed(self, ea: int, prev_ea: int) -> None:
+        func = ida_funcs.get_func(ea)
+        if not func or func.start_ea == self._last_func_start:
+            return
+        self._last_func_start = func.start_ea
+        try:
+            self.coordinator.on_screen_function_changed(func.start_ea)
+        except Exception as e:
+            logger.error(f"[ChatContextHooks] context update failed: {e}")
+
+
 class AiDecompFunctionViewHooks(kw.UI_Hooks):
     """
     Hook that tracks when the screen EA changes (user moves between functions),
@@ -64,9 +98,10 @@ class AiDecompFunctionViewHooks(kw.UI_Hooks):
         if ok:
             # First hook, does not trigger event. Manual call to coordinator.
             self._is_hooked = True
-            ea = kw.get_screen_ea()
-            func = ida_funcs.get_func(ea)
-            self.coordinator.start_decompilation(ea=func.start_ea)
+            func = ida_funcs.get_func(kw.get_screen_ea())
+            if func is not None:
+                self._last_func_start = func.start_ea
+                self.coordinator.start_decompilation(ea=func.start_ea)
             logger.info("[FunctionViewHooks] Hook registered.")
         else:
             logger.error("[FunctionViewHooks] Failed to register.")
