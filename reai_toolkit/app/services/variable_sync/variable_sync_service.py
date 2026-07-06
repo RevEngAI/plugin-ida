@@ -8,7 +8,7 @@ from libbs.decompilers.ida.compat import execute_read
 from loguru import logger
 
 from revengai import (
-    Argument,
+    FunctionArgument,
     BaseResponseFunctionDataTypesList,
     BatchUpdateDataTypesInputBody,
     BatchUpdateDataTypesItem,
@@ -16,7 +16,7 @@ from revengai import (
     Configuration,
     Enumeration,
     FunctionInfo,
-    FunctionInfoFuncDepsInner,
+    V2FunctionInfoFuncDepsInner,
     FunctionsDataTypesApi,
     FunctionType,
     Structure,
@@ -24,7 +24,7 @@ from revengai import (
 )
 from revengai import ApiException
 from revengai.models.function_header import FunctionHeader as SdkFunctionHeader
-from revengai.models.stack_variable import StackVariable as SdkStackVariable
+from revengai.models.function_stack_variable import FunctionStackVariable as SdkStackVariable
 from revengai.models.structure_member import StructureMember
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -161,7 +161,7 @@ class VariableSyncService(IThreadService):
 
         header = func.header
         args = {
-            hex(offset): Argument(
+            hex(offset): FunctionArgument(
                 offset=offset, name=arg.name or "", type=arg.type or "", size=arg.size or 0
             )
             for offset, arg in (header.args or {}).items()
@@ -194,7 +194,7 @@ class VariableSyncService(IThreadService):
         pending.extend(arg.type for arg in (func_type.header.args or {}).values())
         pending.extend(svar.type for svar in (func_type.stack_vars or {}).values())
 
-        deps: dict[str, FunctionInfoFuncDepsInner] = {}
+        deps: dict[str, V2FunctionInfoFuncDepsInner] = {}
         seen: set[str] = set()
         while pending and len(deps) < 200:
             name = self._base_type_name(pending.pop())
@@ -209,11 +209,11 @@ class VariableSyncService(IThreadService):
 
         return list(deps.values())
 
-    def _resolve_type(self, name: str) -> Tuple[Optional[FunctionInfoFuncDepsInner], list]:
+    def _resolve_type(self, name: str) -> Tuple[Optional[V2FunctionInfoFuncDepsInner], list]:
         artifact = _read_named_type(self._deci, name)
         if isinstance(artifact, Typedef):
             return (
-                FunctionInfoFuncDepsInner(
+                V2FunctionInfoFuncDepsInner(
                     TypeDefinition(name=artifact.name, type=artifact.type or "", artifact_type="Typedef")
                 ),
                 [artifact.type],
@@ -230,7 +230,7 @@ class VariableSyncService(IThreadService):
             }
             referenced = [member.type for member in artifact.members.values()]
             return (
-                FunctionInfoFuncDepsInner(
+                V2FunctionInfoFuncDepsInner(
                     Structure(name=artifact.name, size=artifact.size, members=members, artifact_type="Struct")
                 ),
                 referenced,
@@ -238,7 +238,7 @@ class VariableSyncService(IThreadService):
         if isinstance(artifact, Enum):
             members = {str(key): int(value) for key, value in (artifact.members or {}).items()}
             return (
-                FunctionInfoFuncDepsInner(
+                V2FunctionInfoFuncDepsInner(
                     Enumeration(name=artifact.name, members=members, artifact_type="Enum")
                 ),
                 [],

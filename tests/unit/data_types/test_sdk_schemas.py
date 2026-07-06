@@ -12,7 +12,7 @@ from revengai import (
     FunctionDataTypesListItem,
     FunctionHeader,
     FunctionInfo,
-    FunctionInfoFuncDepsInner,
+    V2FunctionInfoFuncDepsInner,
     FunctionType,
     Structure,
     TypeDefinition,
@@ -28,7 +28,7 @@ def test_function_type_fields():
 
 
 def test_func_deps_inner_exposes_actual_instance():
-    assert "actual_instance" in FunctionInfoFuncDepsInner.model_fields
+    assert "actual_instance" in V2FunctionInfoFuncDepsInner.model_fields
 
 
 def test_dependency_models_expose_name_and_type():
