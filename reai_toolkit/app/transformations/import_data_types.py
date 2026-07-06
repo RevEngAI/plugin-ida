@@ -5,11 +5,11 @@ from libbs.api import DecompilerInterface
 from libbs.decompilers.ida.compat import execute_ui
 from loguru import logger
 from revengai import (
-    Argument,
+    FunctionArgument,
     Enumeration,
     FunctionDataTypesList,
     FunctionHeader,
-    FunctionInfoFuncDepsInner,
+    V2FunctionInfoFuncDepsInner,
     FunctionInfo,
     FunctionType,
     Structure,
@@ -53,7 +53,7 @@ class ImportDataTypes:
                 if dep.actual_instance.name not in lookup:
                     lookup.update({dep.actual_instance.name: TaggedDependency(dep.actual_instance)}) # type: ignore
 
-            dependency: FunctionInfoFuncDepsInner
+            dependency: V2FunctionInfoFuncDepsInner
             for dependency in data_types.func_deps:
                 if dependency.actual_instance is None:
                     continue
@@ -160,7 +160,7 @@ class ImportDataTypes:
         self.update_function_arguments(imported_header.args, target_function)
 
     def update_function_arguments(
-        self, imported_args: dict[str, Argument], target_function: libbs.artifacts.Function
+        self, imported_args: dict[str, FunctionArgument], target_function: libbs.artifacts.Function
     ) -> None:
         if target_function.header is None:
             return
