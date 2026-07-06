@@ -1,3 +1,4 @@
+import time
 from unittest.mock import MagicMock
 
 import pytest
@@ -43,8 +44,10 @@ def test_service_runs_to_completion_under_idalib(loaded_binary, mocker):
     service.start_ai_decomp_task(
         ea=ea, on_decomp=on_decomp, on_summary=on_summary, on_comments=on_comments
     )
-    service._worker_thread.join(timeout=10.0)
-    assert not service._worker_thread.is_alive(), "worker deadlocked under idalib"
+    deadline = time.monotonic() + 10.0
+    while service.is_worker_running() and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert not service.is_worker_running(), "worker deadlocked under idalib"
 
     on_decomp.assert_called_once()
     result = on_decomp.call_args[0][0]

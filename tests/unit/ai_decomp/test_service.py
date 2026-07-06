@@ -69,11 +69,11 @@ def _comments(items=None, status=TaskStatus.COMPLETED.value) -> CommentsData:
     return CommentsData.model_construct(inline_comments=items or [], task_status=status)
 
 
-def _wait(thread: threading.Thread | None, timeout: float = 5.0) -> None:
-    if thread is None:
-        return
-    thread.join(timeout=timeout)
-    assert not thread.is_alive(), "worker thread did not exit"
+def _wait(service, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while service.is_worker_running() and time.monotonic() < deadline:
+        time.sleep(0.005)
+    assert not service.is_worker_running(), "worker did not go idle"
 
 
 def _run(service, ea: int = 4096):
@@ -84,7 +84,7 @@ def _run(service, ea: int = 4096):
         on_summary=on_summary,
         on_comments=on_comments,
     )
-    _wait(service._worker_thread)
+    _wait(service)
     return on_decomp, on_summary, on_comments
 
 

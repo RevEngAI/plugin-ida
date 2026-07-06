@@ -27,14 +27,34 @@ MAX_REQUEUE_ATTEMPTS = 2
 class AiDecompService(IThreadService):
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration) -> None:
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
-        self._on_decomp: Callable[[GenericApiReturn[DecompilationData]], None] | None = None
-        self._on_summary: Callable[[GenericApiReturn[SummaryData]], None] | None = None
-        self._on_comments: Callable[[GenericApiReturn[CommentsData]], None] | None = None
         self._decomp_cache: dict[int, DecompilationData] = {}
         self._summary_cache: dict[int, SummaryData] = {}
+        self._comments_cache: dict[int, CommentsData] = {}
+        self._inflight: dict[int, threading.Event] = {}
+        self._inflight_lock = threading.Lock()
 
     def thread_in_progress(self) -> bool:
         return self.is_worker_running()
+
+    def is_worker_running(self) -> bool:
+        with self._inflight_lock:
+            return bool(self._inflight)
+
+    def stop_worker(self) -> None:
+        with self._inflight_lock:
+            events = list(self._inflight.values())
+            self._inflight.clear()
+        for evt in events:
+            evt.set()
+        self._decomp_cache.clear()
+        self._summary_cache.clear()
+        self._comments_cache.clear()
+
+    def peek_decomp(self, ea: int) -> DecompilationData | None:
+        function_id = self._get_function_id(start_ea=ea)
+        if function_id is None:
+            return None
+        return self._decomp_cache.get(function_id)
 
     def start_ai_decomp_task(
         self,
@@ -43,11 +63,46 @@ class AiDecompService(IThreadService):
         on_summary: Callable[[GenericApiReturn[SummaryData]], None],
         on_comments: Callable[[GenericApiReturn[CommentsData]], None],
     ) -> None:
-        self.stop_worker()
-        self._on_decomp = on_decomp
-        self._on_summary = on_summary
-        self._on_comments = on_comments
-        self.start_worker(target=self._begin_ai_decomp_task, args=(ea,))
+        function_id = self._get_function_id(start_ea=ea)
+        if function_id is None:
+            on_decomp(GenericApiReturn[DecompilationData](success=True, data=None))
+            return
+
+        with self._inflight_lock:
+            if function_id in self._inflight:
+                return
+            stop_event = threading.Event()
+            self._inflight[function_id] = stop_event
+
+        worker = threading.Thread(
+            target=self._run_task,
+            args=(function_id, stop_event, on_decomp, on_summary, on_comments),
+            name=f"reai-aidecomp-{function_id}",
+            daemon=True,
+        )
+        worker.start()
+
+    def _run_task(
+        self,
+        function_id: int,
+        stop_event: threading.Event,
+        on_decomp: Callable[[GenericApiReturn[DecompilationData]], None],
+        on_summary: Callable[[GenericApiReturn[SummaryData]], None],
+        on_comments: Callable[[GenericApiReturn[CommentsData]], None],
+    ) -> None:
+        try:
+            if stop_event.is_set():
+                return
+            decomp = self._run_decomp_phase(function_id, stop_event, on_decomp)
+            if decomp is None:
+                return
+            self._run_summary_phase(function_id, stop_event, on_summary)
+            self._run_comments_phase(function_id, stop_event, on_comments)
+        except Exception as e:
+            logger.error(f"RevEng.AI: AI decompilation task crashed for {function_id}: {e}")
+        finally:
+            with self._inflight_lock:
+                self._inflight.pop(function_id, None)
 
     def _get_function_id(self, start_ea: int) -> int | None:
         function_map: FunctionMapping | None = self.netstore_service.get_function_mapping()
@@ -112,13 +167,16 @@ class AiDecompService(IThreadService):
             return None, f"Unexpected error fetching AI decompilation: {e}"
 
     def _run_decomp_phase(
-        self, function_id: int, stop_event: threading.Event
+        self,
+        function_id: int,
+        stop_event: threading.Event,
+        on_decomp: Callable[[GenericApiReturn[DecompilationData]], None],
     ) -> DecompilationData | None:
         cached = self._decomp_cache.get(function_id)
         if cached is not None:
             self._safe_dispatch(
                 stop_event,
-                self._on_decomp,
+                on_decomp,
                 GenericApiReturn[DecompilationData](success=True, data=cached),
             )
             return cached
@@ -127,7 +185,7 @@ class AiDecompService(IThreadService):
         if decomp is None:
             self._safe_dispatch(
                 stop_event,
-                self._on_decomp,
+                on_decomp,
                 GenericApiReturn[DecompilationData](success=False, error_message=fetch_err),
             )
             return None
@@ -138,7 +196,7 @@ class AiDecompService(IThreadService):
             self._decomp_cache[function_id] = decomp
             self._safe_dispatch(
                 stop_event,
-                self._on_decomp,
+                on_decomp,
                 GenericApiReturn[DecompilationData](success=True, data=decomp),
             )
             return decomp
@@ -148,7 +206,7 @@ class AiDecompService(IThreadService):
             if not queued_ok:
                 self._safe_dispatch(
                     stop_event,
-                    self._on_decomp,
+                    on_decomp,
                     GenericApiReturn[DecompilationData](
                         success=False, error_message=queue_err
                     ),
@@ -166,7 +224,7 @@ class AiDecompService(IThreadService):
             if poll_err is not None:
                 self._safe_dispatch(
                     stop_event,
-                    self._on_decomp,
+                    on_decomp,
                     GenericApiReturn[DecompilationData](
                         success=False, error_message=poll_err
                     ),
@@ -177,7 +235,7 @@ class AiDecompService(IThreadService):
         if final is None or not final.decompilation:
             self._safe_dispatch(
                 stop_event,
-                self._on_decomp,
+                on_decomp,
                 GenericApiReturn[DecompilationData](
                     success=False,
                     error_message=final_err or "AI decompilation returned no content.",
@@ -188,7 +246,7 @@ class AiDecompService(IThreadService):
         self._decomp_cache[function_id] = final
         self._safe_dispatch(
             stop_event,
-            self._on_decomp,
+            on_decomp,
             GenericApiReturn[DecompilationData](success=True, data=final),
         )
         return final
@@ -236,13 +294,16 @@ class AiDecompService(IThreadService):
             return None, f"Unexpected error fetching AI decompilation summary: {e}"
 
     def _run_summary_phase(
-        self, function_id: int, stop_event: threading.Event
+        self,
+        function_id: int,
+        stop_event: threading.Event,
+        on_summary: Callable[[GenericApiReturn[SummaryData]], None],
     ) -> None:
         cached = self._summary_cache.get(function_id)
         if cached is not None:
             self._safe_dispatch(
                 stop_event,
-                self._on_summary,
+                on_summary,
                 GenericApiReturn[SummaryData](success=True, data=cached),
             )
             return
@@ -251,7 +312,7 @@ class AiDecompService(IThreadService):
         if summary is None:
             self._safe_dispatch(
                 stop_event,
-                self._on_summary,
+                on_summary,
                 GenericApiReturn[SummaryData](success=False, error_message=err),
             )
             return
@@ -262,7 +323,7 @@ class AiDecompService(IThreadService):
             self._summary_cache[function_id] = summary
             self._safe_dispatch(
                 stop_event,
-                self._on_summary,
+                on_summary,
                 GenericApiReturn[SummaryData](success=True, data=summary),
             )
             return
@@ -272,7 +333,7 @@ class AiDecompService(IThreadService):
             if not queued_ok:
                 self._safe_dispatch(
                     stop_event,
-                    self._on_summary,
+                    on_summary,
                     GenericApiReturn[SummaryData](
                         success=False, error_message=queue_err
                     ),
@@ -290,7 +351,7 @@ class AiDecompService(IThreadService):
             if poll_err is not None:
                 self._safe_dispatch(
                     stop_event,
-                    self._on_summary,
+                    on_summary,
                     GenericApiReturn[SummaryData](
                         success=False, error_message=poll_err
                     ),
@@ -301,7 +362,7 @@ class AiDecompService(IThreadService):
         if final is None:
             self._safe_dispatch(
                 stop_event,
-                self._on_summary,
+                on_summary,
                 GenericApiReturn[SummaryData](
                     success=False, error_message=final_err
                 ),
@@ -311,7 +372,7 @@ class AiDecompService(IThreadService):
         self._summary_cache[function_id] = final
         self._safe_dispatch(
             stop_event,
-            self._on_summary,
+            on_summary,
             GenericApiReturn[SummaryData](success=True, data=final),
         )
 
@@ -358,13 +419,25 @@ class AiDecompService(IThreadService):
             return None, f"Unexpected error fetching inline comments: {e}"
 
     def _run_comments_phase(
-        self, function_id: int, stop_event: threading.Event
+        self,
+        function_id: int,
+        stop_event: threading.Event,
+        on_comments: Callable[[GenericApiReturn[CommentsData]], None],
     ) -> None:
+        cached = self._comments_cache.get(function_id)
+        if cached is not None:
+            self._safe_dispatch(
+                stop_event,
+                on_comments,
+                GenericApiReturn[CommentsData](success=True, data=cached),
+            )
+            return
+
         comments, err = self._fetch_comments(function_id)
         if comments is None:
             self._safe_dispatch(
                 stop_event,
-                self._on_comments,
+                on_comments,
                 GenericApiReturn[CommentsData](success=False, error_message=err),
             )
             return
@@ -372,9 +445,10 @@ class AiDecompService(IThreadService):
         status = str(comments.task_status)
 
         if status == TaskStatus.COMPLETED.value:
+            self._comments_cache[function_id] = comments
             self._safe_dispatch(
                 stop_event,
-                self._on_comments,
+                on_comments,
                 GenericApiReturn[CommentsData](success=True, data=comments),
             )
             return
@@ -384,7 +458,7 @@ class AiDecompService(IThreadService):
             if not queued_ok:
                 self._safe_dispatch(
                     stop_event,
-                    self._on_comments,
+                    on_comments,
                     GenericApiReturn[CommentsData](
                         success=False, error_message=queue_err
                     ),
@@ -402,7 +476,7 @@ class AiDecompService(IThreadService):
             if poll_err is not None:
                 self._safe_dispatch(
                     stop_event,
-                    self._on_comments,
+                    on_comments,
                     GenericApiReturn[CommentsData](
                         success=False, error_message=poll_err
                     ),
@@ -413,16 +487,17 @@ class AiDecompService(IThreadService):
         if final is None:
             self._safe_dispatch(
                 stop_event,
-                self._on_comments,
+                on_comments,
                 GenericApiReturn[CommentsData](
                     success=False, error_message=final_err
                 ),
             )
             return
 
+        self._comments_cache[function_id] = final
         self._safe_dispatch(
             stop_event,
-            self._on_comments,
+            on_comments,
             GenericApiReturn[CommentsData](success=True, data=final),
         )
 
@@ -468,23 +543,6 @@ class AiDecompService(IThreadService):
                 return False, None
 
         return False, None
-
-    def _begin_ai_decomp_task(self, stop_event: threading.Event, start_ea: int) -> None:
-        function_id = self._get_function_id(start_ea=start_ea)
-        if function_id is None:
-            self._safe_dispatch(
-                stop_event,
-                self._on_decomp,
-                GenericApiReturn[DecompilationData](success=True, data=None),
-            )
-            return
-
-        decomp = self._run_decomp_phase(function_id, stop_event)
-        if decomp is None:
-            return
-
-        self._run_summary_phase(function_id, stop_event)
-        self._run_comments_phase(function_id, stop_event)
 
 
 def _format_api_error(e: ApiException) -> str:
