@@ -1,6 +1,6 @@
 """SSE frame parser tests — feed fake byte chunks, no network."""
 
-from reai_toolkit.app.services.chat.schema import normalize_event
+from reai_toolkit.app.services.chat.schema import EntityRef, normalize_event
 from reai_toolkit.app.services.chat.sse import (
     event_from_frame,
     iter_sse_events,
@@ -143,3 +143,17 @@ def test_tool_result_entity_updates_parsed():
     assert ev.updated is not None
     assert ev.updated[0].type == "function"
     assert ev.updated[0].ids == [1, 2]
+    assert ev.updated[0].refs == []
+
+
+def test_tool_result_entity_refs_parsed():
+    frame = _frame(
+        '{"type": 12, "data": {"tool_call_id": "t", "tool_name": "rename_functions", '
+        '"updated": [{"type": "function", "ids": [2015699787], '
+        '"refs": [{"id": 2015699787, "name": "region_position", "vaddr": 4198416}]}]}}'
+    )
+    ev = list(iter_sse_events([frame]))[0]
+    assert ev.updated is not None
+    assert ev.updated[0].refs == [
+        EntityRef(id=2015699787, name="region_position", vaddr=4198416)
+    ]

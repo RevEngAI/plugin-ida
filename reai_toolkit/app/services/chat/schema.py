@@ -39,11 +39,19 @@ ROLE_TOOL = 4
 
 
 @dataclass
+class EntityRef:
+    id: int
+    name: str = ""
+    vaddr: int = 0
+
+
+@dataclass
 class EntityUpdate:
     """A backend entity a tool result reports as changed. Drives view refresh."""
 
     type: str
     ids: list[int]
+    refs: list[EntityRef] = field(default_factory=list)
 
 
 @dataclass
@@ -78,6 +86,26 @@ def resolve_type(type_field: Any) -> Optional[str]:
     return None
 
 
+def _parse_refs(raw: Any) -> list[EntityRef]:
+    if not isinstance(raw, list):
+        return []
+    out: list[EntityRef] = []
+    for item in raw:
+        if not isinstance(item, dict) or "id" not in item:
+            continue
+        try:
+            out.append(
+                EntityRef(
+                    id=int(item["id"]),
+                    name=str(item.get("name") or ""),
+                    vaddr=int(item.get("vaddr") or 0),
+                )
+            )
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 def _parse_entity_updates(raw: Any) -> Optional[list[EntityUpdate]]:
     if not isinstance(raw, list):
         return None
@@ -92,7 +120,13 @@ def _parse_entity_updates(raw: Any) -> Optional[list[EntityUpdate]]:
         if not isinstance(ids, list):
             continue
         try:
-            out.append(EntityUpdate(type=etype, ids=[int(i) for i in ids]))
+            out.append(
+                EntityUpdate(
+                    type=etype,
+                    ids=[int(i) for i in ids],
+                    refs=_parse_refs(item.get("refs")),
+                )
+            )
         except (TypeError, ValueError):
             continue
     return out or None

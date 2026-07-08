@@ -6,7 +6,6 @@ from reai_toolkit.app.services.chat.reducer import (
     ConfirmTool,
     EventAction,
     SendMessage,
-    SetToolFunctions,
     build_initial_state,
     chat_reducer,
     initial_state,
@@ -15,6 +14,8 @@ from reai_toolkit.app.services.chat.schema import (
     AssistantMessage,
     ChatEvent,
     ContextCompacted,
+    EntityRef,
+    EntityUpdate,
     FunctionRef,
     Step,
     ToolCall,
@@ -210,17 +211,47 @@ def test_api_error_action_finalizes():
     assert state.items[-1].is_streaming is False
 
 
-def test_set_tool_functions_attaches_links():
+def _rename_result_events():
+    return [
+        _ev("TOOL_CALL_START", tool_call_id="t1", tool_name="rename_functions"),
+        _ev(
+            "TOOL_CALL_RESULT",
+            tool_call_id="t1",
+            tool_name="rename_functions",
+            updated=[
+                EntityUpdate(
+                    type="function",
+                    ids=[2015699787],
+                    refs=[
+                        EntityRef(id=2015699787, name="region_position", vaddr=4198416)
+                    ],
+                )
+            ],
+        ),
+    ]
+
+
+def test_tool_call_result_attaches_function_links_from_refs():
+    state = _fold(_rename_result_events())
+    tool = [i for i in state.items if isinstance(i, ToolCall)][0]
+    assert tool.functions == [FunctionRef(ea=4198416, name="region_position")]
+
+
+def test_tool_call_result_links_persist_on_replay():
+    state = build_initial_state(_rename_result_events())
+    tool = [i for i in state.items if isinstance(i, ToolCall)][0]
+    assert tool.functions == [FunctionRef(ea=4198416, name="region_position")]
+
+
+def test_tool_call_result_without_refs_leaves_no_links():
     state = _fold(
         [
-            _ev("TOOL_CALL_START", tool_call_id="t1", tool_name="rename_functions"),
-            _ev("TOOL_CALL_RESULT", tool_call_id="t1", tool_name="rename_functions"),
+            _ev("TOOL_CALL_START", tool_call_id="t1", tool_name="do"),
+            _ev("TOOL_CALL_RESULT", tool_call_id="t1", tool_name="do"),
         ]
     )
-    refs = [FunctionRef(ea=0x408140, name="chat_agent_renamed")]
-    state = chat_reducer(state, SetToolFunctions(tool_call_id="t1", functions=refs))
     tool = [i for i in state.items if isinstance(i, ToolCall)][0]
-    assert tool.functions == refs
+    assert tool.functions is None
 
 
 def test_build_initial_state_replays_user_and_events():
