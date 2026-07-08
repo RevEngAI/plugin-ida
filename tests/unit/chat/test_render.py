@@ -14,10 +14,14 @@ from reai_toolkit.app.components.tabs.chat_render import (
     render_transcript_markdown,
     title_case,
 )
+from reai_toolkit.app.services.chat.reducer import build_initial_state
 from reai_toolkit.app.services.chat.schema import (
     AssistantMessage,
+    ChatEvent,
     ChatState,
     ContextCompacted,
+    EntityRef,
+    EntityUpdate,
     FunctionRef,
     RunError,
     Step,
@@ -83,6 +87,30 @@ def test_render_function_jump_links():
     )
     md = render_transcript_markdown(state)
     assert "[chat_agent_renamed](ida://jump/4227392)" in md
+
+
+def test_render_jump_links_persist_from_replayed_refs():
+    events = [
+        ChatEvent(
+            type="TOOL_CALL_START", tool_call_id="t1", tool_name="rename_functions"
+        ),
+        ChatEvent(
+            type="TOOL_CALL_RESULT",
+            tool_call_id="t1",
+            tool_name="rename_functions",
+            updated=[
+                EntityUpdate(
+                    type="function",
+                    ids=[2015699787],
+                    refs=[
+                        EntityRef(id=2015699787, name="region_position", vaddr=4198416)
+                    ],
+                )
+            ],
+        ),
+    ]
+    md = render_transcript_markdown(build_initial_state(events))
+    assert "[region_position](ida://jump/4198416)" in md
 
 
 def test_find_pending_confirmation():

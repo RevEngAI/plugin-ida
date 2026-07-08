@@ -17,6 +17,7 @@ from reai_toolkit.app.services.chat.schema import (
     ChatItem,
     ChatState,
     ContextCompacted,
+    FunctionRef,
     RunError,
     Step,
     StoredEvent,
@@ -61,15 +62,7 @@ class Reset:
     stored_events: Optional[list[StoredEvent]] = None
 
 
-@dataclass
-class SetToolFunctions:
-    tool_call_id: str
-    functions: list
-
-
-ChatAction = Union[
-    SendMessage, Cancel, ConfirmTool, EventAction, ApiError, Reset, SetToolFunctions
-]
+ChatAction = Union[SendMessage, Cancel, ConfirmTool, EventAction, ApiError, Reset]
 
 
 def _new_id() -> str:
@@ -152,20 +145,23 @@ def chat_reducer(state: ChatState, action: ChatAction) -> ChatState:
             items=_finalize_running_items(state.items),
         )
 
-    if isinstance(action, SetToolFunctions):
-        return replace(
-            state,
-            items=_find_last_and_update(
-                state.items,
-                lambda it: isinstance(it, ToolCall) and it.id == action.tool_call_id,
-                lambda it: replace(it, functions=action.functions),
-            ),
-        )
-
     if isinstance(action, EventAction):
         return _reduce_event(state, action.event)
 
     return state
+
+
+def _functions_from_updates(updates) -> Optional[list[FunctionRef]]:
+    if not updates:
+        return None
+    out: list[FunctionRef] = []
+    for u in updates:
+        if u.type != "function":
+            continue
+        for r in u.refs:
+            if r.name and r.vaddr:
+                out.append(FunctionRef(ea=r.vaddr, name=r.name))
+    return out or None
 
 
 def _reduce_event(state: ChatState, event: ChatEvent) -> ChatState:
@@ -267,10 +263,16 @@ def _reduce_event(state: ChatState, event: ChatEvent) -> ChatState:
         )
 
     if t == "TOOL_CALL_RESULT":
+        functions = _functions_from_updates(event.updated)
         items = _find_last_and_update(
             state.items,
             lambda it: isinstance(it, ToolCall) and it.id == event.tool_call_id,
-            lambda it: replace(it, status="finished", is_error=event.is_error),
+            lambda it: replace(
+                it,
+                status="finished",
+                is_error=event.is_error,
+                functions=functions or it.functions,
+            ),
         )
         items = _find_last_and_update(
             items,

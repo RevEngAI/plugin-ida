@@ -10,6 +10,8 @@ worker thread under an auto/direct connection).
 
 from __future__ import annotations
 
+import queue
+import sys
 import threading
 from typing import Callable, Optional
 
@@ -26,10 +28,37 @@ from reai_toolkit.app.core.qt_compat import QtCore, QtWidgets, Signal, Slot
 from reai_toolkit.app.services.chat.schema import ChatState
 
 
-class ChatStreamWorker(QtCore.QObject):
-    """Runs one chat turn (optional create → optional send → stream) off-thread."""
+class _StderrSlotWarningFilter:
+    def __init__(self, wrapped) -> None:
+        self._wrapped = wrapped
+        self._local = threading.local()
 
-    event_ready = Signal(object)
+    def write(self, text):
+        buf = getattr(self._local, "buf", "") + text
+        while "\n" in buf:
+            line, buf = buf.split("\n", 1)
+            if "_StreamRelay::handle_event" not in line:
+                self._wrapped.write(line + "\n")
+        self._local.buf = buf
+        return len(text)
+
+    def flush(self):
+        buf = getattr(self._local, "buf", "")
+        self._local.buf = ""
+        if buf and "_StreamRelay::handle_event" not in buf:
+            self._wrapped.write(buf)
+        self._wrapped.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+
+if not isinstance(sys.stderr, _StderrSlotWarningFilter):
+    sys.stderr = _StderrSlotWarningFilter(sys.stderr)
+
+
+class ChatStreamWorker(QtCore.QObject):
+    event_ready = Signal()
     conversation_created = Signal(str)
     errored = Signal(str)
     finished = Signal()
@@ -50,6 +79,7 @@ class ChatStreamWorker(QtCore.QObject):
         self._last_event_id = last_event_id
         self._stopped = False
         self._stop_event = threading.Event()
+        self._event_queue: "queue.Queue" = queue.Queue()
 
     @Slot()
     def run(self) -> None:
@@ -78,7 +108,8 @@ class ChatStreamWorker(QtCore.QObject):
             for ev in self._svc.stream(conv_id, self._stop_event, self._last_event_id):
                 if self._stopped:
                     break
-                self.event_ready.emit(ev)
+                self._event_queue.put(ev)
+                self.event_ready.emit()
         except Exception as e:
             self.errored.emit(str(e))
         finally:
@@ -94,19 +125,29 @@ class ChatStreamWorker(QtCore.QObject):
 
 
 class _StreamRelay(QtCore.QObject):
-    """UI-thread QObject that forwards worker signals to plain callbacks."""
-
     def __init__(self) -> None:
         super().__init__()
+        self._event_queue: Optional["queue.Queue"] = None
         self.on_event: Optional[Callable] = None
         self.on_conversation_created: Optional[Callable] = None
         self.on_error: Optional[Callable] = None
         self.on_finished: Optional[Callable] = None
 
-    @Slot(object)
-    def handle_event(self, ev) -> None:
-        if self.on_event:
-            self.on_event(ev)
+    def bind_queue(self, q: "queue.Queue") -> None:
+        self._event_queue = q
+
+    @Slot()
+    def handle_event(self) -> None:
+        q = self._event_queue
+        if q is None:
+            return
+        while True:
+            try:
+                ev = q.get_nowait()
+            except queue.Empty:
+                break
+            if self.on_event:
+                self.on_event(ev)
 
     @Slot(str)
     def handle_conversation_created(self, uuid: str) -> None:
@@ -204,16 +245,18 @@ class ChatPanel(kw.PluginForm):
         f = self._title_label.font()
         f.setBold(True)
         self._title_label.setFont(f)
-        self._context_label = QtWidgets.QLabel("")
-        self._context_label.setStyleSheet("color: gray;")
         history_btn = QtWidgets.QPushButton("History")
         new_btn = QtWidgets.QPushButton("New chat")
         header.addWidget(self._title_label)
         header.addStretch(1)
-        header.addWidget(self._context_label)
         header.addWidget(history_btn)
         header.addWidget(new_btn)
         root.addLayout(header)
+
+        self._context_label = QtWidgets.QLabel("")
+        self._context_label.setStyleSheet("color: gray;")
+        self._context_label.setWordWrap(True)
+        root.addWidget(self._context_label)
 
         self._history_list = QtWidgets.QListWidget()
         self._history_list.setVisible(False)
@@ -265,7 +308,7 @@ class ChatPanel(kw.PluginForm):
 
         self._render_timer = QtCore.QTimer(self._parent_window)
         self._render_timer.setSingleShot(True)
-        self._render_timer.setInterval(40)
+        self._render_timer.setInterval(100)
         self._render_timer.timeout.connect(self._flush_render)
 
         self._relay = _StreamRelay()
@@ -376,6 +419,7 @@ class ChatPanel(kw.PluginForm):
         worker.moveToThread(thread)
         thread.started.connect(worker.run)
         if self._relay is not None:
+            self._relay.bind_queue(worker._event_queue)
             worker.event_ready.connect(self._relay.handle_event)
             worker.conversation_created.connect(self._relay.handle_conversation_created)
             worker.errored.connect(self._relay.handle_error)
@@ -429,6 +473,9 @@ class ChatPanel(kw.PluginForm):
         self._streaming = False
         if self.on_stream_finished:
             self.on_stream_finished()
+        if self._render_timer is not None and self._render_timer.isActive():
+            self._render_timer.stop()
+        self._flush_render()
 
     def _on_send_clicked(self) -> None:
         if self._input is None:

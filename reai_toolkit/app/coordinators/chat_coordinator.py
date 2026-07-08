@@ -29,7 +29,6 @@ from reai_toolkit.app.services.chat.reducer import (
     ConfirmTool,
     EventAction,
     SendMessage,
-    SetToolFunctions,
     build_initial_state,
     chat_reducer,
     initial_state,
@@ -37,7 +36,6 @@ from reai_toolkit.app.services.chat.reducer import (
 from reai_toolkit.app.services.chat.schema import (
     ChatState,
     ConversationContextDTO,
-    FunctionRef,
 )
 from reai_toolkit.hooks.reactive import ChatContextHooks
 
@@ -223,27 +221,22 @@ class ChatCoordinator(BaseCoordinator):
         self._render()
 
     def on_stream_finished(self) -> None:
-        return
+        self._render()
 
     def _handle_tool_result(self, ev) -> None:
         if ev.updated:
             func_ids = [i for u in ev.updated if u.type == "function" for i in u.ids]
             if func_ids:
-                self._sync_and_link_functions(ev.tool_call_id, func_ids)
+                self._sync_functions(func_ids)
             elif any(u.type == "analysis" for u in ev.updated):
                 self.refresh_disassembly_view()
         self._maybe_open_viewer(ev)
 
-    def _sync_and_link_functions(self, tool_call_id: str, func_ids: list) -> None:
-        """For each function the agent touched: pull its current name into the
-        IDB (targeted, per-function — no full analysis sync), auto-jump to it as
-        it applies, and attach a clickable jump link to the tool-call."""
-
+    def _sync_functions(self, func_ids: list) -> None:
         def _work() -> None:
             func_map = self.app.netstore_service.get_function_mapping()
             if func_map is None:
                 return
-            refs: list[FunctionRef] = []
             applied = False
             last_ea: Optional[int] = None
             for fid in func_ids:
@@ -257,24 +250,15 @@ class ChatCoordinator(BaseCoordinator):
                 if self.chat_service.update_function_name(ea, name):
                     self.chat_service.tag_function_as_renamed(name)
                     applied = True
-                refs.append(FunctionRef(ea=ea, name=name))
                 self.jump_to(ea)
                 last_ea = ea
-            if refs:
-                self._attach_function_links(tool_call_id, refs)
             if applied:
                 self.refresh_disassembly_view()
+                self._refresh_context_chip(last_ea)
             if last_ea is not None and self._ai_decomp_coord is not None:
                 self._ai_decomp_coord.follow_function(last_ea)
 
         threading.Thread(target=_work, daemon=True).start()
-
-    @execute_ui
-    def _attach_function_links(self, tool_call_id: str, refs: list) -> None:
-        self._state = chat_reducer(
-            self._state, SetToolFunctions(tool_call_id=tool_call_id, functions=refs)
-        )
-        self._render()
 
     @execute_ui
     def jump_to(self, ea: int) -> None:
@@ -335,6 +319,10 @@ class ChatCoordinator(BaseCoordinator):
         if self._panel is not None:
             self._panel.set_context_chip(self._resolve_context_chip_text(ea))
 
+    @execute_ui
+    def _refresh_context_chip(self, ea: Optional[int] = None) -> None:
+        self._update_context_chip(ea)
+
     @execute_read
     def _resolve_context_chip_text(self, ea: Optional[int] = None) -> str:
         try:
@@ -348,7 +336,7 @@ class ChatCoordinator(BaseCoordinator):
                 bits.append(f"fn: {name}")
             if analysis_id is not None:
                 bits.append(f"analysis #{analysis_id}")
-            return "  ·  ".join(bits) if bits else "No analysis attached"
+            return "\n".join(bits) if bits else "No analysis attached"
         except Exception:
             return ""
 
