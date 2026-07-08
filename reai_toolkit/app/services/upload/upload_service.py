@@ -10,6 +10,7 @@ from revengai.api.config_api import ConfigApi
 from revengai.models.analysis_create_request import AnalysisCreateRequest
 from revengai.models.analysis_create_response import AnalysisCreateResponse
 from revengai.models.analysis_scope import AnalysisScope
+from revengai.models.tag import Tag
 from revengai.models.upload_file_type import UploadFileType
 from revengai.models.base_response_upload_response import BaseResponseUploadResponse
 
@@ -212,7 +213,7 @@ class UploadService(IThreadService):
             filename=file_name,
             sha_256_hash=binary_sha256,
             debug_hash=debug_sha256,
-            tags=tags or [],
+            tags=[Tag(name=tag) for tag in (tags or [])],
             analysis_scope=AnalysisScope.PUBLIC if public else AnalysisScope.PRIVATE,
             symbols=symbols,
         )
