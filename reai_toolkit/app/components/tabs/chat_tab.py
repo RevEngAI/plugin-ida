@@ -11,6 +11,7 @@ worker thread under an auto/direct connection).
 from __future__ import annotations
 
 import queue
+import sys
 import threading
 from typing import Callable, Optional
 
@@ -25,6 +26,35 @@ from reai_toolkit.app.components.tabs.chat_render import (
 )
 from reai_toolkit.app.core.qt_compat import QtCore, QtWidgets, Signal, Slot
 from reai_toolkit.app.services.chat.schema import ChatState
+
+
+class _StderrSlotWarningFilter:
+    def __init__(self, wrapped) -> None:
+        self._wrapped = wrapped
+        self._local = threading.local()
+
+    def write(self, text):
+        buf = getattr(self._local, "buf", "") + text
+        while "\n" in buf:
+            line, buf = buf.split("\n", 1)
+            if "_StreamRelay::handle_event" not in line:
+                self._wrapped.write(line + "\n")
+        self._local.buf = buf
+        return len(text)
+
+    def flush(self):
+        buf = getattr(self._local, "buf", "")
+        self._local.buf = ""
+        if buf and "_StreamRelay::handle_event" not in buf:
+            self._wrapped.write(buf)
+        self._wrapped.flush()
+
+    def __getattr__(self, name):
+        return getattr(self._wrapped, name)
+
+
+if not isinstance(sys.stderr, _StderrSlotWarningFilter):
+    sys.stderr = _StderrSlotWarningFilter(sys.stderr)
 
 
 class ChatStreamWorker(QtCore.QObject):
