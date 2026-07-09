@@ -67,9 +67,16 @@ def test_sync_never_opens_or_switches_pseudocode(tmp_path):
 
     if not report_path.is_file():
         log = log_path.read_text() if log_path.is_file() else ""
-        if "license" in log.lower():
+        stderr = proc.stderr.decode(errors="replace")
+        stdout = proc.stdout.decode(errors="replace")
+        if "license" in log.lower() or "license" in stderr.lower():
             pytest.skip("IDA license unavailable")
-        pytest.fail(f"IDA produced no report (rc={proc.returncode}); log tail:\n{log[-2000:]}")
+        pytest.fail(
+            f"IDA produced no report (rc={proc.returncode});"
+            f"\nstderr tail:\n{stderr[-2000:]}"
+            f"\nstdout tail:\n{stdout[-2000:]}"
+            f"\nlog tail:\n{log[-2000:]}"
+        )
 
     report = json.loads(report_path.read_text())
 
