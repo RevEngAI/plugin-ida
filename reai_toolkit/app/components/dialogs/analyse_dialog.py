@@ -177,12 +177,22 @@ class AnalyseDialog(DialogBase):
             file_path=self.file_path,
             symbols=AnalyseDialog.cached_symbols,
             debug_file_path=self.debug_file_path,
-            tags=[],
+            tags=self._parse_tags(),
             public=self.ui.radioButton_2.isChecked(),
             thread_callback=self.callback,
         )
 
         self.accept()
+
+    def _parse_tags(self) -> list[str]:
+        seen: set[str] = set()
+        tags: list[str] = []
+        for raw in self.ui.apiTags.text().split(","):
+            tag: str = raw.strip()
+            if tag and tag not in seen:
+                seen.add(tag)
+                tags.append(tag)
+        return tags
 
     def initialize_function_boundaries(self) -> None:
         symbols: Symbols | None = collect_symbols_from_ida()
