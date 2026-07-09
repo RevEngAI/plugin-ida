@@ -2,7 +2,7 @@ from typing import cast
 
 import libbs.artifacts
 from libbs.api import DecompilerInterface
-from libbs.decompilers.ida.compat import execute_ui
+from libbs.decompilers.ida.compat import execute_ui, convert_type_str_to_ida_type
 from loguru import logger
 from revengai import (
     FunctionArgument,
@@ -32,9 +32,10 @@ class ImportDataTypes:
         self.deci: DecompilerInterface
 
     @execute_ui
-    def execute(self, functions: FunctionDataTypesList, matched_function_mapping: dict[int, int] = {}) -> None:
+    def execute(self, functions: FunctionDataTypesList, matched_function_mapping: dict[int, int] = {}) -> set[int]:
         self.deci = DecompilerInterface.discover(force_decompiler="ida") # type: ignore
         lookup: dict[str, TaggedDependency] = {}
+        failed: set[int] = set()
 
         for function in functions.items:
             data_types: FunctionInfo | None = function.data_types
@@ -70,18 +71,21 @@ class ImportDataTypes:
 
             func: FunctionType | None = data_types.func_types
             if func:
-                # If we obtained data types from a matched function, we need to make sure we map it to the original effective address.
-                if matched_function_mapping:
-                    ea: int = matched_function_mapping[function.function_id]
-                else:
-                    ea: int = func.addr
-
                 try:
-                    self.update_function(func, ea)
+                    if matched_function_mapping:
+                        ea: int = matched_function_mapping[function.function_id]
+                    else:
+                        ea: int = func.addr
+
+                    if not self.update_function(func, ea) or self._function_types_unparseable(func):
+                        failed.add(function.function_id)
                 except Exception as e:
                     logger.warning(
-                        f"RevEng.AI: skipped data types for {func.name} at ea=0x{ea:x}: {e!r}"
+                        f"RevEng.AI: skipped data types for function {function.function_id}: {e!r}"
                     )
+                    failed.add(function.function_id)
+
+        return failed
 
 
     def process_dependency(
@@ -130,14 +134,14 @@ class ImportDataTypes:
             name=imported_typedef.name, type_=normalized_type
         )
 
-    def update_function(self, func: FunctionType, ea: int) -> None:
+    def update_function(self, func: FunctionType, ea: int) -> bool:
         base_address: int = self.deci.binary_base_addr
         rva: int = ea - base_address
 
         target_func: libbs.artifacts.Function | None = self.deci.functions.get(rva) # type: ignore
         if target_func is None:
             logger.warning(f"failed to update function: {func.name} at rva: 0x{rva:0x}")
-            return
+            return False
 
         target_func.name = func.name
         target_func.size = func.size
@@ -148,6 +152,16 @@ class ImportDataTypes:
             self.update_header(func.header, target_func)
 
         self.deci.functions[rva] = target_func
+        return True
+
+    def _function_types_unparseable(self, func: FunctionType) -> bool:
+        if not (func.header and func.header.args):
+            return False
+        for arg in func.header.args.values():
+            type_str: str = self.normalise_type(arg.type) if arg.type else ""
+            if type_str and convert_type_str_to_ida_type(type_str) is None:
+                return True
+        return False
 
     def update_header(
         self, imported_header: FunctionHeader, target_function: libbs.artifacts.Function

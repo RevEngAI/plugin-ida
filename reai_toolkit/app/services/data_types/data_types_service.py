@@ -1,3 +1,5 @@
+from dataclasses import dataclass, field
+
 from revengai import ApiException, Configuration
 from revengai.exceptions import NotFoundException
 
@@ -17,13 +19,20 @@ from reai_toolkit.app.transformations.import_data_types import ImportDataTypes
 FUNCTION_IDS_BATCH_SIZE = 50
 
 
+@dataclass
+class DataTypesImportResult:
+    error: str | None = None
+    remote_absent_ids: set[int] = field(default_factory=set)
+    apply_failed_ids: set[int] = field(default_factory=set)
+
+
 class ImportDataTypesService(IThreadService):
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration) -> None:
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
 
-    def import_data_types(self, matches: dict[int, int]) -> str | None:
+    def import_data_types(self, matches: dict[int, int]) -> DataTypesImportResult:
         if len(matches) == 0:
-            return None
+            return DataTypesImportResult()
 
         idt: ImportDataTypes = ImportDataTypes()
         matched_function_ids: list[int] = list(matches.keys())
@@ -32,17 +41,29 @@ class ImportDataTypesService(IThreadService):
             response: FunctionDataTypesList | None = self._get_data_types(matched_function_ids)
         except NotFoundException as e:
             logger.warning(f"failed to apply data types for {len(matched_function_ids)} functions: {e}")
-            return None
+            return DataTypesImportResult(remote_absent_ids=set(matched_function_ids))
         except ApiException as e:
             logger.error(f"RevEng.AI: failed to sync function data types: HTTP {e.status} {e.reason}")
-            return f"Failed to sync function data types: HTTP {e.status} {e.reason}"
+            return DataTypesImportResult(error=f"Failed to sync function data types: HTTP {e.status} {e.reason}")
         except Exception as e:
             logger.error(f"RevEng.AI: failed to sync function data types: {e}")
-            return f"Failed to sync function data types: {e}"
+            return DataTypesImportResult(error=f"Failed to sync function data types: {e}")
 
+        present_ids: set[int] = (
+            {item.function_id for item in response.items if item.data_types is not None}
+            if response
+            else set()
+        )
+        remote_absent_ids: set[int] = set(matched_function_ids) - present_ids
+
+        apply_failed_ids: set[int] = set()
         if response:
-            idt.execute(response, matched_function_mapping=matches)
-        return None
+            apply_failed_ids = idt.execute(response, matched_function_mapping=matches) or set()
+
+        return DataTypesImportResult(
+            remote_absent_ids=remote_absent_ids,
+            apply_failed_ids=apply_failed_ids,
+        )
 
     def _get_data_types(self, function_ids: list[int] | None = None) -> FunctionDataTypesList | None:
         if not function_ids:

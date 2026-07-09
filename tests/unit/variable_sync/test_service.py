@@ -1,4 +1,5 @@
 import queue
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -105,6 +106,82 @@ def test_patch_header_updates_arg_and_return_type(service):
     assert info.func_types.header.args["0x0"].type == "size_t"
     assert info.func_types.header.type == "int"
     assert info.func_types.type == "int"
+
+
+def test_push_local_types_batch_noop_without_targets_or_analysis(service):
+    service._deci = MagicMock()
+    assert service.push_local_function_types_batch({}, analysis_id=1) == 0
+    assert service.push_local_function_types_batch({1: 0x1000}, analysis_id=None) == 0
+
+
+def test_push_local_types_batch_uses_version_zero_when_absent(service, sdk, mocker):
+    service._deci = MagicMock()
+    service._deci.binary_base_addr = 0x400000
+    build = mocker.patch.object(service, "_build_function_info", return_value=_function_info())
+    sdk.list_function_data_types_for_functions.return_value = MagicMock(
+        status=True, data=MagicMock(items=[])
+    )
+    out = MagicMock()
+    out.results = [SimpleNamespace(function_id=1, status="updated", data_types_version=1)]
+    sdk.batch_update_function_data_types.return_value = out
+
+    updated = service.push_local_function_types_batch({1: 0x401000}, analysis_id=9)
+
+    assert updated == 1
+    build.assert_called_once_with(0x401000 - 0x400000)
+    body = sdk.batch_update_function_data_types.call_args.kwargs[
+        "batch_update_data_types_input_body"
+    ]
+    assert body.functions[0].function_id == 1
+    assert body.functions[0].data_types_version == 0
+
+
+def test_push_local_types_batch_overwrites_with_remote_version(service, sdk, mocker):
+    service._deci = MagicMock()
+    service._deci.binary_base_addr = 0
+    mocker.patch.object(service, "_build_function_info", return_value=_function_info())
+    sdk.list_function_data_types_for_functions.return_value = MagicMock(
+        status=True,
+        data=MagicMock(items=[SimpleNamespace(function_id=1, data_types_version=5)]),
+    )
+    out = MagicMock()
+    out.results = [SimpleNamespace(function_id=1, status="updated", data_types_version=6)]
+    sdk.batch_update_function_data_types.return_value = out
+
+    service.push_local_function_types_batch({1: 0x1000}, analysis_id=9)
+
+    body = sdk.batch_update_function_data_types.call_args.kwargs[
+        "batch_update_data_types_input_body"
+    ]
+    assert body.functions[0].data_types_version == 5
+
+
+def test_push_local_types_batch_retries_on_version_conflict(service, sdk, mocker):
+    service._deci = MagicMock()
+    service._deci.binary_base_addr = 0
+    mocker.patch.object(service, "_build_function_info", return_value=_function_info())
+    sdk.list_function_data_types_for_functions.side_effect = [
+        MagicMock(
+            status=True,
+            data=MagicMock(items=[SimpleNamespace(function_id=1, data_types_version=1)]),
+        ),
+        MagicMock(
+            status=True,
+            data=MagicMock(items=[SimpleNamespace(function_id=1, data_types_version=2)]),
+        ),
+    ]
+    conflict = MagicMock()
+    conflict.results = [
+        SimpleNamespace(function_id=1, status="version_conflict", data_types_version=None)
+    ]
+    ok = MagicMock()
+    ok.results = [SimpleNamespace(function_id=1, status="updated", data_types_version=3)]
+    sdk.batch_update_function_data_types.side_effect = [conflict, ok]
+
+    updated = service.push_local_function_types_batch({1: 0x1000}, analysis_id=9)
+
+    assert updated == 1
+    assert sdk.batch_update_function_data_types.call_count == 2
 
 
 def test_patch_stack_var_type_change_keeps_name(service):

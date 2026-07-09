@@ -53,6 +53,7 @@ class VariableSyncService(IThreadService):
     _last_ts: dict[tuple, float] = {}
     _debounce_ms: int = 400
     _max_retries: int = 3
+    _type_batch_size: int = 50
 
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
@@ -319,3 +320,85 @@ class VariableSyncService(IThreadService):
                         if arg.type is not None:
                             entry.type = arg.type
                         break
+
+    def push_local_function_types_batch(self, targets: dict[int, int], analysis_id: int | None) -> int:
+        if not targets or analysis_id is None:
+            return 0
+
+        if self._deci is None:
+            try:
+                from libbs.api import DecompilerInterface
+
+                self.attach_decompiler(DecompilerInterface.discover(force_decompiler="ida"))
+            except Exception as e:
+                logger.error(f"RevEng.AI: could not attach decompiler for type push-back: {e}")
+                return 0
+
+        base: int = self._deci.binary_base_addr
+        infos: dict[int, FunctionInfo] = {}
+        for function_id, ea in targets.items():
+            info = self._build_function_info(ea - base)
+            if info is not None:
+                infos[function_id] = info
+
+        if not infos:
+            return 0
+
+        versions: dict[int, int] = self._fetch_type_versions(list(infos.keys()))
+        pending: dict[int, FunctionInfo] = dict(infos)
+        updated: int = 0
+
+        for _ in range(self._max_retries):
+            if not pending:
+                break
+            conflicts: dict[int, FunctionInfo] = {}
+            items = list(pending.items())
+            for start in range(0, len(items), self._type_batch_size):
+                chunk = items[start:start + self._type_batch_size]
+                for result in self._push_types_batch(analysis_id, chunk, versions):
+                    if result.status == "updated":
+                        updated += 1
+                    elif result.status == "version_conflict":
+                        conflicts[result.function_id] = infos[result.function_id]
+                    else:
+                        logger.warning(
+                            f"RevEng.AI: type push for function {result.function_id} returned {result.status}"
+                        )
+            pending = conflicts
+            if pending:
+                versions.update(self._fetch_type_versions(list(pending.keys())))
+
+        return updated
+
+    def _fetch_type_versions(self, function_ids: list[int]) -> dict[int, int]:
+        versions: dict[int, int] = {}
+        with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+            client = FunctionsDataTypesApi(api_client)
+            for start in range(0, len(function_ids), self._type_batch_size):
+                chunk = function_ids[start:start + self._type_batch_size]
+                resp: BaseResponseFunctionDataTypesList = (
+                    client.list_function_data_types_for_functions(function_ids=chunk)  # type: ignore
+                )
+                if resp.status and resp.data:
+                    for item in resp.data.items:
+                        versions[item.function_id] = item.data_types_version or 0
+        return versions
+
+    def _push_types_batch(self, analysis_id: int, items: list, versions: dict[int, int]) -> list:
+        body = BatchUpdateDataTypesInputBody(
+            functions=[
+                BatchUpdateDataTypesItem(
+                    function_id=function_id,
+                    data_types=info.to_dict(),
+                    data_types_version=versions.get(function_id, 0),
+                )
+                for function_id, info in items
+            ]
+        )
+        with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+            client = FunctionsDataTypesApi(api_client)
+            out: BatchUpdateDataTypesOutputBody = client.batch_update_function_data_types(
+                analysis_id=analysis_id,
+                batch_update_data_types_input_body=body,
+            )
+        return out.results or []

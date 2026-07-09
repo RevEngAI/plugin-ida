@@ -99,10 +99,22 @@ class AnalysisSyncCoordinator(BaseCoordinator):
         elif generic_return.data is not None and generic_return.data.data_types_error:
             self.show_error_dialog(message=generic_return.data.data_types_error)
         else:
-            self.show_info_dialog(
-                msg=f"Analysis data synced successfully. \n\nSynced {generic_return.data.matched_function_count} functions with remote analysis."
-                + f"\n{generic_return.data.unmatched_function_count} local functions not present in remote analysis."
+            data = generic_return.data
+            msg: str = (
+                f"Analysis data synced successfully. \n\nSynced {data.matched_function_count} functions with remote analysis."
+                + f"\n{data.unmatched_function_count} local functions not present in remote analysis."
             )
+            if data.canonicalized_name_count or data.deduped_name_count:
+                msg += (
+                    f"\nCanonicalized {data.canonicalized_name_count} and disambiguated "
+                    f"{data.deduped_name_count} name(s)."
+                )
+            if data.pushed_name_count or data.pushed_type_count:
+                msg += (
+                    f"\nPushed {data.pushed_name_count} name(s) and {data.pushed_type_count} "
+                    f"type set(s) back to the platform."
+                )
+            self.show_info_dialog(msg=msg)
 
         self.refresh_disassembly_view()
 

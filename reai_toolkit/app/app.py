@@ -44,16 +44,19 @@ class App:
         self.data_types_service = ImportDataTypesService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
-        self.analysis_sync_service = AnalysisSyncService(data_types_service=self.data_types_service,
-            netstore_service=self.netstore_service, sdk_config=sdk_config
-        )
-        self.existing_analyses_service = ExistingAnalysesService(
-            netstore_service=self.netstore_service, sdk_config=sdk_config
-        )
         self.rename_service = RenameService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.variable_sync_service = VariableSyncService(
+            netstore_service=self.netstore_service, sdk_config=sdk_config
+        )
+        self.analysis_sync_service = AnalysisSyncService(
+            data_types_service=self.data_types_service,
+            rename_service=self.rename_service,
+            variable_sync_service=self.variable_sync_service,
+            netstore_service=self.netstore_service, sdk_config=sdk_config
+        )
+        self.existing_analyses_service = ExistingAnalysesService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.ai_decomp_service = AiDecompService(
