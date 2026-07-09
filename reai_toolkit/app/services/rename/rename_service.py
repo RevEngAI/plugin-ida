@@ -31,6 +31,7 @@ class RenameService(IThreadService):
     _rename_debounce_ms: int = 300  # ignore bursts within 300ms per ea
     _rename_max_retries: int = 5
     _canonicalize_batch_size: int = 25
+    _rename_batch_size: int = 50
 
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
@@ -162,8 +163,17 @@ class RenameService(IThreadService):
                 )
             )
 
-    def push_remote_names(self, renames: list[RenameInput]) -> BaseResponse:
-        return self._rename_remote_function(renames)
+    def push_remote_names(self, renames: list[RenameInput]) -> int:
+        pushed: int = 0
+        for start in range(0, len(renames), self._rename_batch_size):
+            chunk: list[RenameInput] = renames[start:start + self._rename_batch_size]
+            if getattr(self._rename_remote_function(chunk), "status", False):
+                pushed += len(chunk)
+                continue
+            for rename in chunk:
+                if getattr(self._rename_remote_function([rename]), "status", False):
+                    pushed += 1
+        return pushed
 
     def canonicalize_names(self, names: list[str]) -> dict[str, str]:
         mapping: dict[str, str] = {}

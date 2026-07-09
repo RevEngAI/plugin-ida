@@ -241,13 +241,13 @@ class AnalysisSyncService(IThreadService):
             response.data.canonicalized_name_count = canonicalized
 
         if name_pushbacks:
-            push_response = self.rename_service.push_remote_names(name_pushbacks)
-            if getattr(push_response, "status", False):
-                if response.data is not None:
-                    response.data.pushed_name_count = len(name_pushbacks)
-            else:
-                logger.error(
-                    f"RevEng.AI: failed to push {len(name_pushbacks)} corrected name(s) to the platform"
+            pushed: int = self.rename_service.push_remote_names(name_pushbacks)
+            if response.data is not None:
+                response.data.pushed_name_count = pushed
+            if pushed < len(name_pushbacks):
+                logger.warning(
+                    f"RevEng.AI: pushed {pushed}/{len(name_pushbacks)} corrected name(s); "
+                    f"{len(name_pushbacks) - pushed} rejected (functions not editable on the platform)"
                 )
 
         matches: dict[int, int] = {int(k): v for k, v in func_map.function_map.items()}

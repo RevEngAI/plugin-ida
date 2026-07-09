@@ -117,10 +117,23 @@ def test_push_remote_names_delegates_to_remote_rename(service, ida_calls):
     _, remote = ida_calls
     renames = [RenameInput(ea=0x10, new_name="foo", function_id=1)]
 
-    resp = service.push_remote_names(renames)
+    pushed = service.push_remote_names(renames)
 
+    assert pushed == 1
     remote.assert_called_once_with(renames)
-    assert resp.status is True
+
+
+def test_push_remote_names_falls_back_to_per_item_on_batch_rejection(service, ida_calls):
+    _, remote = ida_calls
+    renames = [RenameInput(ea=i, new_name=f"f{i}", function_id=i) for i in range(3)]
+    ok = BaseResponse.model_construct(status=True)
+    bad = BaseResponse.model_construct(status=False)
+    remote.side_effect = [bad, ok, bad, ok]
+
+    pushed = service.push_remote_names(renames)
+
+    assert pushed == 2
+    assert remote.call_count == 4
 
 
 def test_canonicalize_names_maps_and_chunks_at_25(service, mocker):

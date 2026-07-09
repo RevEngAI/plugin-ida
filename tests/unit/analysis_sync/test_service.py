@@ -28,7 +28,7 @@ def data_types_service():
 def rename_service():
     rs = MagicMock()
     rs.canonicalize_names.return_value = {}
-    rs.push_remote_names.return_value = MagicMock(status=True)
+    rs.push_remote_names.side_effect = lambda renames: len(renames)
     return rs
 
 
