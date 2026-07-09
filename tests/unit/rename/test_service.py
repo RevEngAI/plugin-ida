@@ -1,4 +1,5 @@
 import queue
+from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -110,3 +111,66 @@ def test_enqueue_rename_debounces_rapid_duplicates(service, mocker):
     second = service._rename_q.get_nowait()
     assert [r.new_name for r in first] == ["a"]
     assert second == []
+
+
+def test_push_remote_names_delegates_to_remote_rename(service, ida_calls):
+    _, remote = ida_calls
+    renames = [RenameInput(ea=0x10, new_name="foo", function_id=1)]
+
+    pushed = service.push_remote_names(renames)
+
+    assert pushed == 1
+    remote.assert_called_once_with(renames)
+
+
+def test_push_remote_names_falls_back_to_per_item_on_batch_rejection(service, ida_calls):
+    _, remote = ida_calls
+    renames = [RenameInput(ea=i, new_name=f"f{i}", function_id=i) for i in range(3)]
+    ok = BaseResponse.model_construct(status=True)
+    bad = BaseResponse.model_construct(status=False)
+    remote.side_effect = [bad, ok, bad, ok]
+
+    pushed = service.push_remote_names(renames)
+
+    assert pushed == 2
+    assert remote.call_count == 4
+
+
+def test_canonicalize_names_maps_and_chunks_at_25(service, mocker):
+    mocker.patch.object(RenameService, "yield_api_client")
+    api_class = mocker.patch(
+        "reai_toolkit.app.services.rename.rename_service.FunctionsCoreApi"
+    )
+    api = MagicMock()
+    api_class.return_value = api
+
+    def _canon(canonicalize_names_input_body):
+        out = MagicMock()
+        out.results = [
+            SimpleNamespace(name=n, canonical_name=n.upper())
+            for n in canonicalize_names_input_body.names
+        ]
+        return out
+
+    api.v3_canonicalize_function_names.side_effect = _canon
+
+    names = [f"n{i}" for i in range(30)]
+    mapping = service.canonicalize_names(names)
+
+    assert api.v3_canonicalize_function_names.call_count == 2
+    assert mapping["n0"] == "N0"
+    assert len(mapping) == 30
+
+
+def test_canonicalize_names_skips_failed_chunk(service, mocker):
+    mocker.patch.object(RenameService, "yield_api_client")
+    api_class = mocker.patch(
+        "reai_toolkit.app.services.rename.rename_service.FunctionsCoreApi"
+    )
+    api = MagicMock()
+    api_class.return_value = api
+    api.v3_canonicalize_function_names.side_effect = RuntimeError("boom")
+
+    mapping = service.canonicalize_names(["a", "b"])
+
+    assert mapping == {}

@@ -1,7 +1,6 @@
 from unittest.mock import MagicMock
 
 import pytest
-from revengai import ApiException
 from revengai.exceptions import ForbiddenException, NotFoundException
 from revengai.models.function_data_types_list import FunctionDataTypesList
 from revengai.models.function_data_types_list_item import FunctionDataTypesListItem
@@ -99,42 +98,71 @@ def test_skips_unsuccessful_chunks(service, sdk):
     assert [item.function_id for item in result.items] == [1, 2, 1, 2]
 
 
-def test_import_data_types_returns_none_on_success(service, sdk, mocker):
+def test_import_data_types_computes_absent_when_remote_types_missing(service, sdk, mocker):
     sdk.list_function_data_types_for_functions.return_value = _response([_item(1)])
-    apply = mocker.patch.object(svc_mod.ImportDataTypes, "execute")
+    apply = mocker.patch.object(svc_mod.ImportDataTypes, "execute", return_value=set())
 
-    assert service.import_data_types({1: 0x1000}) is None
+    result = service.import_data_types({1: 0x1000})
+
     apply.assert_called_once()
+    assert result.error is None
+    assert result.remote_absent_ids == {1}
+    assert result.apply_failed_ids == set()
 
 
-def test_import_data_types_returns_none_for_empty_matches(service, sdk):
-    assert service.import_data_types({}) is None
+def test_import_data_types_marks_apply_failures(service, sdk, mocker):
+    present = FunctionDataTypesListItem.model_construct(
+        completed=True,
+        status="success",
+        data_types=MagicMock(),
+        data_types_version=1,
+        function_id=1,
+    )
+    sdk.list_function_data_types_for_functions.return_value = _response([present])
+    mocker.patch.object(svc_mod.ImportDataTypes, "execute", return_value={1})
+
+    result = service.import_data_types({1: 0x1000})
+
+    assert result.remote_absent_ids == set()
+    assert result.apply_failed_ids == {1}
+
+
+def test_import_data_types_empty_matches(service, sdk):
+    result = service.import_data_types({})
+
+    assert result.error is None
+    assert result.remote_absent_ids == set()
+    assert result.apply_failed_ids == set()
     sdk.list_function_data_types_for_functions.assert_not_called()
 
 
-def test_import_data_types_returns_single_error_on_forbidden(service, sdk, mocker):
+def test_import_data_types_returns_error_on_forbidden(service, sdk, mocker):
     sdk.list_function_data_types_for_functions.side_effect = ForbiddenException(
         status=403, reason="Forbidden"
     )
     apply = mocker.patch.object(svc_mod.ImportDataTypes, "execute")
 
     matches = {fid: fid * 16 for fid in range(FUNCTION_IDS_BATCH_SIZE * 3)}
-    err = service.import_data_types(matches)
+    result = service.import_data_types(matches)
 
-    assert err is not None
-    assert "403" in err
-    assert "Forbidden" in err
+    assert result.error is not None
+    assert "403" in result.error
+    assert "Forbidden" in result.error
+    assert result.remote_absent_ids == set()
     apply.assert_not_called()
     assert sdk.list_function_data_types_for_functions.call_count == 1
 
 
-def test_import_data_types_treats_not_found_as_warning(service, sdk, mocker):
+def test_import_data_types_treats_not_found_as_all_absent(service, sdk, mocker):
     sdk.list_function_data_types_for_functions.side_effect = NotFoundException(
         status=404, reason="Not Found"
     )
     apply = mocker.patch.object(svc_mod.ImportDataTypes, "execute")
 
-    assert service.import_data_types({1: 0x1000}) is None
+    result = service.import_data_types({1: 0x1000, 2: 0x2000})
+
+    assert result.error is None
+    assert result.remote_absent_ids == {1, 2}
     apply.assert_not_called()
 
 
@@ -142,8 +170,8 @@ def test_import_data_types_returns_error_on_unexpected_exception(service, sdk, m
     sdk.list_function_data_types_for_functions.side_effect = RuntimeError("boom")
     apply = mocker.patch.object(svc_mod.ImportDataTypes, "execute")
 
-    err = service.import_data_types({1: 0x1000})
+    result = service.import_data_types({1: 0x1000})
 
-    assert err is not None
-    assert "boom" in err
+    assert result.error is not None
+    assert "boom" in result.error
     apply.assert_not_called()

@@ -3,7 +3,8 @@ from typing import Any, Callable
 
 import ida_name
 import ida_dirtree
-from libbs.decompilers.ida.compat import execute_write
+import idaapi
+from libbs.decompilers.ida.compat import execute_write, execute_read
 
 from loguru import logger
 from revengai import ApiClient, ApiException, Configuration
@@ -70,9 +71,38 @@ class BaseService:
         # SN_CHECK: check for validity
         # SN_AUTO:   mark as auto-generated name
         # SN_NODUMMY: Prevents warning "can't rename byte as '<func_name>' because the name has a reserved prefix".
-        flags: int = ida_name.SN_CHECK | ida_name.SN_AUTO | ida_name.SN_NODUMMY
+        flags: int = ida_name.SN_CHECK | ida_name.SN_AUTO | ida_name.SN_NODUMMY | ida_name.SN_NOWARN
 
         return ida_name.set_name(ea, new_name, flags)
+
+    @staticmethod
+    @execute_read
+    def is_protected_user_name(ea: int) -> bool:
+        cur: str = ida_name.get_name(ea) or ""
+        try:
+            return bool(cur and ida_name.is_uname(cur))
+        except Exception:
+            return False
+
+    @staticmethod
+    @execute_write
+    def apply_deduped_name(ea: int, desired_name: str) -> str | None:
+        flags: int = ida_name.SN_CHECK | ida_name.SN_AUTO | ida_name.SN_NODUMMY | ida_name.SN_NOWARN
+
+        candidate: str = desired_name
+        suffix: int = 1
+        while True:
+            holder: int = ida_name.get_name_ea(idaapi.BADADDR, candidate)
+            if holder == idaapi.BADADDR or holder == ea:
+                break
+            candidate = f"{desired_name}_{suffix}"
+            suffix += 1
+            if suffix > 100000:
+                return None
+
+        if ida_name.set_name(ea, candidate, flags):
+            return ida_name.get_name(ea) or candidate
+        return None
 
     # =========================================
     # RevEng API WRAPPER SAFE METHODS

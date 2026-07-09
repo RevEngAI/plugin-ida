@@ -4,12 +4,15 @@ import time
 from typing import List, Optional
 
 from libbs.decompilers.ida.compat import execute_write
+from loguru import logger
 
 from revengai import (
     BaseResponse,
+    CanonicalizeNamesInputBody,
     Configuration,
     FunctionMapping,
     FunctionRenameMap,
+    FunctionsCoreApi,
     FunctionsListRename,
     FunctionsRenamingHistoryApi,
 )
@@ -27,6 +30,8 @@ class RenameService(IThreadService):
     _rename_last_ts: dict[int, float] = {}
     _rename_debounce_ms: int = 300  # ignore bursts within 300ms per ea
     _rename_max_retries: int = 5
+    _canonicalize_batch_size: int = 25
+    _rename_batch_size: int = 50
 
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
@@ -157,3 +162,36 @@ class RenameService(IThreadService):
                     functions=function_rename_list
                 )
             )
+
+    def push_remote_names(self, renames: list[RenameInput]) -> int:
+        pushed: int = 0
+        for start in range(0, len(renames), self._rename_batch_size):
+            chunk: list[RenameInput] = renames[start:start + self._rename_batch_size]
+            if getattr(self._rename_remote_function(chunk), "status", False):
+                pushed += len(chunk)
+                continue
+            for rename in chunk:
+                if getattr(self._rename_remote_function([rename]), "status", False):
+                    pushed += 1
+        return pushed
+
+    def canonicalize_names(self, names: list[str]) -> dict[str, str]:
+        mapping: dict[str, str] = {}
+        unique: list[str] = [n for n in dict.fromkeys(names) if n]
+
+        for start in range(0, len(unique), self._canonicalize_batch_size):
+            chunk: list[str] = unique[start:start + self._canonicalize_batch_size]
+            try:
+                with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+                    client = FunctionsCoreApi(api_client)
+                    out = client.v3_canonicalize_function_names(
+                        canonicalize_names_input_body=CanonicalizeNamesInputBody(names=chunk)
+                    )
+            except Exception as e:
+                logger.error(f"RevEng.AI: failed to canonicalize names: {e}")
+                continue
+
+            for result in (out.results or []):
+                mapping[result.name] = result.canonical_name
+
+        return mapping
