@@ -4,7 +4,8 @@ import time
 from typing import Optional, Tuple
 
 from libbs.artifacts import Enum, FunctionHeader, StackVariable, Struct, Typedef
-from libbs.decompilers.ida.compat import execute_read
+from libbs.decompilers.ida.compat import DummyIDACodeView, execute_read
+from libbs.decompilers.ida.compat import function as read_ida_function
 from loguru import logger
 
 from revengai import (
@@ -29,7 +30,20 @@ from reai_toolkit.app.interfaces.thread_service import IThreadService
 
 @execute_read
 def _read_decompiler_function(deci, func_addr: int):
-    return deci.functions.get(func_addr)
+    lowered: int = deci.art_lifter.lower_addr(func_addr)
+    try:
+        if deci.decompiler_available:
+            code_view = DummyIDACodeView(lowered)
+            if code_view.cfunc is None:
+                return None
+            func = read_ida_function(lowered, ida_code_view=code_view)
+        else:
+            func = read_ida_function(lowered, decompiler_available=False)
+    except Exception as e:
+        logger.debug(f"RevEng.AI: could not read function at 0x{lowered:x}: {e}")
+        return None
+
+    return deci.art_lifter.lift(func) if func is not None else None
 
 
 @execute_read

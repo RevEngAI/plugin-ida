@@ -66,4 +66,5 @@ testpaths = ["tests"]
 addopts = "--import-mode=importlib -s"
 markers = [
     "idalib: tests that require an activated idalib (IDA Pro headless). Run with `pytest -m idalib`. In CI these run on the `ida` self-hosted runner image (IDA + idalib preinstalled, licensing provided by the runner environment).",
+    "ida_ui: tests that launch the real IDA GUI to observe widget behavior. Opt-in: set REAI_UI_TESTS=1 and ensure no interactive IDA instance is running (needs the license seat and a display).",
 ]
