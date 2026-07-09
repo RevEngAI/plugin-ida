@@ -184,6 +184,26 @@ def test_push_local_types_batch_retries_on_version_conflict(service, sdk, mocker
     assert sdk.batch_update_function_data_types.call_count == 2
 
 
+def test_resolve_type_builds_valid_function_info_dependency(service, mocker):
+    from libbs.artifacts import Typedef
+    from revengai import FunctionDependency, FunctionInfo
+
+    mocker.patch.object(
+        svc_mod, "_read_named_type", return_value=Typedef(name="u32", type_="unsigned int")
+    )
+
+    dep, referenced = service._resolve_type("u32")
+
+    assert isinstance(dep, FunctionDependency)
+    assert referenced == ["unsigned int"]
+    info = FunctionInfo(func_types=None, func_deps=[dep])
+    assert info.to_dict()["func_deps"][0] == {
+        "artifact_type": "Typedef",
+        "name": "u32",
+        "type": "unsigned int",
+    }
+
+
 def test_patch_stack_var_type_change_keeps_name(service):
     info = _function_info(stack_vars={"-0x20": _sdk_stack_var(-32, "local_20", "char")})
 
@@ -346,8 +366,8 @@ def test_collect_func_deps_resolves_typedef_chain(service, mocker):
 
     deps = service._collect_func_deps(func_type)
 
-    assert sorted(d.actual_instance.name for d in deps) == ["__dev_t", "dev_t"]
-    assert all(d.actual_instance.to_dict()["artifact_type"] == "Typedef" for d in deps)
+    assert sorted(d.name for d in deps) == ["__dev_t", "dev_t"]
+    assert all(d.artifact_type == "Typedef" for d in deps)
 
 
 def test_collect_func_deps_resolves_struct_members(service, mocker):
@@ -366,9 +386,9 @@ def test_collect_func_deps_resolves_struct_members(service, mocker):
 
     deps = service._collect_func_deps(func_type)
 
-    by_name = {d.actual_instance.name: d.actual_instance for d in deps}
+    by_name = {d.name: d for d in deps}
     assert set(by_name) == {"mystruct", "myint"}
-    assert by_name["mystruct"].members["0x0"].type == "myint"
+    assert by_name["mystruct"].members["0x0"]["type"] == "myint"
 
 
 def test_push_change_no_analysis_id_does_nothing(service, sdk, netstore):

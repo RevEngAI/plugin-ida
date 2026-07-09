@@ -14,18 +14,14 @@ from revengai import (
     BatchUpdateDataTypesItem,
     BatchUpdateDataTypesOutputBody,
     Configuration,
-    Enumeration,
+    FunctionDependency,
     FunctionInfo,
-    V2FunctionInfoFuncDepsInner,
     FunctionsDataTypesApi,
     FunctionType,
-    Structure,
-    TypeDefinition,
 )
 from revengai import ApiException
 from revengai.models.function_header import FunctionHeader as SdkFunctionHeader
 from revengai.models.function_stack_variable import FunctionStackVariable as SdkStackVariable
-from revengai.models.structure_member import StructureMember
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.interfaces.thread_service import IThreadService
@@ -195,7 +191,7 @@ class VariableSyncService(IThreadService):
         pending.extend(arg.type for arg in (func_type.header.args or {}).values())
         pending.extend(svar.type for svar in (func_type.stack_vars or {}).values())
 
-        deps: dict[str, V2FunctionInfoFuncDepsInner] = {}
+        deps: dict[str, FunctionDependency] = {}
         seen: set[str] = set()
         while pending and len(deps) < 200:
             name = self._base_type_name(pending.pop())
@@ -210,38 +206,32 @@ class VariableSyncService(IThreadService):
 
         return list(deps.values())
 
-    def _resolve_type(self, name: str) -> Tuple[Optional[V2FunctionInfoFuncDepsInner], list]:
+    def _resolve_type(self, name: str) -> Tuple[Optional[FunctionDependency], list]:
         artifact = _read_named_type(self._deci, name)
         if isinstance(artifact, Typedef):
             return (
-                V2FunctionInfoFuncDepsInner(
-                    TypeDefinition(name=artifact.name, type=artifact.type or "", artifact_type="Typedef")
-                ),
+                FunctionDependency(name=artifact.name, type=artifact.type or "", artifact_type="Typedef"),
                 [artifact.type],
             )
         if isinstance(artifact, Struct):
             members = {
-                hex(member.offset): StructureMember(
-                    name=member.name or "",
-                    offset=member.offset,
-                    type=member.type or "",
-                    size=member.size or 0,
-                )
+                hex(member.offset): {
+                    "name": member.name or "",
+                    "offset": member.offset,
+                    "type": member.type or "",
+                    "size": member.size or 0,
+                }
                 for member in artifact.members.values()
             }
             referenced = [member.type for member in artifact.members.values()]
             return (
-                V2FunctionInfoFuncDepsInner(
-                    Structure(name=artifact.name, size=artifact.size, members=members, artifact_type="Struct")
-                ),
+                FunctionDependency(name=artifact.name, size=artifact.size, members=members, artifact_type="Struct"),
                 referenced,
             )
         if isinstance(artifact, Enum):
             members = {str(key): int(value) for key, value in (artifact.members or {}).items()}
             return (
-                V2FunctionInfoFuncDepsInner(
-                    Enumeration(name=artifact.name, members=members, artifact_type="Enum")
-                ),
+                FunctionDependency(name=artifact.name, members=members, artifact_type="Enum"),
                 [],
             )
         return None, []
@@ -337,7 +327,11 @@ class VariableSyncService(IThreadService):
         base: int = self._deci.binary_base_addr
         infos: dict[int, FunctionInfo] = {}
         for function_id, ea in targets.items():
-            info = self._build_function_info(ea - base)
+            try:
+                info = self._build_function_info(ea - base)
+            except Exception as e:
+                logger.debug(f"RevEng.AI: could not build local types for function {function_id}: {e}")
+                continue
             if info is not None:
                 infos[function_id] = info
 

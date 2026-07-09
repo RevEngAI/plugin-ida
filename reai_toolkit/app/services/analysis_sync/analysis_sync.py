@@ -136,7 +136,9 @@ class AnalysisSyncService(IThreadService):
         func_map: FunctionMapping,
     ) -> tuple[GenericApiReturn[MatchedFunctionSummary], list[RenameInput], list[tuple[int, int | None, str]]]:
         local_vaddr_to_matched_name: dict[str, str] = func_map.name_map
-        inverse_map: dict[str, int] = func_map.inverse_function_map
+        addr_to_function_id: dict[int, int] = {
+            int(addr): int(fid) for fid, addr in func_map.function_map.items()
+        }
 
         logger.info(f"RevEng.AI: Retrieved {len(local_vaddr_to_matched_name)} functions from analysis")
 
@@ -157,7 +159,7 @@ class AnalysisSyncService(IThreadService):
             if new_name:
                 matched_function_count += 1
                 if new_name != old_name:
-                    fid: int | None = inverse_map.get(local_vaddr_str)
+                    fid: int | None = addr_to_function_id.get(local_vaddr)
                     if self.update_function_name(local_vaddr, new_name, check_user_flags=True):
                         self.tag_function_as_renamed(new_name)
                     elif self.is_protected_user_name(local_vaddr):
@@ -240,8 +242,13 @@ class AnalysisSyncService(IThreadService):
 
         if name_pushbacks:
             push_response = self.rename_service.push_remote_names(name_pushbacks)
-            if response.data is not None and getattr(push_response, "status", False):
-                response.data.pushed_name_count = len(name_pushbacks)
+            if getattr(push_response, "status", False):
+                if response.data is not None:
+                    response.data.pushed_name_count = len(name_pushbacks)
+            else:
+                logger.error(
+                    f"RevEng.AI: failed to push {len(name_pushbacks)} corrected name(s) to the platform"
+                )
 
         matches: dict[int, int] = {int(k): v for k, v in func_map.function_map.items()}
         dt_result = self.data_types_service.import_data_types(matches)

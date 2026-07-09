@@ -71,7 +71,7 @@ class BaseService:
         # SN_CHECK: check for validity
         # SN_AUTO:   mark as auto-generated name
         # SN_NODUMMY: Prevents warning "can't rename byte as '<func_name>' because the name has a reserved prefix".
-        flags: int = ida_name.SN_CHECK | ida_name.SN_AUTO | ida_name.SN_NODUMMY
+        flags: int = ida_name.SN_CHECK | ida_name.SN_AUTO | ida_name.SN_NODUMMY | ida_name.SN_NOWARN
 
         return ida_name.set_name(ea, new_name, flags)
 
@@ -87,7 +87,7 @@ class BaseService:
     @staticmethod
     @execute_write
     def apply_deduped_name(ea: int, desired_name: str) -> str | None:
-        flags: int = ida_name.SN_CHECK | ida_name.SN_AUTO | ida_name.SN_NODUMMY
+        flags: int = ida_name.SN_CHECK | ida_name.SN_AUTO | ida_name.SN_NODUMMY | ida_name.SN_NOWARN
 
         candidate: str = desired_name
         suffix: int = 1

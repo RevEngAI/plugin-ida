@@ -74,8 +74,8 @@ def test_perform_function_sync_no_matches(service, loaded_binary):
 
 def test_perform_function_sync_classifies_invalid_name(service, auto_func):
     func_map = FunctionMapping(
-        function_map={},
-        inverse_function_map={str(auto_func): 7},
+        function_map={"7": auto_func},
+        inverse_function_map={},
         name_map={str(auto_func): "bad::name!!"},
     )
 
@@ -90,8 +90,8 @@ def test_perform_function_sync_dedupes_duplicate_name(service, two_funcs):
     assert ida_name.set_name(ea_a, "dupname", ida_name.SN_CHECK | ida_name.SN_AUTO)
 
     func_map = FunctionMapping(
-        function_map={},
-        inverse_function_map={str(ea_b): 9},
+        function_map={"9": ea_b},
+        inverse_function_map={},
         name_map={str(ea_b): "dupname"},
     )
 
