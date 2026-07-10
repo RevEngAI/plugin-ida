@@ -72,6 +72,23 @@ def test_perform_function_sync_no_matches(service, loaded_binary):
     assert result.data.total_function_count >= 1
 
 
+def test_perform_function_sync_counts_missing_symbol_names(service, auto_func):
+    func_map = FunctionMapping(
+        function_map={},
+        inverse_function_map={},
+        name_map={str(auto_func): ""},
+    )
+
+    result, pushbacks, needs_canonical = service._perform_function_sync(func_map)
+
+    assert result.success is True
+    assert result.data.missing_symbol_name_count >= 1
+    assert result.data.matched_function_count == 0
+    assert ida_name.get_name(auto_func) != ""
+    assert pushbacks == []
+    assert needs_canonical == []
+
+
 def test_perform_function_sync_classifies_invalid_name(service, auto_func):
     func_map = FunctionMapping(
         function_map={"7": auto_func},
