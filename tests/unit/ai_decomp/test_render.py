@@ -7,8 +7,7 @@ from revengai.models.summary_data import SummaryData
 from revengai.models.tokenised_data import TokenisedData
 
 from reai_toolkit.app.coordinators.ai_decomp_render import (
-    detect_identifier_change,
-    parse_edited_buffer,
+    index_of_identifier,
     render_view,
     render_view_with_map,
     resolve_token,
@@ -66,7 +65,7 @@ def _tokenised(tok=TOK, mapping=None):
     )
 
 
-def test_render_matches_legacy_and_builds_map():
+def test_render_matches_legacy_and_builds_model():
     comments = _comments([(2, "local copy"), (99, "out of range")])
     text, model = render_view_with_map(_dd(), _summary("Adds one."), comments)
 
@@ -78,41 +77,51 @@ def test_render_matches_legacy_and_builds_map():
     assert model.comment_by_source == {2: "local copy"}
 
 
+def test_display_maps_align_lines_to_source():
+    text, model = render_view_with_map(_dd(), _summary("S."), _comments([(2, "note")]))
+    lines = text.split("\n")
+
+    assert len(model.display_source) == len(lines)
+    assert len(model.display_is_code) == len(lines)
+
+    for i in range(model.summary_line_count):
+        assert model.display_source[i] is None
+        assert model.display_is_code[i] is False
+
+    comment_rows = [i for i, s in enumerate(lines) if s.strip().startswith("//")]
+    code_rows = [i for i, c in enumerate(model.display_is_code) if c]
+
+    assert len(code_rows) == len(CODE.split("\n"))
+    for row in comment_rows:
+        assert model.display_is_code[row] is False
+        assert model.display_source[row] == 2
+
+    v5_row = next(i for i, s in enumerate(lines) if "int v5" in s)
+    assert model.display_is_code[v5_row] is True
+    assert model.display_source[v5_row] == 2
+
+
 def test_no_summary_no_comments_is_raw_code():
     text, model = render_view_with_map(_dd(), None, None)
     assert text == CODE
     assert model.summary_line_count == 0
     assert model.comment_by_source == {}
+    assert all(model.display_is_code)
+    assert model.display_source == [1, 2, 3, 4]
 
 
-def test_unedited_buffer_round_trips_to_zero_changes():
-    comments = _comments([(2, "local copy")])
-    text, model = render_view_with_map(_dd(), _summary("Adds one."), comments)
-
-    parse = parse_edited_buffer(text, model)
-    assert parse.current_code_lines == model.code_lines
-    assert parse.current_comment_by_index == {1: "local copy"}
-
-
-def test_multiline_comment_round_trips():
-    comments = _comments([(2, "line one\nline two")])
-    text, model = render_view_with_map(_dd(), None, comments)
-    parse = parse_edited_buffer(text, model)
-    assert parse.current_code_lines == model.code_lines
-    assert parse.current_comment_by_index == {1: "line one\nline two"}
+def test_multiline_comment_renders_as_two_comment_lines():
+    text, model = render_view_with_map(_dd(), None, _comments([(2, "line one\nline two")]))
+    lines = text.split("\n")
+    assert "    // line one" in lines
+    assert "    // line two" in lines
+    assert model.comment_by_source == {2: "line one\nline two"}
 
 
-def test_structural_edit_changes_code_line_count():
-    text, model = render_view_with_map(_dd(), None, None)
-    parse = parse_edited_buffer(text + "\n    extra();", model)
-    assert len(parse.current_code_lines) != len(model.code_lines)
-
-
-def test_detect_identifier_change():
-    assert detect_identifier_change("    int v5 = a1;", "    int buf = a1;") == (1, "v5", "buf")
-    assert detect_identifier_change("    int v5 = a1;", "    int v5 = a1;") is None
-    assert detect_identifier_change("    int v5 = a1;", "    int buf = tmp;") is None
-    assert detect_identifier_change("    int v5;", "    int v5 = a1;") is None
+def test_index_of_identifier():
+    assert index_of_identifier("    int v5 = a1;", "v5") == 1
+    assert index_of_identifier("    int v5 = a1;", "a1") == 2
+    assert index_of_identifier("    int v5 = a1;", "missing") == -1
 
 
 def test_resolve_token_positional_variable():

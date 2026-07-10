@@ -14,17 +14,16 @@ HELLO_ELF = os.path.join(ROOT, "tests", "fixtures", "hello.elf")
 
 CHECKS = [
     "view_created",
+    "editor_read_only",
     "render_shows_code",
-    "rename_calls_apply_overrides",
+    "rename_double_click_overrides",
     "rename_overrides_correct",
-    "comment_add_calls_set",
+    "rename_non_token_info",
+    "comment_add_sets",
     "comment_add_args_correct",
-    "comment_remove_calls_delete",
+    "comment_edit_empty_removes",
+    "comment_remove_deletes",
     "comment_remove_args_correct",
-    "structural_reverts",
-    "structural_no_mutation",
-    "structural_info_shown",
-    "unchanged_noop",
     "refresh_button_invalidates",
 ]
 

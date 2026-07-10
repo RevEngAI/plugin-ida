@@ -8,7 +8,6 @@ if TYPE_CHECKING:
     from revengai.models.ai_decomp_function_mapping import AIDecompFunctionMapping
     from revengai.models.comments_data import CommentsData
     from revengai.models.decompilation_data import DecompilationData
-    from revengai.models.inline_comment import InlineComment
     from revengai.models.summary_data import SummaryData
     from revengai.models.tokenised_data import TokenisedData
 
@@ -27,12 +26,8 @@ class RenderModel:
     summary_line_count: int
     code_lines: list[str]
     comment_by_source: dict[int, str]
-
-
-@dataclass
-class EditParse:
-    current_code_lines: list[str]
-    current_comment_by_index: dict[int, str]
+    display_source: list[Optional[int]]
+    display_is_code: list[bool]
 
 
 def render_view(
@@ -58,35 +53,43 @@ def render_view_with_map(
     summary_line_count = len(summary_block.split("\n")) if summary_block is not None else 0
 
     inline = comments.inline_comments if comments is not None else None
-
     comment_by_source: dict[int, str] = {}
     if inline:
         for c in inline:
             if 1 <= c.line <= len(code_lines):
                 comment_by_source[c.line] = c.comment
 
-    body = _inject_inline_comments(code, inline) if inline else code
+    display_lines: list[str] = []
+    display_source: list[Optional[int]] = []
+    display_is_code: list[bool] = []
 
-    text = "\n".join([summary_block, body]) if summary_block is not None else body
+    if summary_block is not None:
+        for sline in summary_block.split("\n"):
+            display_lines.append(sline)
+            display_source.append(None)
+            display_is_code.append(False)
 
+    for idx, code_line in enumerate(code_lines):
+        source_line = idx + 1
+        comment = comment_by_source.get(source_line)
+        if comment is not None:
+            indent = code_line[: len(code_line) - len(code_line.lstrip())]
+            for part in comment.split("\n"):
+                display_lines.append(f"{indent}// {part}")
+                display_source.append(source_line)
+                display_is_code.append(False)
+        display_lines.append(code_line)
+        display_source.append(source_line)
+        display_is_code.append(True)
+
+    text = "\n".join(display_lines)
     return text, RenderModel(
         summary_line_count=summary_line_count,
         code_lines=code_lines,
         comment_by_source=comment_by_source,
+        display_source=display_source,
+        display_is_code=display_is_code,
     )
-
-
-def _inject_inline_comments(code: str, comments: "list[InlineComment]") -> str:
-    lines = code.split("\n")
-    for c in sorted(comments, key=lambda x: x.line, reverse=True):
-        idx = c.line - 1
-        if idx < 0 or idx >= len(lines):
-            continue
-        target = lines[idx]
-        indent = target[: len(target) - len(target.lstrip())]
-        rendered = [f"{indent}// {part}" for part in c.comment.split("\n")]
-        lines[idx:idx] = rendered
-    return "\n".join(lines)
 
 
 def _format_summary_as_comment(summary: str) -> str:
@@ -120,48 +123,9 @@ def _format_summary_as_comment(summary: str) -> str:
     return "\n".join(lines)
 
 
-def parse_edited_buffer(text: str, baseline: RenderModel) -> EditParse:
-    lines = text.split("\n")
-    body = lines[baseline.summary_line_count :]
-
-    code_lines: list[str] = []
-    comment_by_index: dict[int, str] = {}
-    pending: list[str] = []
-
-    for line in body:
-        if line.lstrip().startswith("//"):
-            pending.append(_strip_comment_marker(line))
-        else:
-            if pending:
-                comment_by_index[len(code_lines)] = "\n".join(pending)
-                pending = []
-            code_lines.append(line)
-
-    return EditParse(
-        current_code_lines=code_lines,
-        current_comment_by_index=comment_by_index,
-    )
-
-
-def _strip_comment_marker(line: str) -> str:
-    rest = line.lstrip()[2:]
-    if rest.startswith(" "):
-        rest = rest[1:]
-    return rest
-
-
-def detect_identifier_change(
-    old_line: str, new_line: str
-) -> Optional[tuple[int, str, str]]:
-    old_idents = _IDENT_RE.findall(old_line)
-    new_idents = _IDENT_RE.findall(new_line)
-    if len(old_idents) != len(new_idents):
-        return None
-    diffs = [i for i in range(len(old_idents)) if old_idents[i] != new_idents[i]]
-    if len(diffs) != 1:
-        return None
-    i = diffs[0]
-    return i, old_idents[i], new_idents[i]
+def index_of_identifier(line: str, word: str) -> int:
+    idents = _IDENT_RE.findall(line)
+    return idents.index(word) if word in idents else -1
 
 
 def resolve_token(

@@ -11,10 +11,8 @@ from revengai.models.tokenised_data import TokenisedData
 from reai_toolkit.app.app import App
 from reai_toolkit.app.components.tabs.ai_decomp_tab import AIDecompView
 from reai_toolkit.app.coordinators.ai_decomp_render import (
-    EditParse,
     RenderModel,
-    detect_identifier_change,
-    parse_edited_buffer,
+    index_of_identifier,
     render_view_with_map,
     resolve_token,
 )
@@ -44,7 +42,6 @@ class AiDecompCoordinator(BaseCoordinator):
         self._current_comments: CommentsData | None = None
         self._current_tokenised: TokenisedData | None = None
         self._baseline: RenderModel | None = None
-        self._baseline_text: str = ""
 
     def enable_function_tracking(self) -> None:
         if self._decomp_hooks is None:
@@ -68,7 +65,9 @@ class AiDecompCoordinator(BaseCoordinator):
         if self._decomp_view is None:
             self._decomp_view = self.factory.ai_decomp(on_closed=self._on_pane_closed)
             self._decomp_view.on_refresh = self.refresh_current
-            self._decomp_view.on_commit_edits = self.commit_edits
+            self._decomp_view.on_rename = self.request_rename
+            self._decomp_view.on_edit_comment = self.request_edit_comment
+            self._decomp_view.on_remove_comment = self.request_remove_comment
             self._decomp_view.Create(self._decomp_view.TITLE)
 
     def start_decompilation(self, ea: int) -> None:
@@ -77,7 +76,6 @@ class AiDecompCoordinator(BaseCoordinator):
         self._current_comments = None
         self._current_tokenised = None
         self._baseline = None
-        self._baseline_text = ""
         self._current_func_vaddr = ea
 
         self.run_dialog()
@@ -193,75 +191,94 @@ class AiDecompCoordinator(BaseCoordinator):
         self.ai_decomp_service.invalidate_ea(ea)
         self.start_decompilation(ea)
 
-    def commit_edits(self, text: str) -> None:
-        if self._baseline is None or self._current_func_vaddr is None:
-            return
-        if text == self._baseline_text:
-            return
-
+    def request_rename(self, display_line: int, word: str) -> None:
         ea = self._current_func_vaddr
-        parse = parse_edited_buffer(text, self._baseline)
+        if ea is None or self._baseline is None or self._current_tokenised is None:
+            return
+        if not (0 <= display_line < len(self._baseline.display_is_code)):
+            return
+        if not self._baseline.display_is_code[display_line]:
+            return
 
-        if len(parse.current_code_lines) != len(self._baseline.code_lines):
-            self._rerender()
+        source_line = self._baseline.display_source[display_line]
+        if source_line is None:
+            return
+        source_index = source_line - 1
+        code_line = self._baseline.code_lines[source_index]
+        ident_index = index_of_identifier(code_line, word)
+        if ident_index < 0:
+            return
+
+        resolved = resolve_token(self._current_tokenised, source_index, ident_index, word)
+        if resolved is None:
             self.show_info_dialog(
-                message="Only identifier renames and inline comments are synced; "
-                "structural code edits were reverted."
+                message=f"'{word}' is not a renameable variable or type."
             )
             return
 
-        self._apply_renames(ea, parse)
-        self._apply_comment_edits(ea, parse)
-
-    def _apply_renames(self, ea: int, parse: EditParse) -> None:
-        if self._current_tokenised is None or self._baseline is None:
+        token, _category = resolved
+        new_name = ida_kernwin.ask_str(word, 0, f"Rename '{word}'")
+        if not new_name or new_name == word:
             return
-        overrides: dict[str, str] = {}
-        for i, new_line in enumerate(parse.current_code_lines):
-            old_line = self._baseline.code_lines[i]
-            if old_line == new_line:
-                continue
-            change = detect_identifier_change(old_line, new_line)
-            if change is None:
-                continue
-            ident_index, old_ident, new_ident = change
-            resolved = resolve_token(
-                self._current_tokenised, i, ident_index, old_ident
-            )
-            if resolved is None:
-                continue
-            token, _category = resolved
-            overrides[token] = new_ident
-        if overrides:
-            self.ai_decomp_service.apply_overrides(
-                ea=ea,
-                overrides=overrides,
-                on_decomp=lambda response: self._on_decomp_complete(ea, response),
-                on_tokenised=lambda response: self._on_tokenised_complete(ea, response),
-            )
 
-    def _apply_comment_edits(self, ea: int, parse: EditParse) -> None:
-        if self._baseline is None:
+        self.ai_decomp_service.apply_overrides(
+            ea=ea,
+            overrides={token: new_name},
+            on_decomp=lambda response: self._on_decomp_complete(ea, response),
+            on_tokenised=lambda response: self._on_tokenised_complete(ea, response),
+        )
+
+    def request_edit_comment(self, display_line: int) -> None:
+        ea = self._current_func_vaddr
+        if ea is None or self._baseline is None:
             return
-        for i in range(len(parse.current_code_lines)):
-            source_line = i + 1
-            baseline_comment = self._baseline.comment_by_source.get(source_line)
-            current_comment = parse.current_comment_by_index.get(i)
-            if current_comment == baseline_comment:
-                continue
-            if current_comment:
-                self.ai_decomp_service.set_comment(
-                    ea=ea,
-                    line=source_line,
-                    comment=current_comment,
-                    on_result=lambda response: self._on_comments_updated(ea, response),
-                )
-            elif baseline_comment is not None:
+        source_line = self._source_line_for(display_line)
+        if source_line is None:
+            return
+
+        existing = self._baseline.comment_by_source.get(source_line, "")
+        text = ida_kernwin.ask_text(0, existing, f"Comment for line {source_line}")
+        if text is None:
+            return
+        text = text.strip()
+        if not text:
+            if source_line in self._baseline.comment_by_source:
                 self.ai_decomp_service.remove_comment(
                     ea=ea,
                     line=source_line,
                     on_result=lambda response: self._on_comments_updated(ea, response),
                 )
+            return
+
+        self.ai_decomp_service.set_comment(
+            ea=ea,
+            line=source_line,
+            comment=text,
+            on_result=lambda response: self._on_comments_updated(ea, response),
+        )
+
+    def request_remove_comment(self, display_line: int) -> None:
+        ea = self._current_func_vaddr
+        if ea is None or self._baseline is None:
+            return
+        source_line = self._source_line_for(display_line)
+        if source_line is None:
+            return
+        if source_line not in self._baseline.comment_by_source:
+            self.show_info_dialog(message="No comment on this line.")
+            return
+        self.ai_decomp_service.remove_comment(
+            ea=ea,
+            line=source_line,
+            on_result=lambda response: self._on_comments_updated(ea, response),
+        )
+
+    def _source_line_for(self, display_line: int) -> int | None:
+        if self._baseline is None:
+            return None
+        if not (0 <= display_line < len(self._baseline.display_source)):
+            return None
+        return self._baseline.display_source[display_line]
 
     def _on_comments_updated(
         self, ea: int, response: GenericApiReturn[CommentsData]
@@ -285,7 +302,6 @@ class AiDecompCoordinator(BaseCoordinator):
             summary=self._current_summary,
             comments=self._current_comments,
         )
-        self._baseline_text = rendered
         self._decomp_view.update_view_content(rendered)
 
     def _on_pane_closed(self) -> None:

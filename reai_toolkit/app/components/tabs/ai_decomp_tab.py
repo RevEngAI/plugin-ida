@@ -7,12 +7,49 @@ from libbs.decompilers.ida.compat import execute_ui
 from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets, Signal
 
 
-class _DecompEditor(QtWidgets.QPlainTextEdit):
-    editsCommitted = Signal(str)
+_WORD_UNDER_CURSOR = getattr(
+    getattr(QtGui.QTextCursor, "SelectionType", QtGui.QTextCursor), "WordUnderCursor"
+)
 
-    def focusOutEvent(self, event) -> None:
-        super().focusOutEvent(event)
-        self.editsCommitted.emit(self.toPlainText())
+
+def _menu_exec(menu, pos):
+    fn = getattr(menu, "exec_", None) or getattr(menu, "exec")
+    return fn(pos)
+
+
+class _DecompEditor(QtWidgets.QPlainTextEdit):
+    renameRequested = Signal(int, str)
+    commentEditRequested = Signal(int)
+    commentRemoveRequested = Signal(int)
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        super().mouseDoubleClickEvent(event)
+        cursor = self.textCursor()
+        word = cursor.selectedText()
+        if word:
+            self.renameRequested.emit(cursor.blockNumber(), word)
+
+    def contextMenuEvent(self, event) -> None:
+        cursor = self.cursorForPosition(event.pos())
+        line = cursor.blockNumber()
+        cursor.select(_WORD_UNDER_CURSOR)
+        word = cursor.selectedText()
+
+        menu = self.createStandardContextMenu()
+        menu.addSeparator()
+        act_rename = menu.addAction(f"Rename '{word}'…") if word else None
+        act_comment = menu.addAction("Add / edit comment…")
+        act_remove = menu.addAction("Remove comment")
+
+        chosen = _menu_exec(menu, event.globalPos())
+        if chosen is None:
+            return
+        if act_rename is not None and chosen == act_rename:
+            self.renameRequested.emit(line, word)
+        elif chosen == act_comment:
+            self.commentEditRequested.emit(line)
+        elif chosen == act_remove:
+            self.commentRemoveRequested.emit(line)
 
 
 class AIDecompView(kw.PluginForm):
@@ -31,12 +68,13 @@ class AIDecompView(kw.PluginForm):
         super().__init__()
         self._on_closed: Callable[[], None] | None = on_closed
         self.on_refresh: Callable[[], None] | None = None
-        self.on_commit_edits: Callable[[str], None] | None = None
+        self.on_rename: Callable[[int, str], None] | None = None
+        self.on_edit_comment: Callable[[int], None] | None = None
+        self.on_remove_comment: Callable[[int], None] | None = None
         self._parent_window: QtWidgets.QWidget | None = None
         self._editor: _DecompEditor | None = None
         self._refresh_btn: QtWidgets.QPushButton | None = None
         self._highlighter: CppHighlighter | None = None
-        self._suppress: bool = False
 
     def Create(self, title: Any) -> Any:
         """Compatibility shim: show the PluginForm like your previous Create()."""
@@ -76,9 +114,11 @@ class AIDecompView(kw.PluginForm):
 
         # Editor
         self._editor = _DecompEditor(self._parent_window)
-        self._editor.setReadOnly(False)
+        self._editor.setReadOnly(True)
         self._editor.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
-        self._editor.editsCommitted.connect(self._on_edits_committed)
+        self._editor.renameRequested.connect(self._on_rename_requested)
+        self._editor.commentEditRequested.connect(self._on_edit_comment_requested)
+        self._editor.commentRemoveRequested.connect(self._on_remove_comment_requested)
 
         # Monospace font tuned for IDA
         font = QtGui.QFont(
@@ -113,11 +153,17 @@ class AIDecompView(kw.PluginForm):
         if self.on_refresh:
             self.on_refresh()
 
-    def _on_edits_committed(self, text: str) -> None:
-        if self._suppress:
-            return
-        if self.on_commit_edits:
-            self.on_commit_edits(text)
+    def _on_rename_requested(self, line: int, word: str) -> None:
+        if self.on_rename:
+            self.on_rename(line, word)
+
+    def _on_edit_comment_requested(self, line: int) -> None:
+        if self.on_edit_comment:
+            self.on_edit_comment(line)
+
+    def _on_remove_comment_requested(self, line: int) -> None:
+        if self.on_remove_comment:
+            self.on_remove_comment(line)
 
     # --- public API ------------------------------------------------
     @execute_ui
@@ -125,13 +171,11 @@ class AIDecompView(kw.PluginForm):
         if not self._editor:
             return
 
-        self._suppress = True
         self._editor.blockSignals(True)
         try:
             self._editor.setPlainText(code)
         finally:
             self._editor.blockSignals(False)
-            self._suppress = False
 
     def clear(self) -> None:
         self.update_view_content("")

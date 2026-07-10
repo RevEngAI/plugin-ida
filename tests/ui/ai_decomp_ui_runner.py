@@ -31,6 +31,7 @@ def _run(report: dict) -> None:
     from types import SimpleNamespace
     from unittest.mock import MagicMock
 
+    import ida_kernwin
     import idautils
 
     from revengai.models.ai_decomp_function_mapping import AIDecompFunctionMapping
@@ -44,6 +45,10 @@ def _run(report: dict) -> None:
     from reai_toolkit.app.coordinators.ai_decomp_coordinator import AiDecompCoordinator
     from reai_toolkit.app.core.qt_compat import QtWidgets
     from reai_toolkit.app.core.shared_schema import GenericApiReturn
+
+    answers = {"str": "count", "text": "hello"}
+    ida_kernwin.ask_str = lambda default, hist, prompt: answers["str"]
+    ida_kernwin.ask_text = lambda maxsz, default, prompt: answers["text"]
 
     ea = next(iter(idautils.Functions()), 0x1000)
 
@@ -71,9 +76,8 @@ def _run(report: dict) -> None:
         app=MagicMock(), factory=factory, log=MagicMock(), ai_decomp_service=service
     )
     infos: list = []
-    errors_shown: list = []
     coord.show_info_dialog = lambda **kw: infos.append(kw)
-    coord.show_error_dialog = lambda **kw: errors_shown.append(kw)
+    coord.show_error_dialog = lambda **kw: infos.append(kw)
 
     qapp = QtWidgets.QApplication.instance()
 
@@ -88,8 +92,8 @@ def _run(report: dict) -> None:
     if view is None or view._editor is None:
         report["errors"].append("AIDecompView editor was not created")
         return
-
     report["view_created"] = True
+    report["editor_read_only"] = view._editor.isReadOnly() is True
 
     def seed_plain() -> None:
         service.reset_mock()
@@ -102,68 +106,74 @@ def _run(report: dict) -> None:
         coord._rerender()
         pump()
 
-    def commit(edited: str) -> None:
-        view._editor.setPlainText(edited)
-        view._editor.editsCommitted.emit(view._editor.toPlainText())
+    def seed_with_comment() -> None:
+        service.reset_mock()
+        service.peek_decomp.return_value = None
+        coord._current_func_vaddr = ea
+        coord._current_summary = None
+        coord._current_decomp = decomp
+        coord._current_tokenised = tokenised
+        coord._on_comments_complete(
+            ea,
+            GenericApiReturn(
+                success=True,
+                data=CommentsData.model_construct(
+                    inline_comments=[InlineComment.model_construct(comment="hola", line=2)],
+                    task_status="COMPLETED",
+                ),
+            ),
+        )
         pump()
+
+    def code_line_row(needle: str) -> int:
+        lines = view._editor.toPlainText().split("\n")
+        return next(i for i, s in enumerate(lines) if needle in s)
 
     seed_plain()
     report["render_shows_code"] = CODE in view._editor.toPlainText()
 
     seed_plain()
-    commit(CODE.replace("    int v5 = a1;", "    int count = a1;"))
-    report["rename_calls_apply_overrides"] = service.apply_overrides.called
+    answers["str"] = "count"
+    view._editor.renameRequested.emit(code_line_row("int v5"), "v5")
+    pump()
+    report["rename_double_click_overrides"] = service.apply_overrides.called
     if service.apply_overrides.called:
         report["rename_overrides_correct"] = (
             service.apply_overrides.call_args.kwargs.get("overrides") == {"@@V@@": "count"}
         )
 
     seed_plain()
-    lines = CODE.split("\n")
-    lines.insert(1, "    // hello")
-    commit("\n".join(lines))
-    report["comment_add_calls_set"] = service.set_comment.called
+    infos.clear()
+    view._editor.renameRequested.emit(0, "int")
+    pump()
+    report["rename_non_token_info"] = not service.apply_overrides.called and len(infos) >= 1
+
+    seed_plain()
+    answers["text"] = "hello"
+    view._editor.commentEditRequested.emit(code_line_row("int v5"))
+    pump()
+    report["comment_add_sets"] = service.set_comment.called
     if service.set_comment.called:
         kw = service.set_comment.call_args.kwargs
         report["comment_add_args_correct"] = kw.get("line") == 2 and kw.get("comment") == "hello"
 
-    service.reset_mock()
-    service.peek_decomp.return_value = None
-    coord._current_func_vaddr = ea
-    coord._current_summary = None
-    coord._current_decomp = decomp
-    coord._current_tokenised = tokenised
-    coord._on_comments_complete(
-        ea,
-        GenericApiReturn(
-            success=True,
-            data=CommentsData.model_construct(
-                inline_comments=[InlineComment.model_construct(comment="hola", line=2)],
-                task_status="COMPLETED",
-            ),
-        ),
-    )
+    seed_with_comment()
+    answers["text"] = ""
+    view._editor.commentEditRequested.emit(code_line_row("int v5"))
     pump()
-    commit(CODE)
-    report["comment_remove_calls_delete"] = service.remove_comment.called
+    report["comment_edit_empty_removes"] = (
+        service.remove_comment.called
+        and service.remove_comment.call_args.kwargs.get("line") == 2
+    )
+
+    seed_with_comment()
+    view._editor.commentRemoveRequested.emit(code_line_row("int v5"))
+    pump()
+    report["comment_remove_deletes"] = service.remove_comment.called
     if service.remove_comment.called:
         report["comment_remove_args_correct"] = (
             service.remove_comment.call_args.kwargs.get("line") == 2
         )
-
-    seed_plain()
-    commit(CODE + "\n    extra();")
-    report["structural_reverts"] = view._editor.toPlainText() == CODE
-    report["structural_no_mutation"] = not service.apply_overrides.called and not service.set_comment.called
-    report["structural_info_shown"] = len(infos) >= 1
-
-    seed_plain()
-    commit(view._editor.toPlainText())
-    report["unchanged_noop"] = (
-        not service.apply_overrides.called
-        and not service.set_comment.called
-        and not service.remove_comment.called
-    )
 
     service.reset_mock()
     service.peek_decomp.return_value = None
@@ -182,17 +192,16 @@ def main() -> None:
         "ok": False,
         "errors": [],
         "view_created": False,
+        "editor_read_only": False,
         "render_shows_code": False,
-        "rename_calls_apply_overrides": False,
+        "rename_double_click_overrides": False,
         "rename_overrides_correct": False,
-        "comment_add_calls_set": False,
+        "rename_non_token_info": False,
+        "comment_add_sets": False,
         "comment_add_args_correct": False,
-        "comment_remove_calls_delete": False,
+        "comment_edit_empty_removes": False,
+        "comment_remove_deletes": False,
         "comment_remove_args_correct": False,
-        "structural_reverts": False,
-        "structural_no_mutation": False,
-        "structural_info_shown": False,
-        "unchanged_noop": False,
         "refresh_button_invalidates": False,
     }
     ida_auto.auto_wait()
