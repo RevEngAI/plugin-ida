@@ -28,12 +28,10 @@ def _ida_gui_running() -> bool:
     return False
 
 
-def _display_prefix() -> list[str] | None:
-    if sys.platform != "linux" or os.environ.get("DISPLAY") or os.environ.get("WAYLAND_DISPLAY"):
-        return []
-    if shutil.which("xvfb-run"):
-        return ["xvfb-run", "-a"]
-    return None
+def _headless_env() -> dict[str, str]:
+    if sys.platform == "linux" and not os.environ.get("DISPLAY") and not os.environ.get("WAYLAND_DISPLAY"):
+        return {"QT_QPA_PLATFORM": "offscreen"}
+    return {}
 
 
 @pytest.mark.skipif(
@@ -48,18 +46,20 @@ def test_sync_never_opens_or_switches_pseudocode(tmp_path):
         pytest.skip("an IDA instance is already running (license seat busy)")
     if not os.path.isfile(HELLO_ELF):
         pytest.skip(f"missing fixture {HELLO_ELF}")
-    prefix = _display_prefix()
-    if prefix is None:
-        pytest.skip("no display and xvfb-run unavailable")
 
     binary = tmp_path / "hello.elf"
     shutil.copy(HELLO_ELF, binary)
     report_path = tmp_path / "report.json"
     log_path = tmp_path / "ida.log"
-    env = dict(os.environ, REAI_UI_REPORT=str(report_path), REAI_UI_ROOT=ROOT)
+    env = dict(
+        os.environ,
+        REAI_UI_REPORT=str(report_path),
+        REAI_UI_ROOT=ROOT,
+        **_headless_env(),
+    )
 
     proc = subprocess.run(
-        [*prefix, ida, "-A", f"-S{RUNNER}", f"-L{log_path}", str(binary)],
+        [ida, "-A", f"-S{RUNNER}", f"-L{log_path}", str(binary)],
         env=env,
         capture_output=True,
         timeout=300,
