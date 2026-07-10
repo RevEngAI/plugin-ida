@@ -10,8 +10,11 @@ from revengai import (
 )
 from revengai.models.comments_data import CommentsData
 from revengai.models.decompilation_data import DecompilationData
+from revengai.models.patch_comment_body import PatchCommentBody
 from revengai.models.summary_data import SummaryData
 from revengai.models.task_status import TaskStatus
+from revengai.models.tokenised_data import TokenisedData
+from revengai.models.upsert_overrides_input_body import UpsertOverridesInputBody
 from revengai.models.workflow_progress import WorkflowProgress
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -30,6 +33,7 @@ class AiDecompService(IThreadService):
         self._decomp_cache: dict[int, DecompilationData] = {}
         self._summary_cache: dict[int, SummaryData] = {}
         self._comments_cache: dict[int, CommentsData] = {}
+        self._tokenised_cache: dict[int, TokenisedData] = {}
         self._inflight: dict[int, threading.Event] = {}
         self._inflight_lock = threading.Lock()
 
@@ -49,6 +53,7 @@ class AiDecompService(IThreadService):
         self._decomp_cache.clear()
         self._summary_cache.clear()
         self._comments_cache.clear()
+        self._tokenised_cache.clear()
 
     def peek_decomp(self, ea: int) -> DecompilationData | None:
         function_id = self._get_function_id(start_ea=ea)
@@ -56,12 +61,31 @@ class AiDecompService(IThreadService):
             return None
         return self._decomp_cache.get(function_id)
 
+    def function_id_for(self, ea: int) -> int | None:
+        return self._get_function_id(start_ea=ea)
+
+    def invalidate(self, function_id: int) -> None:
+        self._decomp_cache.pop(function_id, None)
+        self._summary_cache.pop(function_id, None)
+        self._comments_cache.pop(function_id, None)
+        self._tokenised_cache.pop(function_id, None)
+        with self._inflight_lock:
+            evt = self._inflight.pop(function_id, None)
+        if evt is not None:
+            evt.set()
+
+    def invalidate_ea(self, ea: int) -> None:
+        function_id = self._get_function_id(start_ea=ea)
+        if function_id is not None:
+            self.invalidate(function_id)
+
     def start_ai_decomp_task(
         self,
         ea: int,
         on_decomp: Callable[[GenericApiReturn[DecompilationData]], None],
         on_summary: Callable[[GenericApiReturn[SummaryData]], None],
         on_comments: Callable[[GenericApiReturn[CommentsData]], None],
+        on_tokenised: Callable[[GenericApiReturn[TokenisedData]], None] | None = None,
     ) -> None:
         function_id = self._get_function_id(start_ea=ea)
         if function_id is None:
@@ -76,11 +100,200 @@ class AiDecompService(IThreadService):
 
         worker = threading.Thread(
             target=self._run_task,
-            args=(function_id, stop_event, on_decomp, on_summary, on_comments),
+            args=(
+                function_id,
+                stop_event,
+                on_decomp,
+                on_summary,
+                on_comments,
+                on_tokenised,
+            ),
             name=f"reai-aidecomp-{function_id}",
             daemon=True,
         )
         worker.start()
+
+    def apply_overrides(
+        self,
+        ea: int,
+        overrides: dict[str, str],
+        on_decomp: Callable[[GenericApiReturn[DecompilationData]], None],
+        on_tokenised: Callable[[GenericApiReturn[TokenisedData]], None],
+    ) -> None:
+        function_id = self._get_function_id(start_ea=ea)
+        if function_id is None:
+            on_decomp(
+                GenericApiReturn[DecompilationData](
+                    success=False, error_message="Function is not part of the analysis."
+                )
+            )
+            return
+        self._spawn(
+            self._run_apply_overrides,
+            f"reai-aidecomp-overrides-{function_id}",
+            (function_id, overrides, on_decomp, on_tokenised),
+        )
+
+    def set_comment(
+        self,
+        ea: int,
+        line: int,
+        comment: str,
+        on_result: Callable[[GenericApiReturn[CommentsData]], None],
+    ) -> None:
+        function_id = self._get_function_id(start_ea=ea)
+        if function_id is None:
+            on_result(
+                GenericApiReturn[CommentsData](
+                    success=False, error_message="Function is not part of the analysis."
+                )
+            )
+            return
+        self._spawn(
+            self._run_set_comment,
+            f"reai-aidecomp-comment-{function_id}",
+            (function_id, line, comment, on_result),
+        )
+
+    def remove_comment(
+        self,
+        ea: int,
+        line: int,
+        on_result: Callable[[GenericApiReturn[CommentsData]], None],
+    ) -> None:
+        function_id = self._get_function_id(start_ea=ea)
+        if function_id is None:
+            on_result(
+                GenericApiReturn[CommentsData](
+                    success=False, error_message="Function is not part of the analysis."
+                )
+            )
+            return
+        self._spawn(
+            self._run_remove_comment,
+            f"reai-aidecomp-comment-del-{function_id}",
+            (function_id, line, on_result),
+        )
+
+    @staticmethod
+    def _spawn(target: Callable[..., Any], name: str, args: tuple) -> None:
+        threading.Thread(target=target, args=args, name=name, daemon=True).start()
+
+    def _run_apply_overrides(
+        self,
+        function_id: int,
+        overrides: dict[str, str],
+        on_decomp: Callable[[GenericApiReturn[DecompilationData]], None],
+        on_tokenised: Callable[[GenericApiReturn[TokenisedData]], None],
+    ) -> None:
+        try:
+            with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+                FunctionsAIDecompilationApi(api_client).upsert_ai_decompilation_overrides(
+                    function_id=function_id,
+                    upsert_overrides_input_body=UpsertOverridesInputBody(
+                        overrides=overrides
+                    ),
+                )
+        except ApiException as e:
+            on_decomp(
+                GenericApiReturn[DecompilationData](
+                    success=False, error_message=_format_api_error(e)
+                )
+            )
+            return
+        except Exception as e:
+            on_decomp(
+                GenericApiReturn[DecompilationData](
+                    success=False, error_message=f"Unexpected error applying overrides: {e}"
+                )
+            )
+            return
+
+        self.invalidate(function_id)
+
+        decomp, derr = self._fetch_decompilation(function_id)
+        if decomp is not None and decomp.decompilation:
+            self._decomp_cache[function_id] = decomp
+            on_decomp(GenericApiReturn[DecompilationData](success=True, data=decomp))
+        else:
+            on_decomp(
+                GenericApiReturn[DecompilationData](
+                    success=False,
+                    error_message=derr or "AI decompilation returned no content.",
+                )
+            )
+
+        tokenised, _terr = self._fetch_tokenised(function_id)
+        if (
+            tokenised is not None
+            and str(tokenised.status) == TaskStatus.COMPLETED.value
+            and tokenised.function_mapping is not None
+        ):
+            self._tokenised_cache[function_id] = tokenised
+            on_tokenised(GenericApiReturn[TokenisedData](success=True, data=tokenised))
+
+    def _run_set_comment(
+        self,
+        function_id: int,
+        line: int,
+        comment: str,
+        on_result: Callable[[GenericApiReturn[CommentsData]], None],
+    ) -> None:
+        try:
+            with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+                data = FunctionsAIDecompilationApi(
+                    api_client
+                ).patch_ai_decompilation_inline_comment(
+                    function_id=function_id,
+                    patch_comment_body=PatchCommentBody(comment=comment, line=line),
+                )
+        except ApiException as e:
+            on_result(
+                GenericApiReturn[CommentsData](
+                    success=False, error_message=_format_api_error(e)
+                )
+            )
+            return
+        except Exception as e:
+            on_result(
+                GenericApiReturn[CommentsData](
+                    success=False, error_message=f"Unexpected error updating comment: {e}"
+                )
+            )
+            return
+        self._comments_cache[function_id] = data
+        on_result(GenericApiReturn[CommentsData](success=True, data=data))
+
+    def _run_remove_comment(
+        self,
+        function_id: int,
+        line: int,
+        on_result: Callable[[GenericApiReturn[CommentsData]], None],
+    ) -> None:
+        try:
+            with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+                data = FunctionsAIDecompilationApi(
+                    api_client
+                ).delete_ai_decompilation_inline_comment(
+                    function_id=function_id,
+                    line=line,
+                )
+        except ApiException as e:
+            on_result(
+                GenericApiReturn[CommentsData](
+                    success=False, error_message=_format_api_error(e)
+                )
+            )
+            return
+        except Exception as e:
+            on_result(
+                GenericApiReturn[CommentsData](
+                    success=False, error_message=f"Unexpected error removing comment: {e}"
+                )
+            )
+            return
+        self._comments_cache[function_id] = data
+        on_result(GenericApiReturn[CommentsData](success=True, data=data))
 
     def _run_task(
         self,
@@ -89,6 +302,7 @@ class AiDecompService(IThreadService):
         on_decomp: Callable[[GenericApiReturn[DecompilationData]], None],
         on_summary: Callable[[GenericApiReturn[SummaryData]], None],
         on_comments: Callable[[GenericApiReturn[CommentsData]], None],
+        on_tokenised: Callable[[GenericApiReturn[TokenisedData]], None] | None = None,
     ) -> None:
         try:
             if stop_event.is_set():
@@ -98,11 +312,14 @@ class AiDecompService(IThreadService):
                 return
             self._run_summary_phase(function_id, stop_event, on_summary)
             self._run_comments_phase(function_id, stop_event, on_comments)
+            if on_tokenised is not None:
+                self._run_tokenised_phase(function_id, stop_event, on_tokenised)
         except Exception as e:
             logger.error(f"RevEng.AI: AI decompilation task crashed for {function_id}: {e}")
         finally:
             with self._inflight_lock:
-                self._inflight.pop(function_id, None)
+                if self._inflight.get(function_id) is stop_event:
+                    self._inflight.pop(function_id, None)
 
     def _get_function_id(self, start_ea: int) -> int | None:
         function_map: FunctionMapping | None = self.netstore_service.get_function_mapping()
@@ -500,6 +717,63 @@ class AiDecompService(IThreadService):
             on_comments,
             GenericApiReturn[CommentsData](success=True, data=final),
         )
+
+    def _fetch_tokenised(
+        self, function_id: int
+    ) -> tuple[TokenisedData | None, str | None]:
+        try:
+            with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+                tokenised = FunctionsAIDecompilationApi(
+                    api_client
+                ).get_ai_decompilation_tokenised(function_id=function_id)
+            return tokenised, None
+        except ApiException as e:
+            return None, _format_api_error(e)
+        except Exception as e:
+            return None, f"Unexpected error fetching tokenised data: {e}"
+
+    def _run_tokenised_phase(
+        self,
+        function_id: int,
+        stop_event: threading.Event,
+        on_tokenised: Callable[[GenericApiReturn[TokenisedData]], None],
+    ) -> None:
+        cached = self._tokenised_cache.get(function_id)
+        if cached is not None:
+            self._safe_dispatch(
+                stop_event,
+                on_tokenised,
+                GenericApiReturn[TokenisedData](success=True, data=cached),
+            )
+            return
+
+        tokenised, err = self._fetch_tokenised(function_id)
+        if tokenised is None:
+            self._safe_dispatch(
+                stop_event,
+                on_tokenised,
+                GenericApiReturn[TokenisedData](success=False, error_message=err),
+            )
+            return
+
+        if (
+            str(tokenised.status) == TaskStatus.COMPLETED.value
+            and tokenised.function_mapping is not None
+        ):
+            self._tokenised_cache[function_id] = tokenised
+            self._safe_dispatch(
+                stop_event,
+                on_tokenised,
+                GenericApiReturn[TokenisedData](success=True, data=tokenised),
+            )
+        else:
+            self._safe_dispatch(
+                stop_event,
+                on_tokenised,
+                GenericApiReturn[TokenisedData](
+                    success=False, error_message="Tokenised data not ready."
+                ),
+            )
 
     def _poll_workflow(
         self,

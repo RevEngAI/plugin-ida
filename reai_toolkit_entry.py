@@ -33,6 +33,7 @@ _add_vendor_paths()
 from loguru import logger
 
 from reai_toolkit.app.app import App
+from reai_toolkit.app.core.logging_setup import configure_logging
 from reai_toolkit.app.coordinator import Coordinator
 from reai_toolkit.app.factory import DialogFactory
 from reai_toolkit.hooks.artifacts import ArtifactChangeHooks
@@ -70,9 +71,9 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         self._setup_handled = False
 
     def init(self):
+        configure_logging()
         self.app = App(__IDA_VERSION__, __PLUGIN_VERSION__)
         self.factory = DialogFactory(self.app)
-        print(Coordinator.__abstractmethods__)
         self.coordinator = Coordinator(app=self.app, factory=self.factory, log=logger)
 
         # Top level menu hooks
