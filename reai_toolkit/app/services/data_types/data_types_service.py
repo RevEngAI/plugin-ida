@@ -1,3 +1,4 @@
+import threading
 from dataclasses import dataclass, field
 
 from revengai import ApiException, Configuration
@@ -29,6 +30,14 @@ class DataTypesImportResult:
 class ImportDataTypesService(IThreadService):
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration) -> None:
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
+
+    def import_data_types_async(self, matches: dict[int, int]) -> None:
+        self.start_worker(target=self._import_worker, args=(matches,))
+
+    def _import_worker(self, _: threading.Event, matches: dict[int, int]) -> None:
+        result: DataTypesImportResult = self.import_data_types(matches)
+        if result.error:
+            logger.error(f"RevEng.AI: {result.error}")
 
     def import_data_types(self, matches: dict[int, int]) -> DataTypesImportResult:
         if len(matches) == 0:

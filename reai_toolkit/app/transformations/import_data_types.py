@@ -1,20 +1,24 @@
 from typing import cast
 
+import ida_funcs
+import ida_typeinf
+import idaapi
+
 import libbs.artifacts
 from libbs.api import DecompilerInterface
-from libbs.decompilers.ida.compat import execute_ui, convert_type_str_to_ida_type
+from libbs.decompilers.ida.compat import execute_write, convert_type_str_to_ida_type
 from loguru import logger
 from revengai import (
-    FunctionArgument,
     Enumeration,
+    FunctionArgument,
     FunctionDataTypesList,
-    FunctionHeader,
-    V2FunctionInfoFuncDepsInner,
-    FunctionInfo,
+    FunctionDataTypesListItem,
     FunctionType,
     Structure,
     TypeDefinition,
 )
+
+APPLY_CHUNK_SIZE = 50
 
 
 class TaggedDependency:
@@ -31,69 +35,144 @@ class ImportDataTypes:
     def __init__(self) -> None:
         self.deci: DecompilerInterface
 
-    @execute_ui
     def execute(self, functions: FunctionDataTypesList, matched_function_mapping: dict[int, int] = {}) -> set[int]:
-        self.deci = DecompilerInterface.discover(force_decompiler="ida") # type: ignore
-        lookup: dict[str, TaggedDependency] = {}
+        items: list[FunctionDataTypesListItem] = [
+            item for item in functions.items if item.data_types is not None
+        ]
+        if not items:
+            return set()
+
+        # Track processed dependencies to prevent duplicate imports.
+        # Without this:
+        # - Shared dependencies get re-processed, breaking references (shows as invalid ordinals in IDA)
+        # - Cannot resolve subdependencies (e.g. struct fields that reference other imported types)
+        lookup: dict[str, TaggedDependency] = self._build_lookup(items)
+        if lookup:
+            self._apply_dependencies(lookup)
+
         failed: set[int] = set()
+        total: int = len(items)
+        for start in range(0, total, APPLY_CHUNK_SIZE):
+            chunk: list[FunctionDataTypesListItem] = items[start:start + APPLY_CHUNK_SIZE]
+            failed |= self._apply_chunk(chunk, matched_function_mapping)
+            logger.info(
+                f"RevEng.AI: applied data types to {min(start + APPLY_CHUNK_SIZE, total)}/{total} functions"
+            )
 
-        for function in functions.items:
-            data_types: FunctionInfo | None = function.data_types
+        return failed
 
-            if data_types is None:
-                continue
-            
-            # Track processed dependencies to prevent duplicate imports.
-            # Without this:
-            # - Shared dependencies get re-processed, breaking references (shows as invalid ordinals in IDA)
-            # - Cannot resolve subdependencies (e.g. struct fields that reference other imported types)
-            for dep in data_types.func_deps:
+    def _build_lookup(self, items: list[FunctionDataTypesListItem]) -> dict[str, TaggedDependency]:
+        lookup: dict[str, TaggedDependency] = {}
+        for item in items:
+            for dep in item.data_types.func_deps or []:
                 if dep.actual_instance is None:
                     continue
 
                 if dep.actual_instance.name not in lookup:
-                    lookup.update({dep.actual_instance.name: TaggedDependency(dep.actual_instance)}) # type: ignore
+                    lookup[dep.actual_instance.name] = TaggedDependency(dep.actual_instance) # type: ignore
 
-            dependency: V2FunctionInfoFuncDepsInner
-            for dependency in data_types.func_deps:
-                if dependency.actual_instance is None:
-                    continue
+        return lookup
 
-                tagged_dependency: TaggedDependency | None = lookup.get(dependency.actual_instance.name)
-                if tagged_dependency:
-                    try:
-                        self.process_dependency(tagged_dependency, lookup)
-                    except Exception as e:
-                        logger.warning(
-                            f"RevEng.AI: skipped dependency {tagged_dependency.name!r}: {e!r}"
-                        )
-                        tagged_dependency.processed = True
+    @execute_write
+    def _apply_dependencies(self, lookup: dict[str, TaggedDependency]) -> None:
+        self.deci = DecompilerInterface.discover(force_decompiler="ida") # type: ignore
+        for tagged_dependency in lookup.values():
+            try:
+                self.process_dependency(tagged_dependency, lookup)
+            except Exception as e:
+                logger.warning(
+                    f"RevEng.AI: skipped dependency {tagged_dependency.name!r}: {e!r}"
+                )
+                tagged_dependency.processed = True
 
-            func: FunctionType | None = data_types.func_types
-            if func:
-                try:
-                    if matched_function_mapping:
-                        ea: int = matched_function_mapping[function.function_id]
-                    else:
-                        ea: int = func.addr
+    @execute_write
+    def _apply_chunk(
+        self, chunk: list[FunctionDataTypesListItem], matched_function_mapping: dict[int, int]
+    ) -> set[int]:
+        failed: set[int] = set()
+        for item in chunk:
+            func: FunctionType | None = item.data_types.func_types
+            if func is None:
+                continue
 
-                    if not self.update_function(func, ea) or self._function_types_unparseable(func):
-                        failed.add(function.function_id)
-                except Exception as e:
-                    logger.warning(
-                        f"RevEng.AI: skipped data types for function {function.function_id}: {e!r}"
-                    )
-                    failed.add(function.function_id)
+            try:
+                if matched_function_mapping:
+                    ea: int = matched_function_mapping[item.function_id]
+                else:
+                    ea: int = func.addr
+
+                if not self.apply_function_type(func, ea):
+                    failed.add(item.function_id)
+            except Exception as e:
+                logger.warning(
+                    f"RevEng.AI: skipped data types for function {item.function_id}: {e!r}"
+                )
+                failed.add(item.function_id)
 
         return failed
 
+    def apply_function_type(self, func: FunctionType, ea: int) -> bool:
+        if ida_funcs.get_func(ea) is None:
+            logger.warning(f"failed to update function: {func.name} at 0x{ea:x}")
+            return False
+
+        args: list[FunctionArgument] = sorted(func.header.args.values(), key=lambda a: a.offset)
+        arg_types: list[tuple[str, ida_typeinf.tinfo_t]] = []
+        for arg in args:
+            arg_tif = convert_type_str_to_ida_type(self.normalise_type(arg.type)) if arg.type else None
+            if arg_tif is None:
+                return False
+            arg_types.append((arg.name, arg_tif))
+
+        details: ida_typeinf.func_type_data_t = self._current_func_details(ea)
+
+        ret_type: str = self.normalise_type(func.header.type) if func.header.type else ""
+        if ret_type:
+            ret_tif = convert_type_str_to_ida_type(ret_type)
+            if ret_tif is None:
+                return False
+            details.rettype = ret_tif
+        elif details.rettype.empty():
+            details.rettype = convert_type_str_to_ida_type("void")
+
+        if arg_types:
+            details.clear()
+            for name, arg_tif in arg_types:
+                funcarg = ida_typeinf.funcarg_t()
+                funcarg.name = name
+                funcarg.type = arg_tif
+                details.push_back(funcarg)
+
+        proto = ida_typeinf.tinfo_t()
+        if not proto.create_func(details):
+            return False
+
+        return bool(ida_typeinf.apply_tinfo(ea, proto, ida_typeinf.TINFO_DEFINITE))
+
+    @staticmethod
+    def _current_func_details(ea: int) -> "ida_typeinf.func_type_data_t":
+        details = ida_typeinf.func_type_data_t()
+        existing = ida_typeinf.tinfo_t()
+        if idaapi.get_tinfo(existing, ea) and existing.is_func() and existing.get_func_details(details):
+            return details
+
+        if (
+            ida_typeinf.guess_tinfo(existing, ea) != ida_typeinf.GUESS_FUNC_FAILED
+            and existing.is_func()
+            and existing.get_func_details(details)
+        ):
+            return details
+
+        details = ida_typeinf.func_type_data_t()
+        details.cc = ida_typeinf.CM_CC_UNKNOWN
+        return details
 
     def process_dependency(
         self, tagged_dependency: TaggedDependency, lookup: dict[str, TaggedDependency]
     ) -> None:
         if tagged_dependency.processed:
             return
-        
+
         dependency: Structure | Enumeration | TypeDefinition = tagged_dependency.dependency
         match dependency:
             case Structure():
@@ -110,7 +189,7 @@ class ImportDataTypes:
     def update_struct(self, imported_struct: Structure, lookup: dict[str, TaggedDependency]) -> None:
         if imported_struct.size is None:
             return
-        
+
         for member in imported_struct.members.values():
             subdependency: TaggedDependency | None = lookup.get(member.type)
             if subdependency:
@@ -133,56 +212,6 @@ class ImportDataTypes:
         self.deci.typedefs[imported_typedef.name] = libbs.artifacts.Typedef(
             name=imported_typedef.name, type_=normalized_type
         )
-
-    def update_function(self, func: FunctionType, ea: int) -> bool:
-        base_address: int = self.deci.binary_base_addr
-        rva: int = ea - base_address
-
-        target_func: libbs.artifacts.Function | None = self.deci.functions.get(rva) # type: ignore
-        if target_func is None:
-            logger.warning(f"failed to update function: {func.name} at rva: 0x{rva:0x}")
-            return False
-
-        target_func.name = func.name
-        target_func.size = func.size
-        target_func.type = func.type
-
-        # Check the target function has a header.
-        if target_func.header:
-            self.update_header(func.header, target_func)
-
-        self.deci.functions[rva] = target_func
-        return True
-
-    def _function_types_unparseable(self, func: FunctionType) -> bool:
-        if not (func.header and func.header.args):
-            return False
-        for arg in func.header.args.values():
-            type_str: str = self.normalise_type(arg.type) if arg.type else ""
-            if type_str and convert_type_str_to_ida_type(type_str) is None:
-                return True
-        return False
-
-    def update_header(
-        self, imported_header: FunctionHeader, target_function: libbs.artifacts.Function
-    ) -> None:
-        if target_function.header is None:
-            return
-        
-        target_function.header.name = imported_header.name
-        target_function.header.type = self.normalise_type(imported_header.type)
-        self.update_function_arguments(imported_header.args, target_function)
-
-    def update_function_arguments(
-        self, imported_args: dict[str, FunctionArgument], target_function: libbs.artifacts.Function
-    ) -> None:
-        if target_function.header is None:
-            return
-
-        for arg in imported_args.values():
-            arg.type = self.normalise_type(arg.type)
-
-        target_function.header.args = {v.offset: v for v in imported_args.values()}
 
     @staticmethod
     def normalise_type(data_type: str) -> str:

@@ -1240,7 +1240,7 @@ class MatchingDialog(DialogBase):
                 remote_function_id: int = self.local_func_id_to_remote_func_id[local_function_id]
                 selected_matches[remote_function_id] = self.matched_func_to_original_ea[remote_function_id]
 
-        self.data_types_service.import_data_types(selected_matches)
+        self.data_types_service.import_data_types_async(selected_matches)
 
     # =====================================================================
     # (Optional) page-switch helpers
