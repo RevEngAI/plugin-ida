@@ -6,8 +6,10 @@ import pytest
 from revengai import ApiException
 from revengai.models.comments_data import CommentsData
 from revengai.models.decompilation_data import DecompilationData
+from revengai.models.inline_comment import InlineComment
 from revengai.models.summary_data import SummaryData
 from revengai.models.task_status import TaskStatus
+from revengai.models.tokenised_data import TokenisedData
 from revengai.models.workflow_progress import WorkflowProgress
 
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -67,6 +69,22 @@ def _summary(ai="", raw="", status=TaskStatus.COMPLETED.value) -> SummaryData:
 
 def _comments(items=None, status=TaskStatus.COMPLETED.value) -> CommentsData:
     return CommentsData.model_construct(inline_comments=items or [], task_status=status)
+
+
+def _tokd(status=TaskStatus.COMPLETED.value) -> TokenisedData:
+    return TokenisedData.model_construct(
+        status=status,
+        tokenised_decompilation="int @@F@@(void) {}",
+        predicted_function_name="f",
+        function_mapping=MagicMock(),
+    )
+
+
+def _wait_mock(mock: MagicMock, timeout: float = 5.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not mock.called and time.monotonic() < deadline:
+        time.sleep(0.005)
+    assert mock.called, "callback was not invoked"
 
 
 def _wait(service, timeout: float = 5.0) -> None:
@@ -346,3 +364,144 @@ def test_stop_mid_poll_drops_callback(service, sdk):
     release.set()
     time.sleep(0.2)
     on_decomp.assert_not_called()
+
+
+def test_tokenised_phase_caches_and_dispatches_on_completed(service, sdk):
+    sdk.get_ai_decompilation.return_value = _dd(code="ok")
+    sdk.get_ai_decompilation_tokenised.return_value = _tokd()
+
+    on_tokenised = MagicMock()
+    service.start_ai_decomp_task(
+        ea=4096,
+        on_decomp=MagicMock(),
+        on_summary=MagicMock(),
+        on_comments=MagicMock(),
+        on_tokenised=on_tokenised,
+    )
+    _wait(service)
+
+    on_tokenised.assert_called_once()
+    assert on_tokenised.call_args[0][0].success is True
+    assert service._tokenised_cache[42] is sdk.get_ai_decompilation_tokenised.return_value
+
+
+def test_tokenised_phase_skipped_when_no_callback(service, sdk):
+    sdk.get_ai_decompilation.return_value = _dd(code="ok")
+    _run(service)
+    sdk.get_ai_decompilation_tokenised.assert_not_called()
+
+
+def test_apply_overrides_sends_body_refetches_and_caches(service, sdk):
+    sdk.upsert_ai_decompilation_overrides.return_value = MagicMock()
+    sdk.get_ai_decompilation.return_value = _dd(code="renamed")
+    sdk.get_ai_decompilation_tokenised.return_value = _tokd()
+
+    on_decomp, on_tokenised = MagicMock(), MagicMock()
+    service.apply_overrides(
+        ea=4096,
+        overrides={"@@V_v5@@": "buf"},
+        on_decomp=on_decomp,
+        on_tokenised=on_tokenised,
+    )
+    _wait_mock(on_decomp)
+    _wait_mock(on_tokenised)
+
+    _, kwargs = sdk.upsert_ai_decompilation_overrides.call_args
+    assert kwargs["function_id"] == 42
+    assert kwargs["upsert_overrides_input_body"].overrides == {"@@V_v5@@": "buf"}
+
+    payload = on_decomp.call_args[0][0]
+    assert payload.success is True
+    assert payload.data.decompilation == "renamed"
+    assert service._decomp_cache[42].decompilation == "renamed"
+    assert service._tokenised_cache[42] is sdk.get_ai_decompilation_tokenised.return_value
+
+
+def test_apply_overrides_api_error_surfaces(service, sdk):
+    sdk.upsert_ai_decompilation_overrides.side_effect = ApiException(status=500, reason="x")
+
+    on_decomp, on_tokenised = MagicMock(), MagicMock()
+    service.apply_overrides(
+        ea=4096, overrides={"a": "b"}, on_decomp=on_decomp, on_tokenised=on_tokenised
+    )
+    _wait_mock(on_decomp)
+
+    assert on_decomp.call_args[0][0].success is False
+    sdk.get_ai_decompilation.assert_not_called()
+
+
+def test_set_comment_calls_patch_and_updates_cache(service, sdk):
+    updated = _comments(items=[InlineComment.model_construct(comment="hi", line=3)])
+    sdk.patch_ai_decompilation_inline_comment.return_value = updated
+
+    on_result = MagicMock()
+    service.set_comment(ea=4096, line=3, comment="hi", on_result=on_result)
+    _wait_mock(on_result)
+
+    _, kwargs = sdk.patch_ai_decompilation_inline_comment.call_args
+    assert kwargs["function_id"] == 42
+    assert kwargs["patch_comment_body"].comment == "hi"
+    assert kwargs["patch_comment_body"].line == 3
+    assert on_result.call_args[0][0].success is True
+    assert service._comments_cache[42] is updated
+
+
+def test_remove_comment_calls_delete_and_updates_cache(service, sdk):
+    updated = _comments(items=[])
+    sdk.delete_ai_decompilation_inline_comment.return_value = updated
+
+    on_result = MagicMock()
+    service.remove_comment(ea=4096, line=3, on_result=on_result)
+    _wait_mock(on_result)
+
+    _, kwargs = sdk.delete_ai_decompilation_inline_comment.call_args
+    assert kwargs["function_id"] == 42
+    assert kwargs["line"] == 3
+    assert on_result.call_args[0][0].success is True
+    assert service._comments_cache[42] is updated
+
+
+def test_comment_mutation_api_error_surfaces(service, sdk):
+    sdk.patch_ai_decompilation_inline_comment.side_effect = ApiException(status=403)
+
+    on_result = MagicMock()
+    service.set_comment(ea=4096, line=1, comment="x", on_result=on_result)
+    _wait_mock(on_result)
+
+    assert on_result.call_args[0][0].success is False
+
+
+def test_mutation_unknown_function_id_reports_failure(service, sdk, netstore):
+    netstore.get_function_mapping.return_value.inverse_function_map = {}
+    on_result = MagicMock()
+    service.set_comment(ea=4096, line=1, comment="x", on_result=on_result)
+    on_result.assert_called_once()
+    assert on_result.call_args[0][0].success is False
+    sdk.patch_ai_decompilation_inline_comment.assert_not_called()
+
+
+def test_invalidate_clears_all_caches_and_inflight(service):
+    service._decomp_cache[42] = object()
+    service._summary_cache[42] = object()
+    service._comments_cache[42] = object()
+    service._tokenised_cache[42] = object()
+    evt = threading.Event()
+    service._inflight[42] = evt
+
+    service.invalidate(42)
+
+    assert 42 not in service._decomp_cache
+    assert 42 not in service._summary_cache
+    assert 42 not in service._comments_cache
+    assert 42 not in service._tokenised_cache
+    assert 42 not in service._inflight
+    assert evt.is_set()
+
+
+def test_function_id_for_and_invalidate_ea(service):
+    assert service.function_id_for(4096) == 42
+    assert service.function_id_for(9999) is None
+
+    service._decomp_cache[42] = object()
+    service.invalidate_ea(4096)
+    assert 42 not in service._decomp_cache

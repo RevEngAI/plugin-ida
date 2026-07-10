@@ -4,7 +4,15 @@ from loguru import logger
 import ida_kernwin as kw
 from libbs.decompilers.ida.compat import execute_ui
 
-from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets
+from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets, Signal
+
+
+class _DecompEditor(QtWidgets.QPlainTextEdit):
+    editsCommitted = Signal(str)
+
+    def focusOutEvent(self, event) -> None:
+        super().focusOutEvent(event)
+        self.editsCommitted.emit(self.toPlainText())
 
 
 class AIDecompView(kw.PluginForm):
@@ -22,9 +30,13 @@ class AIDecompView(kw.PluginForm):
     def __init__(self, on_closed: Optional[Callable[[], None]] = None) -> None:
         super().__init__()
         self._on_closed: Callable[[], None] | None = on_closed
+        self.on_refresh: Callable[[], None] | None = None
+        self.on_commit_edits: Callable[[str], None] | None = None
         self._parent_window: QtWidgets.QWidget | None = None
-        self._editor: QtWidgets.QPlainTextEdit | None = None
+        self._editor: _DecompEditor | None = None
+        self._refresh_btn: QtWidgets.QPushButton | None = None
         self._highlighter: CppHighlighter | None = None
+        self._suppress: bool = False
 
     def Create(self, title: Any) -> Any:
         """Compatibility shim: show the PluginForm like your previous Create()."""
@@ -52,10 +64,21 @@ class AIDecompView(kw.PluginForm):
         layout = QtWidgets.QVBoxLayout(self._parent_window)
         layout.setContentsMargins(0, 0, 0, 0)
 
+        # Header
+        header = QtWidgets.QHBoxLayout()
+        title = QtWidgets.QLabel("RevEng.AI — AI Decomp", self._parent_window)
+        header.addWidget(title)
+        header.addStretch(1)
+        self._refresh_btn = QtWidgets.QPushButton("Refresh", self._parent_window)
+        self._refresh_btn.clicked.connect(self._on_refresh_clicked)
+        header.addWidget(self._refresh_btn)
+        layout.addLayout(header)
+
         # Editor
-        self._editor = QtWidgets.QPlainTextEdit(self._parent_window)
-        self._editor.setReadOnly(True)
+        self._editor = _DecompEditor(self._parent_window)
+        self._editor.setReadOnly(False)
         self._editor.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
+        self._editor.editsCommitted.connect(self._on_edits_committed)
 
         # Monospace font tuned for IDA
         font = QtGui.QFont(
@@ -83,7 +106,18 @@ class AIDecompView(kw.PluginForm):
                 logger.warning(f"on_closed callback failed: {e}")
         self._highlighter = None
         self._editor = None
+        self._refresh_btn = None
         self._parent_window = None
+
+    def _on_refresh_clicked(self) -> None:
+        if self.on_refresh:
+            self.on_refresh()
+
+    def _on_edits_committed(self, text: str) -> None:
+        if self._suppress:
+            return
+        if self.on_commit_edits:
+            self.on_commit_edits(text)
 
     # --- public API ------------------------------------------------
     @execute_ui
@@ -91,13 +125,13 @@ class AIDecompView(kw.PluginForm):
         if not self._editor:
             return
 
+        self._suppress = True
         self._editor.blockSignals(True)
         try:
             self._editor.setPlainText(code)
         finally:
             self._editor.blockSignals(False)
-
-
+            self._suppress = False
 
     def clear(self) -> None:
         self.update_view_content("")

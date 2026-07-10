@@ -41,7 +41,7 @@ else:
         Ui_MatchingPanel,
     )
 
-print("[AnnDialog] Qt version:", QT_VER)
+logger.debug(f"[AnnDialog] Qt version: {QT_VER}")
 
 DEBOUNCE_MS = 250
 
@@ -218,7 +218,7 @@ class MatchingDialog(DialogBase):
 
         self._progress_bar = self.ui.loadingBar if hasattr(self.ui, "loadingBar") else None
         if self._progress_bar is not None:
-            print("[AnnDialog] Progress bar found")
+            logger.debug("[AnnDialog] Progress bar found")
             self._progress_bar.setMinimum(0)
             self._progress_bar.setMaximum(0)
 
@@ -705,7 +705,7 @@ class MatchingDialog(DialogBase):
             debug_all=True if self.ui.chkDebugSymbols.isChecked() else None,
         )
 
-        print(f"[AnnDialog] Starting ANN with args: {gen_kwargs}")
+        logger.debug(f"[AnnDialog] Starting ANN with args: {gen_kwargs}")
 
         self.stop_ann()  # ensure previous worker is cleaned up
 
@@ -732,7 +732,7 @@ class MatchingDialog(DialogBase):
         if self._progress_bar:
             self._progress_bar.setVisible(False)
         self.toggle_search_ui(pause=False)
-        print(f"[AnnDialog] ANN worker error: {msg}")
+        logger.error(f"[AnnDialog] ANN worker error: {msg}")
         self.error_dialog = ErrorDialog(error_message=msg, parent=self)
         self.error_dialog.show()
 
@@ -746,7 +746,7 @@ class MatchingDialog(DialogBase):
             try:
                 self._matching_worker.stop()
             except Exception as e:
-                print(f"[AnnDialog] Failed to stop ANN worker: {e}")
+                logger.debug(f"[AnnDialog] Failed to stop ANN worker: {e}")
                 pass
         if self._matching_thread is not None:
             # Let it exit naturally; Qt handles cleanup via the signals we set
@@ -763,7 +763,7 @@ class MatchingDialog(DialogBase):
         etype = getattr(ev, "event", None)
         etype: MatchEvent
 
-        print(
+        logger.debug(
             f"[AnnDialog] ANN event: {etype}, completed: {getattr(ev, 'completed', None)}/{getattr(ev, 'total', None)}, ok: {getattr(ev, 'ok', None)}"
         )
 
@@ -978,7 +978,7 @@ class MatchingDialog(DialogBase):
         table.setWordWrap(True)
         table.resizeRowsToContents()
 
-        print(
+        logger.debug(
             f"Single: Displayed {len(self.matching_results.results[0].matched_functions)} ANN results"
         )
 
@@ -1202,7 +1202,7 @@ class MatchingDialog(DialogBase):
         self.ui.btnResultClearAll.clicked.connect(clear_all)
         self.ui.btnResultSelectAll.clicked.connect(select_all)
 
-        print(f"Multiple: Displayed {len(self.matching_results.results)} ANN results")
+        logger.debug(f"Multiple: Displayed {len(self.matching_results.results)} ANN results")
 
     def enqueue_renames(self):
         # Read checked rows from results table
@@ -1216,7 +1216,7 @@ class MatchingDialog(DialogBase):
                     function_id = item.data(QtCore.Qt.ItemDataRole.UserRole)
                     matched_item = table.item(r, MatchColumns.MATCHED_NAME).text()
                     vaddr = self.rename_service.function_id_to_vaddr(function_id)
-                    print(f"RENAME: Function ID {function_id} -> {matched_item}")
+                    logger.debug(f"RENAME: Function ID {function_id} -> {matched_item}")
                     rename_list.append(
                         RenameInput(
                             function_id=function_id,
@@ -1228,7 +1228,7 @@ class MatchingDialog(DialogBase):
             self.accept()
 
         except Exception as e:
-            print(f"Failed to enqueue renames: {e}")
+            logger.error(f"Failed to enqueue renames: {e}")
     
     def import_data_types(self):
         selected_matches: dict[int, int] = {}
