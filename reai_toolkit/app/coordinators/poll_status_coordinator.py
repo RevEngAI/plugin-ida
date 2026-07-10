@@ -1,5 +1,8 @@
 from typing import TYPE_CHECKING
 
+from reai_toolkit.app.coordinators.auto_unstrip_coordinator import (
+    AutoUnstripStatusCoordinator,
+)
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.coordinators.sync_analysis_coordinator import (
     AnalysisSyncCoordinator,
@@ -17,6 +20,7 @@ if TYPE_CHECKING:
 class AnalysisStatusCoordinator(BaseCoordinator):
     analysis_status_service: AnalysisStatusService
     analysis_sync_coord: AnalysisSyncCoordinator
+    auto_unstrip_coord: AutoUnstripStatusCoordinator
 
     def __init__(
         self,
@@ -26,11 +30,13 @@ class AnalysisStatusCoordinator(BaseCoordinator):
         log,
         analysis_status_service: AnalysisStatusService,
         analysis_sync_coord: AnalysisSyncCoordinator,
+        auto_unstrip_coord: AutoUnstripStatusCoordinator,
     ):
         super().__init__(app=app, factory=factory, log=log)
 
         self.analysis_status_service = analysis_status_service
         self.analysis_sync_coord = analysis_sync_coord
+        self.auto_unstrip_coord = auto_unstrip_coord
 
     def run_dialog(self) -> None:
         pass
@@ -58,5 +64,11 @@ class AnalysisStatusCoordinator(BaseCoordinator):
             return
 
         self.analysis_sync_coord.sync_analysis()
+
+        analysis_id: int | None = generic_return.data
+        if analysis_id is not None:
+            self.auto_unstrip_coord.poll_and_resync(
+                analysis_id=analysis_id, attach_to_existing_analysis=False
+            )
 
         self.refresh_disassembly_view()

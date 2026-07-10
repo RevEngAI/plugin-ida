@@ -5,6 +5,9 @@ from revengai import FunctionMapping
 from reai_toolkit.app.coordinators.about_coordinator import AboutCoordinator
 from reai_toolkit.app.coordinators.ai_decomp_coordinator import AiDecompCoordinator
 from reai_toolkit.app.coordinators.auth_coordinator import AuthCoordinator
+from reai_toolkit.app.coordinators.auto_unstrip_coordinator import (
+    AutoUnstripStatusCoordinator,
+)
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.coordinators.chat_coordinator import ChatCoordinator
 from reai_toolkit.app.coordinators.create_analysis_coordinator import (
@@ -44,12 +47,22 @@ class Coordinator(BaseCoordinator):
             log=log,
             analysis_sync_service=app.analysis_sync_service,
         )
+        self.auto_unstrip_statusc: AutoUnstripStatusCoordinator = (
+            AutoUnstripStatusCoordinator(
+                app=app,
+                factory=factory,
+                log=log,
+                auto_unstrip_status_service=app.auto_unstrip_status_service,
+                analysis_sync_coord=self.sync_analysisc,
+            )
+        )
         self.poll_statusc: AnalysisStatusCoordinator = AnalysisStatusCoordinator(
             app=app,
             factory=factory,
             log=log,
             analysis_status_service=app.analysis_status_service,
             analysis_sync_coord=self.sync_analysisc,
+            auto_unstrip_coord=self.auto_unstrip_statusc,
         )
         self.create_analysisc: CreateAnalysisCoordinator = CreateAnalysisCoordinator(
             app=app, factory=factory, log=log, analysis_status_coord=self.poll_statusc
@@ -66,6 +79,7 @@ class Coordinator(BaseCoordinator):
                 log=log,
                 existing_analyses_service=app.existing_analyses_service,
                 analysis_sync_coord=self.sync_analysisc,
+                auto_unstrip_coord=self.auto_unstrip_statusc,
             )
         )
 

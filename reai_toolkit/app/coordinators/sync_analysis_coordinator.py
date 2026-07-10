@@ -104,6 +104,11 @@ class AnalysisSyncCoordinator(BaseCoordinator):
                 f"Analysis data synced successfully. \n\nSynced {data.matched_function_count} functions with remote analysis."
                 + f"\n{data.unmatched_function_count} local functions not present in remote analysis."
             )
+            if data.missing_symbol_name_count:
+                msg += (
+                    f"\n{data.missing_symbol_name_count} function(s) in the remote analysis "
+                    f"with missing symbol names."
+                )
             if data.canonicalized_name_count or data.deduped_name_count:
                 msg += (
                     f"\nCanonicalized {data.canonicalized_name_count} and disambiguated "

@@ -2,6 +2,9 @@ from typing import TYPE_CHECKING, List
 
 import idaapi
 
+from reai_toolkit.app.coordinators.auto_unstrip_coordinator import (
+    AutoUnstripStatusCoordinator,
+)
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.coordinators.sync_analysis_coordinator import (
     AnalysisSyncCoordinator,
@@ -20,6 +23,7 @@ from revengai.models.analysis_record import AnalysisRecord
 class ExistingAnalysesCoordinator(BaseCoordinator):
     existing_analyses_service: ExistingAnalysesService
     analysis_sync_coord: AnalysisSyncCoordinator
+    auto_unstrip_coord: AutoUnstripStatusCoordinator
 
     def __init__(
         self,
@@ -29,11 +33,13 @@ class ExistingAnalysesCoordinator(BaseCoordinator):
         log,
         existing_analyses_service: ExistingAnalysesService,
         analysis_sync_coord: AnalysisSyncCoordinator,
+        auto_unstrip_coord: AutoUnstripStatusCoordinator,
     ):
         super().__init__(app=app, factory=factory, log=log)
 
         self.existing_analyses_service = existing_analyses_service
         self.analysis_sync_coord = analysis_sync_coord
+        self.auto_unstrip_coord = auto_unstrip_coord
 
     def run_dialog(self) -> None:
         response = self.existing_analyses_service.fetch_analyses_same_hash(
@@ -64,6 +70,10 @@ class ExistingAnalysesCoordinator(BaseCoordinator):
         self.refresh_disassembly_view()
 
         self.analysis_sync_coord.sync_analysis(attach_to_existing_analysis=True)
+
+        self.auto_unstrip_coord.poll_and_resync(
+            analysis_id=data.analysis_id, attach_to_existing_analysis=True
+        )
 
 
     def is_authed(self) -> bool:

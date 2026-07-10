@@ -144,6 +144,7 @@ class AnalysisSyncService(IThreadService):
 
         matched_function_count: int = 0
         unmatched_function_count: int = 0
+        missing_symbol_name_count: int = 0
         total_function_count: int = 0
         deduped_name_count: int = 0
 
@@ -177,6 +178,8 @@ class AnalysisSyncService(IThreadService):
                                     )
                         else:
                             needs_canonical.append((local_vaddr, fid, new_name))
+            elif local_vaddr_str in local_vaddr_to_matched_name:
+                missing_symbol_name_count += 1
             else:
                 unmatched_function_count += 1
 
@@ -184,10 +187,12 @@ class AnalysisSyncService(IThreadService):
 
         logger.info(f"RevEng.AI: Matched {matched_function_count} functions")
         logger.info(f"RevEng.AI: {unmatched_function_count} functions not matched")
+        logger.info(f"RevEng.AI: {missing_symbol_name_count} functions with missing symbol names")
 
         summary: MatchedFunctionSummary = MatchedFunctionSummary(
             matched_function_count=matched_function_count,
             unmatched_function_count=unmatched_function_count,
+            missing_symbol_name_count=missing_symbol_name_count,
             total_function_count=total_function_count,
             deduped_name_count=deduped_name_count,
         )

@@ -3,6 +3,9 @@ from reai_toolkit.app.services.ai_decomp.ai_decomp_service import AiDecompServic
 from reai_toolkit.app.services.analysis_status.analysis_status import (
     AnalysisStatusService,
 )
+from reai_toolkit.app.services.auto_unstrip_status.auto_unstrip_status import (
+    AutoUnstripStatusService,
+)
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
 from reai_toolkit.app.services.auth.auth_service import AuthService
 from reai_toolkit.app.services.chat.chat_service import ChatService
@@ -39,6 +42,9 @@ class App:
             sdk_config=sdk_config,
         )
         self.analysis_status_service = AnalysisStatusService(
+            netstore_service=self.netstore_service, sdk_config=sdk_config
+        )
+        self.auto_unstrip_status_service = AutoUnstripStatusService(
             netstore_service=self.netstore_service, sdk_config=sdk_config
         )
         self.data_types_service = ImportDataTypesService(

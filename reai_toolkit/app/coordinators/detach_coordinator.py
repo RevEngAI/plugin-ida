@@ -21,6 +21,7 @@ class DetachCoordinator(BaseCoordinator):
     def _detach_analysis(self) -> None:
         self.app.analysis_sync_service.stop_worker()
         self.app.analysis_status_service.stop_worker()
+        self.app.auto_unstrip_status_service.stop_worker()
         self.app.ai_decomp_service.stop_worker()
         self.app.rename_service.stop_worker()
         self.app.matching_service.stop_worker()
