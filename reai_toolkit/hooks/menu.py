@@ -189,8 +189,8 @@ def _safe_unregister(aid: str) -> None:
 def register_menu_hooks(coordinator: Coordinator, plugin_version: str) -> dict:
     _handlers: dict[str, ida_kernwin.action_handler_t] = {
         "ping": PingH(),
-        "about": AboutH(coordinator),
-        "help": VersionH(version=plugin_version),
+        "about": VersionH(version=plugin_version),
+        "help": AboutH(coordinator),
         "auth": AuthH(coordinator),
         "analyse": AnalyseH(coordinator),
         "sync_and_poll": SyncH(coordinator),
