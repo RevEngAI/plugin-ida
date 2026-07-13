@@ -7,12 +7,14 @@ from revengai.models.comments_data import CommentsData
 from revengai.models.decompilation_data import DecompilationData
 from revengai.models.summary_data import SummaryData
 from revengai.models.tokenised_data import TokenisedData
+from revengai.models.workflow_progress import WorkflowProgress
 
 from reai_toolkit.app.app import App
 from reai_toolkit.app.components.tabs.ai_decomp_tab import AIDecompView
 from reai_toolkit.app.coordinators.ai_decomp_render import (
     RenderModel,
     index_of_identifier,
+    render_progress,
     render_view_with_map,
     resolve_token,
 )
@@ -116,7 +118,17 @@ class AiDecompCoordinator(BaseCoordinator):
             on_summary=lambda response: self._on_summary_complete(ea, response),
             on_comments=lambda response: self._on_comments_complete(ea, response),
             on_tokenised=lambda response: self._on_tokenised_complete(ea, response),
+            on_progress=lambda progress: self._on_progress(ea, progress),
         )
+
+    def _on_progress(self, ea: int, progress: WorkflowProgress) -> None:
+        if ea != self._current_func_vaddr:
+            return
+        if self._current_decomp is not None:
+            return
+        if self._decomp_view is None:
+            return
+        self._decomp_view.update_view_content(render_progress(progress))
 
     def _on_decomp_complete(
         self, ea: int, response: GenericApiReturn[DecompilationData]
@@ -307,4 +319,4 @@ class AiDecompCoordinator(BaseCoordinator):
     def _on_pane_closed(self) -> None:
         self._decomp_view = None
         self.disable_function_tracking()
-        self.log.info("AI Decomp view closed, reference cleared.")
+        self.log.debug("AI Decomp view closed, reference cleared.")

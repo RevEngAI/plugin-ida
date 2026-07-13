@@ -86,6 +86,7 @@ class AiDecompService(IThreadService):
         on_summary: Callable[[GenericApiReturn[SummaryData]], None],
         on_comments: Callable[[GenericApiReturn[CommentsData]], None],
         on_tokenised: Callable[[GenericApiReturn[TokenisedData]], None] | None = None,
+        on_progress: Callable[[WorkflowProgress], None] | None = None,
     ) -> None:
         function_id = self._get_function_id(start_ea=ea)
         if function_id is None:
@@ -107,6 +108,7 @@ class AiDecompService(IThreadService):
                 on_summary,
                 on_comments,
                 on_tokenised,
+                on_progress,
             ),
             name=f"reai-aidecomp-{function_id}",
             daemon=True,
@@ -303,11 +305,14 @@ class AiDecompService(IThreadService):
         on_summary: Callable[[GenericApiReturn[SummaryData]], None],
         on_comments: Callable[[GenericApiReturn[CommentsData]], None],
         on_tokenised: Callable[[GenericApiReturn[TokenisedData]], None] | None = None,
+        on_progress: Callable[[WorkflowProgress], None] | None = None,
     ) -> None:
         try:
             if stop_event.is_set():
                 return
-            decomp = self._run_decomp_phase(function_id, stop_event, on_decomp)
+            decomp = self._run_decomp_phase(
+                function_id, stop_event, on_decomp, on_progress
+            )
             if decomp is None:
                 return
             self._run_summary_phase(function_id, stop_event, on_summary)
@@ -388,6 +393,7 @@ class AiDecompService(IThreadService):
         function_id: int,
         stop_event: threading.Event,
         on_decomp: Callable[[GenericApiReturn[DecompilationData]], None],
+        on_progress: Callable[[WorkflowProgress], None] | None = None,
     ) -> DecompilationData | None:
         cached = self._decomp_cache.get(function_id)
         if cached is not None:
@@ -436,6 +442,7 @@ class AiDecompService(IThreadService):
             status_fn=self._fetch_decomp_status,
             requeue_fn=self._queue_decompilation,
             label="AI Decompilation",
+            on_progress=on_progress,
         )
         if not polled_ok:
             if poll_err is not None:
@@ -782,6 +789,7 @@ class AiDecompService(IThreadService):
         status_fn: Callable[[int], tuple[WorkflowProgress | None, str | None]],
         requeue_fn: Callable[[int], tuple[bool, str | None]],
         label: str,
+        on_progress: Callable[[WorkflowProgress], None] | None = None,
     ) -> tuple[bool, str | None]:
         requeue_attempts = 0
         while not stop_event.is_set():
@@ -789,9 +797,11 @@ class AiDecompService(IThreadService):
             if status_err is not None or progress is None:
                 return False, status_err or f"{label} status fetch returned nothing."
 
-            logger.info(
+            logger.debug(
                 f"RevEng.AI: {label} progress for function id {function_id}: {progress.status}"
             )
+
+            self._safe_dispatch(stop_event, on_progress, progress)
 
             if progress.status == TaskStatus.COMPLETED:
                 return True, None
