@@ -133,6 +133,6 @@ class Coordinator(BaseCoordinator):
                 str(current_func.start_ea), None
             )
             portal_url: str = (
-                self.app.config_service.portal_url + f"/analyses/{analysis_id}?fn={function_id}"
+                self.app.config_service.portal_url + f"/analyses/{analysis_id}?fn={function_id}&view=functions"
             )
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(portal_url))
