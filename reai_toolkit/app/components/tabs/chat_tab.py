@@ -178,6 +178,48 @@ class _ChatInput(QtWidgets.QPlainTextEdit):
         super().keyPressEvent(event)
 
 
+class _PanelBridge(QtCore.QObject):
+    def __init__(self, panel: "ChatPanel") -> None:
+        super().__init__()
+        self._panel = panel
+
+    @Slot()
+    def history(self) -> None:
+        self._panel._on_history_clicked()
+
+    @Slot()
+    def new_chat(self) -> None:
+        self._panel._on_new_chat_clicked()
+
+    @Slot()
+    def approve(self) -> None:
+        self._panel._on_confirm_clicked(True)
+
+    @Slot()
+    def reject(self) -> None:
+        self._panel._on_confirm_clicked(False)
+
+    @Slot()
+    def send(self) -> None:
+        self._panel._on_send_clicked()
+
+    @Slot()
+    def stop(self) -> None:
+        self._panel._on_stop_clicked()
+
+    @Slot()
+    def flush(self) -> None:
+        self._panel._flush_render()
+
+    @Slot(QtCore.QUrl)
+    def anchor(self, url) -> None:
+        self._panel._on_anchor_clicked(url)
+
+    @Slot(QtWidgets.QListWidgetItem)
+    def history_item(self, item) -> None:
+        self._panel._on_history_item(item)
+
+
 class ChatPanel(kw.PluginForm):
     TITLE = "RevEng.AI — Agent Chat"
 
@@ -208,6 +250,7 @@ class ChatPanel(kw.PluginForm):
         self._send_btn: Optional[QtWidgets.QPushButton] = None
         self._stop_btn: Optional[QtWidgets.QPushButton] = None
 
+        self._bridge: Optional[_PanelBridge] = None
         self._relay: Optional[_StreamRelay] = None
         self._thread: Optional[QtCore.QThread] = None
         self._worker: Optional[ChatStreamWorker] = None
@@ -266,7 +309,6 @@ class ChatPanel(kw.PluginForm):
         self._transcript = QtWidgets.QTextBrowser()
         self._transcript.setOpenLinks(False)
         self._transcript.setOpenExternalLinks(False)
-        self._transcript.anchorClicked.connect(self._on_anchor_clicked)
         root.addWidget(self._transcript, 1)
 
         self._confirm_bar = QtWidgets.QWidget()
@@ -296,26 +338,28 @@ class ChatPanel(kw.PluginForm):
         input_row.addLayout(btn_col)
         root.addLayout(input_row)
 
-        history_btn.clicked.connect(self._on_history_clicked)
-        new_btn.clicked.connect(self._on_new_chat_clicked)
-        approve_btn.clicked.connect(lambda: self._on_confirm_clicked(True))
-        reject_btn.clicked.connect(lambda: self._on_confirm_clicked(False))
-        self._send_btn.clicked.connect(self._on_send_clicked)
-        self._stop_btn.clicked.connect(self._on_stop_clicked)
-        self._input.submit.connect(self._on_send_clicked)
-        self._history_list.itemActivated.connect(self._on_history_item)
-        self._history_list.itemClicked.connect(self._on_history_item)
-
         self._render_timer = QtCore.QTimer(self._parent_window)
         self._render_timer.setSingleShot(True)
         self._render_timer.setInterval(100)
-        self._render_timer.timeout.connect(self._flush_render)
 
         self._relay = _StreamRelay()
         self._relay.on_event = self._handle_stream_event
         self._relay.on_conversation_created = self._handle_conversation_created
         self._relay.on_error = self._handle_stream_error
         self._relay.on_finished = self._handle_stream_finished
+
+        self._bridge = _PanelBridge(self)
+        self._transcript.anchorClicked.connect(self._bridge.anchor)
+        history_btn.clicked.connect(self._bridge.history)
+        new_btn.clicked.connect(self._bridge.new_chat)
+        approve_btn.clicked.connect(self._bridge.approve)
+        reject_btn.clicked.connect(self._bridge.reject)
+        self._send_btn.clicked.connect(self._bridge.send)
+        self._stop_btn.clicked.connect(self._bridge.stop)
+        self._input.submit.connect(self._bridge.send)
+        self._history_list.itemActivated.connect(self._bridge.history_item)
+        self._history_list.itemClicked.connect(self._bridge.history_item)
+        self._render_timer.timeout.connect(self._bridge.flush)
 
     def OnClose(self, form) -> None:
         self.stop_stream_worker()
@@ -333,6 +377,7 @@ class ChatPanel(kw.PluginForm):
         self._input = None
         self._parent_window = None
         self._render_timer = None
+        self._bridge = None
 
     def focus(self) -> None:
         if self._parent_window:

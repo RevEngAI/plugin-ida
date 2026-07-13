@@ -8,8 +8,10 @@ if TYPE_CHECKING:
     from revengai.models.ai_decomp_function_mapping import AIDecompFunctionMapping
     from revengai.models.comments_data import CommentsData
     from revengai.models.decompilation_data import DecompilationData
+    from revengai.models.progress_message import ProgressMessage
     from revengai.models.summary_data import SummaryData
     from revengai.models.tokenised_data import TokenisedData
+    from revengai.models.workflow_progress import WorkflowProgress
 
 
 _IDENT_RE = re.compile(r"[A-Za-z_]\w*")
@@ -90,6 +92,46 @@ def render_view_with_map(
         display_source=display_source,
         display_is_code=display_is_code,
     )
+
+
+def render_progress(progress: "WorkflowProgress") -> str:
+    lines: list[str] = ["// RevEng.AI — AI decompilation in progress…", "//"]
+
+    steps_total = progress.steps_total or 0
+    step_index = progress.step_index or 0
+    step_name = progress.step or ""
+    status = progress.status or ""
+
+    if steps_total > 0:
+        current = min(step_index + 1, steps_total)
+        lines.append(f"// Step {current}/{steps_total}: {step_name} [{status}]")
+    elif step_name:
+        lines.append(f"// {step_name} [{status}]")
+    else:
+        lines.append(f"// {status}")
+
+    messages = progress.messages or []
+    if messages:
+        lines.append("//")
+        for message in messages:
+            lines.append(f"// {_format_progress_message(message)}")
+
+    return "\n".join(lines)
+
+
+def _format_progress_message(message: "ProgressMessage") -> str:
+    stamp = _format_progress_time(getattr(message, "timestamp", None))
+    prefix = f"{stamp} " if stamp else ""
+    return f"{prefix}[{message.level}] {message.text}"
+
+
+def _format_progress_time(timestamp) -> str:
+    if timestamp is None:
+        return ""
+    try:
+        return timestamp.strftime("%H:%M:%S")
+    except (AttributeError, ValueError):
+        return ""
 
 
 def _format_summary_as_comment(summary: str) -> str:

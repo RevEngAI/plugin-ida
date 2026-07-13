@@ -102,7 +102,7 @@ class AiDecompFunctionViewHooks(kw.UI_Hooks):
             if func is not None:
                 self._last_func_start = func.start_ea
                 self.coordinator.start_decompilation(ea=func.start_ea)
-            logger.info("[FunctionViewHooks] Hook registered.")
+            logger.debug("[FunctionViewHooks] Hook registered.")
         else:
             logger.error("[FunctionViewHooks] Failed to register.")
         return ok
@@ -115,7 +115,7 @@ class AiDecompFunctionViewHooks(kw.UI_Hooks):
         if self._is_hooked:
             super().unhook()
             self._is_hooked = False
-            logger.info("[FunctionViewHooks] Hook removed.")
+            logger.debug("[FunctionViewHooks] Hook removed.")
         self._pending_ea = None
         self._last_func_start = None
 
