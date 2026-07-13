@@ -5,7 +5,6 @@ import ida_kernwin as kw
 from revengai import FunctionMapping
 
 from reai_toolkit.app.components.dialogs.matching_dialog import MatchingDialog
-from reai_toolkit.app.components.tabs.similarity_tab import SimilarityTab
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.services.matching.matching_service import MatchingService
 from reai_toolkit.app.services.matching.schema import ValidFunction

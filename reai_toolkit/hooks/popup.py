@@ -8,7 +8,6 @@ from reai_toolkit.app.coordinator import Coordinator
 DECOMP_ACTION_NAME = "revengai:toggle_ai_decomp"
 VIEW_ACTION_NAME = "revengai:function_portal_view"
 MATCHING_ACTION_NAME = "revengai:function_matching_view"
-SIMILARITY_ACTION_NAME = "revengai:function_similarity_view"
 CHAT_ACTION_NAME = "revengai:ask_about_function"
 
 _HANDLERS = {}
@@ -110,37 +109,6 @@ def _register_function_matching_action(coordinator: Coordinator):
     return MATCHING_ACTION_NAME
 
 
-class FunctionSimilarityViewH(kw.action_handler_t):
-    def __init__(self, coordinator: Coordinator):
-        super().__init__()
-        self.coordinator: Coordinator = coordinator
-
-    def activate(self, ctx):
-        self.coordinator.similarityc.enable_function_tracking()
-        return 1
-
-    def update(self, ctx):
-        return kw.AST_ENABLE_FOR_WIDGET
-
-
-def _register_function_similarity_action(coordinator: Coordinator):
-    try:
-        kw.unregister_action(SIMILARITY_ACTION_NAME)
-    except Exception:
-        pass
-    h = FunctionSimilarityViewH(coordinator)  # type: ignore
-    _HANDLERS[SIMILARITY_ACTION_NAME] = h
-    desc = kw.action_desc_t(
-        SIMILARITY_ACTION_NAME,
-        "Find Similar Functions",
-        h,
-        None,
-        "Run RevEng.AI function matching and show similar functions in dockable tab",
-    )
-    kw.register_action(desc)
-    return SIMILARITY_ACTION_NAME
-
-
 class AskAboutFunctionH(kw.action_handler_t):
     """Opens the Agent Chat panel prefilled with the current function context."""
 
@@ -179,7 +147,6 @@ def build_hooks(coordinator: Coordinator):
     decomp_action = _register_decomp_action(coordinator)
     func_view_action = _register_function_view_action(coordinator)
     func_matching_action = _register_function_matching_action(coordinator)
-    func_similarity_action = _register_function_similarity_action(coordinator)
     chat_action = _register_chat_action(coordinator)
 
     def _on_popup(widget, popup_handle) -> None:
@@ -200,9 +167,6 @@ def build_hooks(coordinator: Coordinator):
                 )
                 kw.attach_action_to_popup(
                     widget, popup_handle, func_matching_action, "RevEng.AI/", 0
-                )
-                kw.attach_action_to_popup(
-                    widget, popup_handle, func_similarity_action, "RevEng.AI/", 0
                 )
                 kw.attach_action_to_popup(
                     widget, popup_handle, chat_action, "RevEng.AI/", 0
