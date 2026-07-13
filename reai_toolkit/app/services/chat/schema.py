@@ -27,6 +27,7 @@ EVENT_TYPE_NAMES: dict[int, str] = {
     14: "RUN_CANCELLED",
     15: "CONTEXT_COMPACTED",
     16: "TOOL_CONFIRMATION_REQUIRED",
+    17: "TOOL_CALL_PROGRESS",
 }
 
 TERMINAL_EVENTS: frozenset[str] = frozenset(
