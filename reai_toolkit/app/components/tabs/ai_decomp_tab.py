@@ -1,3 +1,4 @@
+from pathlib import Path
 from typing import Any, Callable, Optional
 from loguru import logger
 
@@ -10,6 +11,17 @@ from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets, Signal
 _WORD_UNDER_CURSOR = getattr(
     getattr(QtGui.QTextCursor, "SelectionType", QtGui.QTextCursor), "WordUnderCursor"
 )
+
+
+def _thumb_icon(up: bool) -> Optional[QtGui.QIcon]:
+    stem = "thumb_up" if up else "thumb_down"
+    for ext in (".svg", ".png"):
+        path = Path(__file__).resolve().parent.parent / "resources" / (stem + ext)
+        if path.exists():
+            icon = QtGui.QIcon(str(path))
+            if not icon.isNull():
+                return icon
+    return None
 
 
 def _menu_exec(menu, pos):
@@ -71,9 +83,13 @@ class AIDecompView(kw.PluginForm):
         self.on_rename: Callable[[int, str], None] | None = None
         self.on_edit_comment: Callable[[int], None] | None = None
         self.on_remove_comment: Callable[[int], None] | None = None
+        self.on_rate_up: Callable[[], None] | None = None
+        self.on_rate_down: Callable[[], None] | None = None
         self._parent_window: QtWidgets.QWidget | None = None
         self._editor: _DecompEditor | None = None
         self._refresh_btn: QtWidgets.QPushButton | None = None
+        self._rate_up_btn: QtWidgets.QPushButton | None = None
+        self._rate_down_btn: QtWidgets.QPushButton | None = None
         self._highlighter: CppHighlighter | None = None
 
     def Create(self, title: Any) -> Any:
@@ -107,6 +123,31 @@ class AIDecompView(kw.PluginForm):
         title = QtWidgets.QLabel("RevEng.AI — AI Decomp", self._parent_window)
         header.addWidget(title)
         header.addStretch(1)
+
+        up_icon = _thumb_icon(up=True)
+        self._rate_up_btn = QtWidgets.QPushButton(self._parent_window)
+        if up_icon is not None:
+            self._rate_up_btn.setIcon(up_icon)
+            self._rate_up_btn.setIconSize(QtCore.QSize(16, 16))
+        else:
+            self._rate_up_btn.setText("\U0001f44d")
+        self._rate_up_btn.setCheckable(True)
+        self._rate_up_btn.setToolTip("Rate this AI decompilation as good")
+        self._rate_up_btn.clicked.connect(self._on_rate_up_clicked)
+        header.addWidget(self._rate_up_btn)
+
+        down_icon = _thumb_icon(up=False)
+        self._rate_down_btn = QtWidgets.QPushButton(self._parent_window)
+        if down_icon is not None:
+            self._rate_down_btn.setIcon(down_icon)
+            self._rate_down_btn.setIconSize(QtCore.QSize(16, 16))
+        else:
+            self._rate_down_btn.setText("\U0001f44e")
+        self._rate_down_btn.setCheckable(True)
+        self._rate_down_btn.setToolTip("Rate this AI decompilation as poor")
+        self._rate_down_btn.clicked.connect(self._on_rate_down_clicked)
+        header.addWidget(self._rate_down_btn)
+
         self._refresh_btn = QtWidgets.QPushButton("Refresh", self._parent_window)
         self._refresh_btn.clicked.connect(self._on_refresh_clicked)
         header.addWidget(self._refresh_btn)
@@ -147,11 +188,30 @@ class AIDecompView(kw.PluginForm):
         self._highlighter = None
         self._editor = None
         self._refresh_btn = None
+        self._rate_up_btn = None
+        self._rate_down_btn = None
         self._parent_window = None
 
     def _on_refresh_clicked(self) -> None:
         if self.on_refresh:
             self.on_refresh()
+
+    def _on_rate_up_clicked(self) -> None:
+        self.set_rating("up")
+        if self.on_rate_up:
+            self.on_rate_up()
+
+    def _on_rate_down_clicked(self) -> None:
+        self.set_rating("down")
+        if self.on_rate_down:
+            self.on_rate_down()
+
+    @execute_ui
+    def set_rating(self, rating: Optional[str]) -> None:
+        if self._rate_up_btn:
+            self._rate_up_btn.setChecked(rating == "up")
+        if self._rate_down_btn:
+            self._rate_down_btn.setChecked(rating == "down")
 
     def _on_rename_requested(self, line: int, word: str) -> None:
         if self.on_rename:
