@@ -43,6 +43,8 @@ if TYPE_CHECKING:
     from reai_toolkit.app.coordinators.ai_decomp_coordinator import AiDecompCoordinator
 
 AI_DECOMP_TOOL_HINTS = ("decomp",)
+EDIT_FUNCTION_TYPES_TOOL = "edit_function_types"
+DATA_TYPES_SYNC_DEBOUNCE_S = 0.5
 
 
 class ChatCoordinator(BaseCoordinator):
@@ -64,6 +66,9 @@ class ChatCoordinator(BaseCoordinator):
         self._last_event_id: Optional[int] = None
         self._last_context: Optional[ConversationContextDTO] = None
         self._context_hooks: Optional[ChatContextHooks] = None
+        self._pending_type_ids: set[int] = set()
+        self._type_sync_timer: Optional[threading.Timer] = None
+        self._type_sync_lock = threading.Lock()
 
     @execute_ui
     def run_dialog(self, prefill_context: bool = False) -> None:
@@ -100,6 +105,11 @@ class ChatCoordinator(BaseCoordinator):
     def _on_pane_closed(self) -> None:
         if self._panel is not None:
             self._panel.stop_stream_worker()
+        with self._type_sync_lock:
+            if self._type_sync_timer is not None:
+                self._type_sync_timer.cancel()
+                self._type_sync_timer = None
+            self._pending_type_ids.clear()
         self._disable_context_tracking()
         self._panel = None
         self.log.info("Agent Chat panel closed.")
@@ -226,11 +236,57 @@ class ChatCoordinator(BaseCoordinator):
     def _handle_tool_result(self, ev) -> None:
         if ev.updated:
             func_ids = [i for u in ev.updated if u.type == "function" for i in u.ids]
-            if func_ids:
+            if func_ids and self._is_edit_types_tool(ev):
+                self._sync_data_types(func_ids)
+            elif func_ids:
                 self._sync_functions(func_ids)
             elif any(u.type == "analysis" for u in ev.updated):
                 self.refresh_disassembly_view()
         self._maybe_open_viewer(ev)
+
+    @staticmethod
+    def _is_edit_types_tool(ev) -> bool:
+        return (ev.tool_name or "").lower() == EDIT_FUNCTION_TYPES_TOOL
+
+    def _sync_data_types(self, func_ids: list) -> None:
+        with self._type_sync_lock:
+            self._pending_type_ids.update(int(f) for f in func_ids)
+            if self._type_sync_timer is not None:
+                self._type_sync_timer.cancel()
+            self._type_sync_timer = threading.Timer(
+                DATA_TYPES_SYNC_DEBOUNCE_S, self._flush_data_types
+            )
+            self._type_sync_timer.daemon = True
+            self._type_sync_timer.start()
+
+    def _flush_data_types(self) -> None:
+        with self._type_sync_lock:
+            ids = list(self._pending_type_ids)
+            self._pending_type_ids.clear()
+            self._type_sync_timer = None
+        if not ids:
+            return
+        func_map = self.app.netstore_service.get_function_mapping()
+        if func_map is None:
+            return
+        matches: dict[int, int] = {}
+        for fid in ids:
+            ea = func_map.function_map.get(str(fid))
+            if ea is not None:
+                matches[fid] = ea
+        if not matches:
+            return
+        result = self.app.data_types_service.import_data_types(
+            matches, apply_stack_vars=True
+        )
+        if result.error:
+            self.log.warning(f"Failed to sync data types: {result.error}")
+            return
+        self.refresh_disassembly_view()
+        last_ea = next(iter(matches.values()))
+        self._refresh_context_chip(last_ea)
+        if self._ai_decomp_coord is not None:
+            self._ai_decomp_coord.follow_function(last_ea)
 
     def _sync_functions(self, func_ids: list) -> None:
         def _work() -> None:

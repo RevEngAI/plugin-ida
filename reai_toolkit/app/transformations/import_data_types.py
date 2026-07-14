@@ -1,3 +1,4 @@
+import re
 from typing import cast
 
 import ida_funcs
@@ -19,6 +20,7 @@ from revengai import (
 )
 
 APPLY_CHUNK_SIZE = 50
+_ANALYSIS_SCOPE_RE = re.compile(r"^[0-9a-fA-F]{64}(?:::|/)")
 
 
 class TaggedDependency:
@@ -33,9 +35,15 @@ class TaggedDependency:
 
 class ImportDataTypes:
     def __init__(self) -> None:
-        self.deci: DecompilerInterface
+        self.deci: DecompilerInterface | None = None
+        self._stack_vars_ok: bool | None = None
 
-    def execute(self, functions: FunctionDataTypesList, matched_function_mapping: dict[int, int] = {}) -> set[int]:
+    def execute(
+        self,
+        functions: FunctionDataTypesList,
+        matched_function_mapping: dict[int, int] = {},
+        apply_stack_vars: bool = False,
+    ) -> set[int]:
         items: list[FunctionDataTypesListItem] = [
             item for item in functions.items if item.data_types is not None
         ]
@@ -54,7 +62,7 @@ class ImportDataTypes:
         total: int = len(items)
         for start in range(0, total, APPLY_CHUNK_SIZE):
             chunk: list[FunctionDataTypesListItem] = items[start:start + APPLY_CHUNK_SIZE]
-            failed |= self._apply_chunk(chunk, matched_function_mapping)
+            failed |= self._apply_chunk(chunk, matched_function_mapping, apply_stack_vars)
             logger.info(
                 f"RevEng.AI: applied data types to {min(start + APPLY_CHUNK_SIZE, total)}/{total} functions"
             )
@@ -73,9 +81,33 @@ class ImportDataTypes:
 
         return lookup
 
+    def _ensure_deci(self) -> None:
+        if self.deci is None:
+            self.deci = DecompilerInterface.discover(force_decompiler="ida")  # type: ignore
+
+    def _stack_vars_available(self, ea: int) -> bool:
+        if self._stack_vars_ok is None:
+            self._stack_vars_ok = self._probe_decompiler(ea)
+            if not self._stack_vars_ok:
+                logger.info(
+                    "RevEng.AI: decompiler unavailable for this binary; skipping stack variable sync"
+                )
+        return self._stack_vars_ok
+
+    @staticmethod
+    def _probe_decompiler(ea: int) -> bool:
+        try:
+            import ida_hexrays
+
+            if not ida_hexrays.init_hexrays_plugin():
+                return False
+            return ida_hexrays.decompile(ea, ida_hexrays.hexrays_failure_t()) is not None
+        except Exception:
+            return False
+
     @execute_write
     def _apply_dependencies(self, lookup: dict[str, TaggedDependency]) -> None:
-        self.deci = DecompilerInterface.discover(force_decompiler="ida") # type: ignore
+        self._ensure_deci()
         for tagged_dependency in lookup.values():
             try:
                 self.process_dependency(tagged_dependency, lookup)
@@ -87,7 +119,10 @@ class ImportDataTypes:
 
     @execute_write
     def _apply_chunk(
-        self, chunk: list[FunctionDataTypesListItem], matched_function_mapping: dict[int, int]
+        self,
+        chunk: list[FunctionDataTypesListItem],
+        matched_function_mapping: dict[int, int],
+        apply_stack_vars: bool = False,
     ) -> set[int]:
         failed: set[int] = set()
         for item in chunk:
@@ -103,6 +138,8 @@ class ImportDataTypes:
 
                 if not self.apply_function_type(func, ea):
                     failed.add(item.function_id)
+                if apply_stack_vars:
+                    self.apply_stack_variables(func, ea)
             except Exception as e:
                 logger.warning(
                     f"RevEng.AI: skipped data types for function {item.function_id}: {e!r}"
@@ -148,6 +185,38 @@ class ImportDataTypes:
             return False
 
         return bool(ida_typeinf.apply_tinfo(ea, proto, ida_typeinf.TINFO_DEFINITE))
+
+    def apply_stack_variables(self, func: FunctionType, ea: int) -> None:
+        stack_vars = getattr(func, "stack_vars", None)
+        if not isinstance(stack_vars, dict) or not stack_vars:
+            return
+
+        if not self._stack_vars_available(ea):
+            return
+
+        self._ensure_deci()
+        if self.deci is None:
+            return
+
+        try:
+            lifted_ea: int = self.deci.art_lifter.lift_addr(ea)
+            svars: dict[int, libbs.artifacts.StackVariable] = {
+                svar.offset: libbs.artifacts.StackVariable(
+                    stack_offset=svar.offset,
+                    name=svar.name,
+                    type_=self.normalise_type(svar.type) if svar.type else None,
+                    size=svar.size,
+                    addr=lifted_ea,
+                )
+                for svar in stack_vars.values()
+            }
+            self.deci.functions[lifted_ea] = libbs.artifacts.Function(
+                addr=lifted_ea,
+                header=libbs.artifacts.FunctionHeader(addr=lifted_ea),
+                stack_vars=svars,
+            )
+        except Exception as e:
+            logger.warning(f"RevEng.AI: skipped stack variables for 0x{ea:x}: {e!r}")
 
     @staticmethod
     def _current_func_details(ea: int) -> "ida_typeinf.func_type_data_t":
@@ -222,6 +291,8 @@ class ImportDataTypes:
             delimiter: str = "::"
             pos: int = data_type.find(delimiter)
             data_type = data_type[pos+len(delimiter):]
+
+        data_type = _ANALYSIS_SCOPE_RE.sub("", data_type)
 
         # TODO: PLU-213 Add IDA typedefs for Ghidra primitives so we don't need to bother doing this...
         if data_type == "uchar":
