@@ -21,6 +21,7 @@ from revengai import (
 @pytest.fixture
 def deci(mocker):
     instance = MagicMock()
+    instance.art_lifter.lift_addr.side_effect = lambda addr: addr
     mocker.patch.object(mod.DecompilerInterface, "discover", return_value=instance)
     return instance
 
@@ -144,3 +145,75 @@ def test_execute_skips_items_without_func_types(deci, mocker):
 
     assert failed == set()
     apply.assert_not_called()
+
+
+_HASH = "259156281adba01eb86070f77a039e7054f268c973326adcee5fe4533f14b292"
+
+
+@pytest.mark.parametrize(
+    "raw,expected",
+    [
+        (f"{_HASH}::Candidate *", "Candidate *"),
+        (f"{_HASH}/std::vector<Block_*,std::allocator<Block_*>_>", "std::vector<Block_*,std::allocator<Block_*>_>"),
+        (f"{_HASH}::_Tree_node<x>::_Node *", "_Tree_node<x>::_Node *"),
+        ("DWARF/stdint.h::uint32_t", "uint32_t"),
+        ("std::vector<int>", "std::vector<int>"),
+        ("int", "int"),
+    ],
+)
+def test_normalise_type_strips_analysis_scope(raw, expected):
+    assert ImportDataTypes.normalise_type(raw) == expected
+
+
+def _svar(offset: int, name: str, type_str: str, size: int = 4):
+    return SimpleNamespace(offset=offset, name=name, type=type_str, size=size)
+
+
+def test_apply_stack_variables_writes_function_with_normalised_types(deci, mocker):
+    mocker.patch.object(ImportDataTypes, "_probe_decompiler", return_value=True)
+    func = SimpleNamespace(
+        stack_vars={
+            "0x4": _svar(4, "lhs", "int"),
+            "0x8": _svar(8, "rhs", f"{_HASH}::Candidate *"),
+        }
+    )
+
+    ImportDataTypes().apply_stack_variables(func, 0x1000)
+
+    deci.functions.__setitem__.assert_called_once()
+    ea, written = deci.functions.__setitem__.call_args.args
+    assert ea == 0x1000
+    assert set(written.stack_vars) == {4, 8}
+    assert written.stack_vars[4].name == "lhs"
+    assert written.stack_vars[8].type == "Candidate *"
+
+
+def test_apply_stack_variables_noop_without_stack_vars(deci):
+    ImportDataTypes().apply_stack_variables(SimpleNamespace(stack_vars=None), 0x1000)
+    ImportDataTypes().apply_stack_variables(SimpleNamespace(stack_vars={}), 0x1000)
+
+    mod.DecompilerInterface.discover.assert_not_called()
+    deci.functions.__setitem__.assert_not_called()
+
+
+def test_execute_applies_stack_vars_only_when_enabled(deci, mocker):
+    mocker.patch.object(ImportDataTypes, "apply_function_type", return_value=True)
+    svapply = mocker.patch.object(ImportDataTypes, "apply_stack_variables")
+    items = [_item(1, func_types=MagicMock(addr=0x1000))]
+
+    ImportDataTypes().execute(_functions(items))
+    svapply.assert_not_called()
+
+    ImportDataTypes().execute(_functions(items), apply_stack_vars=True)
+    svapply.assert_called_once()
+
+
+def test_apply_stack_variables_skips_when_decompiler_unavailable(deci, mocker):
+    mocker.patch.object(ImportDataTypes, "_probe_decompiler", return_value=False)
+
+    ImportDataTypes().apply_stack_variables(
+        SimpleNamespace(stack_vars={"0x4": _svar(4, "lhs", "int")}), 0x1000
+    )
+
+    mod.DecompilerInterface.discover.assert_not_called()
+    deci.functions.__setitem__.assert_not_called()

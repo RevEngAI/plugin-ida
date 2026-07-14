@@ -39,7 +39,9 @@ class ImportDataTypesService(IThreadService):
         if result.error:
             logger.error(f"RevEng.AI: {result.error}")
 
-    def import_data_types(self, matches: dict[int, int]) -> DataTypesImportResult:
+    def import_data_types(
+        self, matches: dict[int, int], apply_stack_vars: bool = False
+    ) -> DataTypesImportResult:
         if len(matches) == 0:
             return DataTypesImportResult()
 
@@ -67,7 +69,9 @@ class ImportDataTypesService(IThreadService):
 
         apply_failed_ids: set[int] = set()
         if response:
-            apply_failed_ids = idt.execute(response, matched_function_mapping=matches) or set()
+            apply_failed_ids = idt.execute(
+                response, matched_function_mapping=matches, apply_stack_vars=apply_stack_vars
+            ) or set()
 
         return DataTypesImportResult(
             remote_absent_ids=remote_absent_ids,
