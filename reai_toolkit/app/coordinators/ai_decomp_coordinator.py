@@ -3,6 +3,7 @@ from logging import Logger
 import ida_funcs
 import ida_kernwin
 from libbs.decompilers.ida.compat import execute_read, execute_ui
+from revengai.models.ai_decompilation_rating import AiDecompilationRating
 from revengai.models.comments_data import CommentsData
 from revengai.models.decompilation_data import DecompilationData
 from revengai.models.summary_data import SummaryData
@@ -70,6 +71,8 @@ class AiDecompCoordinator(BaseCoordinator):
             self._decomp_view.on_rename = self.request_rename
             self._decomp_view.on_edit_comment = self.request_edit_comment
             self._decomp_view.on_remove_comment = self.request_remove_comment
+            self._decomp_view.on_rate_up = self.rate_up
+            self._decomp_view.on_rate_down = self.rate_down
             self._decomp_view.Create(self._decomp_view.TITLE)
 
     def start_decompilation(self, ea: int) -> None:
@@ -84,6 +87,7 @@ class AiDecompCoordinator(BaseCoordinator):
 
         cached = self.ai_decomp_service.peek_decomp(ea)
         if self._decomp_view is not None:
+            self._decomp_view.set_rating(None)
             if cached is not None and cached.decompilation:
                 self._current_decomp = cached
                 self._rerender()
@@ -202,6 +206,38 @@ class AiDecompCoordinator(BaseCoordinator):
             return
         self.ai_decomp_service.invalidate_ea(ea)
         self.start_decompilation(ea)
+
+    def rate_up(self) -> None:
+        self._rate(AiDecompilationRating.POSITIVE)
+
+    def rate_down(self) -> None:
+        self._rate(AiDecompilationRating.NEGATIVE)
+
+    def _rate(self, rating: AiDecompilationRating) -> None:
+        ea = self._current_func_vaddr
+        if ea is None:
+            return
+        if self._current_decomp is None:
+            self.show_info_dialog(message="No AI decompilation to rate yet.")
+            if self._decomp_view is not None:
+                self._decomp_view.set_rating(None)
+            return
+        self.ai_decomp_service.rate_decomp(
+            ea=ea,
+            rating=rating,
+            on_result=lambda response: self._on_rating_result(ea, response),
+        )
+
+    def _on_rating_result(
+        self, ea: int, response: GenericApiReturn[bool]
+    ) -> None:
+        if ea != self._current_func_vaddr:
+            return
+        if not response.success:
+            if response.error_message:
+                self.show_error_dialog(message=response.error_message)
+            if self._decomp_view is not None:
+                self._decomp_view.set_rating(None)
 
     def request_rename(self, display_line: int, word: str) -> None:
         ea = self._current_func_vaddr

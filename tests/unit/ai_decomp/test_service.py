@@ -4,6 +4,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from revengai import ApiException
+from revengai.models.ai_decompilation_rating import AiDecompilationRating
 from revengai.models.comments_data import CommentsData
 from revengai.models.decompilation_data import DecompilationData
 from revengai.models.inline_comment import InlineComment
@@ -478,6 +479,48 @@ def test_mutation_unknown_function_id_reports_failure(service, sdk, netstore):
     on_result.assert_called_once()
     assert on_result.call_args[0][0].success is False
     sdk.patch_ai_decompilation_inline_comment.assert_not_called()
+
+
+def test_rate_decomp_calls_upsert_rating(service, sdk):
+    sdk.upsert_ai_decompilation_rating.return_value = MagicMock()
+
+    on_result = MagicMock()
+    service.rate_decomp(
+        ea=4096, rating=AiDecompilationRating.POSITIVE, on_result=on_result
+    )
+    _wait_mock(on_result)
+
+    _, kwargs = sdk.upsert_ai_decompilation_rating.call_args
+    assert kwargs["function_id"] == 42
+    body = kwargs["upsert_ai_decomplation_rating_request"]
+    assert body.rating == AiDecompilationRating.POSITIVE
+    assert body.reason is None
+    assert on_result.call_args[0][0].success is True
+
+
+def test_rate_decomp_api_error_surfaces(service, sdk):
+    sdk.upsert_ai_decompilation_rating.side_effect = ApiException(status=422)
+
+    on_result = MagicMock()
+    service.rate_decomp(
+        ea=4096, rating=AiDecompilationRating.NEGATIVE, on_result=on_result
+    )
+    _wait_mock(on_result)
+
+    assert on_result.call_args[0][0].success is False
+
+
+def test_rate_decomp_unknown_function_id_reports_failure(service, sdk, netstore):
+    netstore.get_function_mapping.return_value.inverse_function_map = {}
+
+    on_result = MagicMock()
+    service.rate_decomp(
+        ea=4096, rating=AiDecompilationRating.POSITIVE, on_result=on_result
+    )
+
+    on_result.assert_called_once()
+    assert on_result.call_args[0][0].success is False
+    sdk.upsert_ai_decompilation_rating.assert_not_called()
 
 
 def test_invalidate_clears_all_caches_and_inflight(service):

@@ -8,12 +8,16 @@ from revengai import (
     FunctionMapping,
     FunctionsAIDecompilationApi,
 )
+from revengai.models.ai_decompilation_rating import AiDecompilationRating
 from revengai.models.comments_data import CommentsData
 from revengai.models.decompilation_data import DecompilationData
 from revengai.models.patch_comment_body import PatchCommentBody
 from revengai.models.summary_data import SummaryData
 from revengai.models.task_status import TaskStatus
 from revengai.models.tokenised_data import TokenisedData
+from revengai.models.upsert_ai_decomplation_rating_request import (
+    UpsertAiDecomplationRatingRequest,
+)
 from revengai.models.upsert_overrides_input_body import UpsertOverridesInputBody
 from revengai.models.workflow_progress import WorkflowProgress
 
@@ -177,9 +181,59 @@ class AiDecompService(IThreadService):
             (function_id, line, on_result),
         )
 
+    def rate_decomp(
+        self,
+        ea: int,
+        rating: AiDecompilationRating,
+        on_result: Callable[[GenericApiReturn[bool]], None],
+    ) -> None:
+        function_id = self._get_function_id(start_ea=ea)
+        if function_id is None:
+            on_result(
+                GenericApiReturn[bool](
+                    success=False, error_message="Function is not part of the analysis."
+                )
+            )
+            return
+        self._spawn(
+            self._run_rate_decomp,
+            f"reai-aidecomp-rating-{function_id}",
+            (function_id, rating, on_result),
+        )
+
     @staticmethod
     def _spawn(target: Callable[..., Any], name: str, args: tuple) -> None:
         threading.Thread(target=target, args=args, name=name, daemon=True).start()
+
+    def _run_rate_decomp(
+        self,
+        function_id: int,
+        rating: AiDecompilationRating,
+        on_result: Callable[[GenericApiReturn[bool]], None],
+    ) -> None:
+        try:
+            with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+                FunctionsAIDecompilationApi(api_client).upsert_ai_decompilation_rating(
+                    function_id=function_id,
+                    upsert_ai_decomplation_rating_request=UpsertAiDecomplationRatingRequest(
+                        rating=rating, reason=None
+                    ),
+                )
+        except ApiException as e:
+            on_result(
+                GenericApiReturn[bool](
+                    success=False, error_message=_format_api_error(e)
+                )
+            )
+            return
+        except Exception as e:
+            on_result(
+                GenericApiReturn[bool](
+                    success=False, error_message=f"Unexpected error submitting rating: {e}"
+                )
+            )
+            return
+        on_result(GenericApiReturn[bool](success=True, data=True))
 
     def _run_apply_overrides(
         self,
