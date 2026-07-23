@@ -46,6 +46,15 @@ def search_api(mocker):
 
 
 @pytest.fixture
+def collections_api(mocker):
+    mocker.patch.object(MatchingService, "yield_api_client")
+    api_class = mocker.patch.object(svc_mod, "CollectionsApi")
+    api_inst = MagicMock()
+    api_class.return_value = api_inst
+    return api_inst
+
+
+@pytest.fixture
 def core_api(mocker):
     mocker.patch.object(MatchingService, "yield_api_client")
     api_class = mocker.patch.object(svc_mod, "FunctionsCoreApi")
@@ -78,23 +87,21 @@ def _matches(matches=None) -> GetMatchesOutputBody:
     )
 
 
-def test_search_collections_returns_results(service, search_api):
+def test_search_collections_returns_results(service, collections_api):
     results = [MagicMock(), MagicMock()]
-    search_api.search_collections.return_value = MagicMock(
-        data=MagicMock(results=results)
-    )
+    collections_api.v3_list_collections.return_value = MagicMock(results=results)
 
     out = service.search_collections("libc")
 
     assert out.success is True
     assert out.data == results
-    search_api.search_collections.assert_called_once_with(
-        model_name="binnet-0.1", partial_collection_name="libc", page_size=10, page=1
+    collections_api.v3_list_collections.assert_called_once_with(
+        search_term="libc", limit=50, offset=0
     )
 
 
-def test_search_collections_failure_returns_empty_success(service, search_api):
-    search_api.search_collections.side_effect = RuntimeError("boom")
+def test_search_collections_failure_returns_empty_success(service, collections_api):
+    collections_api.v3_list_collections.side_effect = RuntimeError("boom")
 
     out = service.search_collections("libc")
 

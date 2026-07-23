@@ -1,6 +1,6 @@
 from revengai import (
     BinarySearchResult,
-    CollectionSearchResult,
+    CollectionListItemBody,
     FunctionMapping,
     FunctionMatch,
     GetMatchesOutputBody,
@@ -64,7 +64,7 @@ def test_search_result_fields():
         BinarySearchResult.model_fields
     )
     assert {"collection_id", "collection_name"} <= set(
-        CollectionSearchResult.model_fields
+        CollectionListItemBody.model_fields
     )
 
 
