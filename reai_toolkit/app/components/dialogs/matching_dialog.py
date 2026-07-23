@@ -5,7 +5,7 @@ from loguru import logger
 
 from revengai.models import (
     BinarySearchResult,
-    CollectionSearchResult,
+    CollectionListItemBody,
     FunctionMatch,
     MatchedFunction,
 )
@@ -154,8 +154,8 @@ class MatchingDialog(DialogBase):
             self.ui.searchFunctions.textEdited.connect(self._update_functions_table)
 
         # ----------------- Collections state -----------------
-        # Internal multi-selection: key -> (name, scope, owner, model, created)
-        self._selected_collections: dict[str, CollectionSearchResult] = {}
+        # Internal multi-selection: key -> (name, scope, owner, size, created)
+        self._selected_collections: dict[str, CollectionListItemBody] = {}
         self._collectionsDebounce = QtCore.QTimer(self)
         self._collectionsDebounce.setSingleShot(True)
         self._collectionsDebounce.timeout.connect(self._performCollectionsSearch)
@@ -390,7 +390,7 @@ class MatchingDialog(DialogBase):
     def _performCollectionsSearch(self):
         query = self.ui.editCollections.text().strip()
 
-        response: GenericApiReturn[List[CollectionSearchResult]] = (
+        response: GenericApiReturn[List[CollectionListItemBody]] = (
             self.matching_service.search_collections(text_input=query)
         )
 
@@ -405,7 +405,7 @@ class MatchingDialog(DialogBase):
         self._fillCollectionsPopup(query=query, rows=response.data)
 
     def _initCollectionsHeader(self):
-        labels = ["Select", "Collection", "Scope", "Owner", "Model", "Created"]
+        labels = ["Select", "Collection", "Scope", "Owner", "Size", "Created"]
 
         view = self.ui.collectionsPopupView
         view.setHeaderHidden(False)
@@ -423,7 +423,7 @@ class MatchingDialog(DialogBase):
             else:
                 hdr.setSectionResizeMode(i, QtWidgets.QHeaderView.Stretch)
 
-    def _fillCollectionsPopup(self, query: str, rows: list[CollectionSearchResult]):
+    def _fillCollectionsPopup(self, query: str, rows: list[CollectionListItemBody]):
         view = self.ui.collectionsPopupView
         view.blockSignals(True)
         view.clear()
@@ -449,10 +449,10 @@ class MatchingDialog(DialogBase):
                 [
                     "",
                     tup.collection_name,
-                    tup.scope,
-                    tup.owned_by,
-                    tup.model_name,
-                    tup.created_at.isoformat(),
+                    tup.collection_scope,
+                    tup.collection_owner,
+                    str(tup.collection_size),
+                    tup.creation.isoformat(),
                 ]
             )
             it.setFlags(

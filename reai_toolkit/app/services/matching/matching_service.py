@@ -10,7 +10,8 @@ from libbs.decompilers.ida.compat import execute_read
 from loguru import logger
 from revengai import (
     BinarySearchResult,
-    CollectionSearchResult,
+    CollectionListItemBody,
+    CollectionsApi,
     Configuration,
     FunctionMapping,
     FunctionMatch,
@@ -57,27 +58,21 @@ class MatchingService(IThreadService):
         name = self.demangle(idc.get_func_name(vaddr))
         return name
 
-    def _search_collections(self, text_input: str) -> List[CollectionSearchResult]:
+    def _search_collections(self, text_input: str) -> List[CollectionListItemBody]:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-            search_client = SearchApi(api_client)
+            collections_client = CollectionsApi(api_client)
 
-            return_list: List[CollectionSearchResult] = []
-
-            response = search_client.search_collections(
-                model_name=self.netstore_service.get_model_name(),
-                partial_collection_name=text_input,
-                page_size=10,
-                page=1,
+            response = collections_client.v3_list_collections(
+                search_term=text_input or None,
+                limit=50,
+                offset=0,
             )
 
-            return_list.extend(response.data.results)
-
-            return return_list
-        pass
+            return response.results or []
 
     def search_collections(
         self, text_input: str
-    ) -> GenericApiReturn[List[CollectionSearchResult]]:
+    ) -> GenericApiReturn[List[CollectionListItemBody]]:
         response = self.api_request_returning(
             lambda: self._search_collections(text_input)
         )
