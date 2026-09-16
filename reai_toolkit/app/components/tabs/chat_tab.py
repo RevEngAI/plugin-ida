@@ -24,7 +24,7 @@ from reai_toolkit.app.components.tabs.chat_render import (
     render_transcript_markdown,
     title_case,
 )
-from reai_toolkit.app.core.qt_compat import QtCore, QtWidgets, Signal, Slot
+from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets, Signal, Slot
 from reai_toolkit.app.services.chat.schema import ChatState
 
 
@@ -234,6 +234,7 @@ class ChatPanel(kw.PluginForm):
         self.on_select_conversation: Optional[Callable[[str], None]] = None
         self.on_request_history: Optional[Callable[[], None]] = None
         self.on_jump: Optional[Callable[[int], None]] = None
+        self.resolve_entity: Optional[Callable[[str, int], Optional[str]]] = None
         self.on_stream_event: Optional[Callable] = None
         self.on_stream_conversation_created: Optional[Callable[[str], None]] = None
         self.on_stream_error: Optional[Callable[[str], None]] = None
@@ -423,7 +424,7 @@ class ChatPanel(kw.PluginForm):
         sb = self._transcript.verticalScrollBar()
         prev = sb.value() if sb is not None else 0
         at_bottom = sb is None or sb.value() >= sb.maximum() - 4
-        md = render_transcript_markdown(state)
+        md = render_transcript_markdown(state, self.resolve_entity)
         # Rebuilding the whole document resets the scrollbar to the top, so only
         # do it when the content actually changed, and afterwards keep the reader
         # where they were: pinned to the bottom if they were following the stream,
@@ -560,6 +561,11 @@ class ChatPanel(kw.PluginForm):
             self.on_select_conversation(uuid)
 
     def _on_anchor_clicked(self, url) -> None:
-        ea = parse_jump_href(url.toString())
-        if ea is not None and self.on_jump:
-            self.on_jump(ea)
+        href = url.toString()
+        ea = parse_jump_href(href)
+        if ea is not None:
+            if self.on_jump:
+                self.on_jump(ea)
+            return
+        if url.scheme() in ("http", "https"):
+            QtGui.QDesktopServices.openUrl(url)

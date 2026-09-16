@@ -430,7 +430,6 @@ class AiDecompService(IThreadService):
             with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
                 FunctionsAIDecompilationApi(api_client).create_ai_decompilation(
                     function_id=function_id,
-                    context_aware=True,
                 )
             return True, None
         except ApiException as e:

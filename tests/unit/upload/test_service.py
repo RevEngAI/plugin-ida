@@ -89,3 +89,27 @@ def test_analyse_converts_tags_to_tag_models(service, sdk, symbols, tags, expect
 
     request = sdk.create_analysis.call_args.kwargs["analysis_create_request"]
     assert request.tags == [Tag(name=name) for name in expected]
+
+
+@pytest.mark.parametrize("no_cache", [True, False])
+def test_analyse_sets_no_cache_on_analysis_config(service, sdk, symbols, no_cache):
+    service.analyse(
+        file_name="binary.elf",
+        binary_sha256="deadbeef",
+        symbols=symbols,
+        no_cache=no_cache,
+    )
+
+    request = sdk.create_analysis.call_args.kwargs["analysis_create_request"]
+    assert request.analysis_config.no_cache is no_cache
+
+
+def test_analyse_defaults_no_cache_false(service, sdk, symbols):
+    service.analyse(
+        file_name="binary.elf",
+        binary_sha256="deadbeef",
+        symbols=symbols,
+    )
+
+    request = sdk.create_analysis.call_args.kwargs["analysis_create_request"]
+    assert request.analysis_config.no_cache is False

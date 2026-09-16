@@ -1,8 +1,12 @@
 from unittest.mock import MagicMock
 
 import pytest
+from revengai.models.analysis_basic_info_output_body import (
+    AnalysisBasicInfoOutputBody,
+)
 from revengai.models.function_mapping import FunctionMapping
 
+from reai_toolkit.app.services.analysis_sync import analysis_sync as svc_mod
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
 from reai_toolkit.app.services.data_types.data_types_service import DataTypesImportResult
@@ -208,3 +212,57 @@ def test_get_function_matches_aborts_when_model_id_fails(service, mocker):
 
     fetch_map.assert_not_called()
     cb.assert_not_called()
+
+
+def _basic_info(model_id=7, base_address=0x140000000):
+    return AnalysisBasicInfoOutputBody.model_construct(
+        model_id=model_id, model_name="binnet", base_address=base_address
+    )
+
+
+@pytest.fixture
+def analyses_api(mocker):
+    mocker.patch.object(AnalysisSyncService, "yield_api_client")
+    api_class = mocker.patch.object(svc_mod, "AnalysesCoreApi")
+    api = MagicMock()
+    api_class.return_value = api
+    return api
+
+
+def test_fetch_model_id_reads_v3_basic_info(service, analyses_api, netstore, mocker):
+    mocker.patch.object(service, "_get_current_base_address", return_value=0x140000000)
+    rebase = mocker.patch.object(service, "_rebase_program")
+    analyses_api.get_analysis_basic_info_0.return_value = _basic_info()
+
+    assert service._fetch_model_id(1234) == 7
+
+    analyses_api.get_analysis_basic_info_0.assert_called_once_with(1234)
+    netstore.put_model_id.assert_called_once_with(7)
+    netstore.put_model_name.assert_called_once_with("binnet")
+    rebase.assert_not_called()
+
+
+def test_fetch_model_id_rebases_on_base_address_mismatch(
+    service, analyses_api, mocker
+):
+    mocker.patch.object(service, "_get_current_base_address", return_value=0x400000)
+    rebase = mocker.patch.object(service, "_rebase_program")
+    analyses_api.get_analysis_basic_info_0.return_value = _basic_info(
+        base_address=0x140000000
+    )
+
+    service._fetch_model_id(1234)
+
+    rebase.assert_called_once_with(0x140000000 - 0x400000)
+
+
+def test_fetch_model_id_skips_rebase_when_base_address_unknown(
+    service, analyses_api, mocker
+):
+    mocker.patch.object(service, "_get_current_base_address", return_value=0x400000)
+    rebase = mocker.patch.object(service, "_rebase_program")
+    analyses_api.get_analysis_basic_info_0.return_value = _basic_info(base_address=None)
+
+    service._fetch_model_id(1234)
+
+    rebase.assert_not_called()

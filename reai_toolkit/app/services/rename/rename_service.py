@@ -1,19 +1,21 @@
 import queue
 import threading
 import time
+from dataclasses import dataclass
 from typing import List, Optional
 
 from libbs.decompilers.ida.compat import execute_write
 from loguru import logger
 
 from revengai import (
-    BaseResponse,
+    ApiException,
+    BatchRenameInputBody,
+    BatchRenameItem,
+    BatchRenameOutputBody,
     CanonicalizeNamesInputBody,
     Configuration,
     FunctionMapping,
-    FunctionRenameMap,
     FunctionsCoreApi,
-    FunctionsListRename,
     FunctionsRenamingHistoryApi,
 )
 
@@ -23,6 +25,13 @@ from reai_toolkit.app.core.utils import (
 )
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.rename.schema import RenameInput
+
+
+@dataclass
+class RemoteRenameOutcome:
+    status: bool
+    renamed_count: int = 0
+    server_error: bool = False
 
 
 class RenameService(IThreadService):
@@ -79,8 +88,14 @@ class RenameService(IThreadService):
 
             total_errors = None
 
-            while attempt < self._rename_max_retries and not stop_event.is_set():
-                total_errors = self._rename_function(function_list=function_list)
+            while attempt < self._rename_max_retries and not (
+                stop_event and stop_event.is_set()
+            ):
+                try:
+                    total_errors = self._rename_function(function_list=function_list)
+                except Exception as e:
+                    logger.error(f"RevEng.AI: failed to rename functions: {e}")
+                    total_errors = len(function_list)
                 if total_errors == 0:
                     break
                 attempt += 1
@@ -129,24 +144,24 @@ class RenameService(IThreadService):
             return total_errors
 
         # Rename remote functions
-        response: BaseResponse = self._rename_remote_function(
-            matched_func_list
-        )
+        response = self._rename_remote_function(matched_func_list)
 
-        if not response.status:
+        if not getattr(response, "status", False):
             total_errors += len(matched_func_list)
 
         return total_errors
 
     @execute_write
-    def _rename_remote_function(self, function_list: list[RenameInput]) -> BaseResponse:
-        function_rename_list: list[FunctionRenameMap] = []
+    def _rename_remote_function(
+        self, function_list: list[RenameInput]
+    ) -> RemoteRenameOutcome:
+        function_rename_list: list[BatchRenameItem] = []
         for func in function_list:
             if func.function_id is None:
                 continue
 
             function_rename_list.append(
-                FunctionRenameMap(
+                BatchRenameItem(
                     function_id=func.function_id,
                     new_mangled_name=func.new_name,
                     new_name=demangle(func.new_name),
@@ -154,25 +169,52 @@ class RenameService(IThreadService):
             )
             self.tag_function_as_renamed(func.new_name)
 
+        if not function_rename_list:
+            return RemoteRenameOutcome(status=True)
+
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             functions_api = FunctionsRenamingHistoryApi(api_client=api_client)
 
-            return functions_api.batch_rename_function(
-                functions_list_rename=FunctionsListRename(
-                    functions=function_rename_list
+            try:
+                response: BatchRenameOutputBody = functions_api.batch_rename_functions(
+                    batch_rename_input_body=BatchRenameInputBody(
+                        functions=function_rename_list
+                    )
                 )
+            except ApiException as e:
+                logger.error(
+                    f"RevEng.AI: failed to rename {len(function_rename_list)} function(s) "
+                    f"remotely: HTTP {e.status} {e.reason}"
+                )
+                return RemoteRenameOutcome(
+                    status=False, server_error=bool(e.status and e.status >= 500)
+                )
+            except Exception as e:
+                logger.error(f"RevEng.AI: failed to rename functions remotely: {e}")
+                return RemoteRenameOutcome(status=False)
+
+            return RemoteRenameOutcome(
+                status=True, renamed_count=getattr(response, "renamed_count", 0)
             )
 
     def push_remote_names(self, renames: list[RenameInput]) -> int:
         pushed: int = 0
         for start in range(0, len(renames), self._rename_batch_size):
             chunk: list[RenameInput] = renames[start:start + self._rename_batch_size]
-            if getattr(self._rename_remote_function(chunk), "status", False):
-                pushed += len(chunk)
+            outcome = self._rename_remote_function(chunk)
+            if getattr(outcome, "status", False):
+                pushed += getattr(outcome, "renamed_count", 0)
                 continue
+            if getattr(outcome, "server_error", False):
+                logger.error(
+                    f"RevEng.AI: abandoning the push of {len(renames) - pushed} name(s); "
+                    "the platform failed to process the request"
+                )
+                break
             for rename in chunk:
-                if getattr(self._rename_remote_function([rename]), "status", False):
-                    pushed += 1
+                single = self._rename_remote_function([rename])
+                if getattr(single, "status", False):
+                    pushed += getattr(single, "renamed_count", 0)
         return pushed
 
     def canonicalize_names(self, names: list[str]) -> dict[str, str]:

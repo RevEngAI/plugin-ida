@@ -7,8 +7,21 @@ from loguru import logger
 from revengai import (
     Configuration,
     CreateAnalysisDataTypesInputBody,
+    CreateDataTypeEntry,
+    CreateEnumDataType,
+    CreateStructDataType,
+    CreateTypedefDataType,
+    DataTypeEnumValueEntry,
+    DataTypeMemberEntry,
     DataTypesApi,
+    EnumDefinition,
+    StructDefinition,
+    TypedefDefinition,
     UpdateAnalysisDataTypesInputBody,
+    UpdateDataTypeEntry,
+    UpdateEnumDataType,
+    UpdateStructDataType,
+    UpdateTypedefDataType,
 )
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -24,11 +37,31 @@ KIND_TYPEDEF = "TYPEDEF"
 
 _DEFINED_KINDS = frozenset({KIND_STRUCT, KIND_ENUM, KIND_TYPEDEF})
 
+_CREATE_MODELS = {
+    KIND_STRUCT: CreateStructDataType,
+    KIND_ENUM: CreateEnumDataType,
+    KIND_TYPEDEF: CreateTypedefDataType,
+}
+
+_UPDATE_MODELS = {
+    KIND_STRUCT: UpdateStructDataType,
+    KIND_ENUM: UpdateEnumDataType,
+    KIND_TYPEDEF: UpdateTypedefDataType,
+}
+
 TypeKey = tuple[str, str, str]
 
 
 def type_key(namespace: Optional[str], name: str, kind: str) -> TypeKey:
     return (namespace or "", name, (kind or "").upper())
+
+
+def empty_definition(kind: str) -> Any:
+    if kind == KIND_STRUCT:
+        return StructDefinition(members=[])
+    if kind == KIND_ENUM:
+        return EnumDefinition(values=[])
+    return TypedefDefinition(target_data_type_id=None)
 
 
 def kind_of(artifact: Any) -> Optional[str]:
@@ -153,15 +186,22 @@ class AnalysisDataTypesService(BaseService):
     def _create_placeholders(
         self, analysis_id: int, missing: dict[str, Any], catalogue: Catalogue
     ) -> dict[str, int]:
-        bodies = [
-            {
-                "kind": kind_of(artifact),
-                "name": name,
-                "namespace": "",
-                "size": getattr(artifact, "size", None) or 0,
-            }
-            for name, artifact in missing.items()
-        ]
+        bodies = []
+        for name, artifact in missing.items():
+            kind = kind_of(artifact)
+            if kind not in _CREATE_MODELS:
+                continue
+            bodies.append(
+                CreateDataTypeEntry(
+                    _CREATE_MODELS[kind](
+                        kind=kind,
+                        name=name,
+                        namespace="",
+                        size=getattr(artifact, "size", None) or 0,
+                        definition=empty_definition(kind),
+                    )
+                )
+            )
 
         created: dict[str, int] = {}
         for chunk in _chunks(bodies, WRITE_BATCH_SIZE):
@@ -169,7 +209,7 @@ class AnalysisDataTypesService(BaseService):
                 client = DataTypesApi(api_client)
                 out = client.v3_create_analysis_data_types(
                     analysis_id=analysis_id,
-                    create_analysis_data_types_input_body=CreateAnalysisDataTypesInputBody.model_construct(
+                    create_analysis_data_types_input_body=CreateAnalysisDataTypesInputBody(
                         data_types=chunk
                     ),
                 ).to_dict()
@@ -193,18 +233,23 @@ class AnalysisDataTypesService(BaseService):
     ) -> None:
         bodies = []
         for name, artifact in artifacts.items():
+            kind = kind_of(artifact)
+            if kind not in _UPDATE_MODELS:
+                continue
             definition = self._definition(artifact, analysis_id, ids, catalogue)
             if definition is None:
                 continue
             bodies.append(
-                {
-                    "data_type_id": ids[name],
-                    "kind": kind_of(artifact),
-                    "name": name,
-                    "namespace": "",
-                    "size": getattr(artifact, "size", None) or 0,
-                    "definition": definition,
-                }
+                UpdateDataTypeEntry(
+                    _UPDATE_MODELS[kind](
+                        data_type_id=ids[name],
+                        kind=kind,
+                        name=name,
+                        namespace="",
+                        size=getattr(artifact, "size", None) or 0,
+                        definition=definition,
+                    )
+                )
             )
 
         for chunk in _chunks(bodies, WRITE_BATCH_SIZE):
@@ -212,7 +257,7 @@ class AnalysisDataTypesService(BaseService):
                 client = DataTypesApi(api_client)
                 out = client.v3_update_analysis_data_types(
                     analysis_id=analysis_id,
-                    update_analysis_data_types_input_body=UpdateAnalysisDataTypesInputBody.model_construct(
+                    update_analysis_data_types_input_body=UpdateAnalysisDataTypesInputBody(
                         data_types=chunk
                     ),
                 ).to_dict()
@@ -224,31 +269,33 @@ class AnalysisDataTypesService(BaseService):
         analysis_id: int,
         ids: dict[str, int],
         catalogue: Catalogue,
-    ) -> Optional[dict]:
+    ) -> Optional[Any]:
         if isinstance(artifact, Struct):
             members = []
             for member in (artifact.members or {}).values():
                 members.append(
-                    {
-                        "name": member.name or "",
-                        "offset": member.offset,
-                        "size": member.size or 0,
-                        "is_bitfield": False,
-                        "data_type_id": self._reference(member.type, ids, catalogue),
-                    }
+                    DataTypeMemberEntry(
+                        name=member.name or "",
+                        offset=member.offset,
+                        size=member.size or 0,
+                        is_bitfield=False,
+                        data_type_id=self._reference(member.type, ids, catalogue),
+                    )
                 )
-            return {"members": members}
+            return StructDefinition(members=members)
 
         if isinstance(artifact, Enum):
-            return {
-                "values": [
-                    {"name": str(key), "value": str(value)}
+            return EnumDefinition(
+                values=[
+                    DataTypeEnumValueEntry(name=str(key), value=str(value))
                     for key, value in (artifact.members or {}).items()
                 ]
-            }
+            )
 
         if isinstance(artifact, Typedef):
-            return {"target_data_type_id": self._reference(artifact.type, ids, catalogue)}
+            return TypedefDefinition(
+                target_data_type_id=self._reference(artifact.type, ids, catalogue)
+            )
 
         return None
 

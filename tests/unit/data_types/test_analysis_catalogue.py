@@ -51,6 +51,10 @@ def _written(items):
     return resp
 
 
+def _sent(body):
+    return body.to_dict()["data_types"]
+
+
 def test_catalogue_indexes_by_key_and_name():
     catalogue = Catalogue.of([_entry(1, "Foo"), _entry(2, "Bar", kind="ENUM")])
 
@@ -128,7 +132,7 @@ def test_ensure_creates_only_the_gaps(service, sdk):
     body = sdk.v3_create_analysis_data_types.call_args.kwargs[
         "create_analysis_data_types_input_body"
     ]
-    assert [d["name"] for d in body.data_types] == ["New"]
+    assert [d["name"] for d in _sent(body)] == ["New"]
 
 
 def test_create_bodies_carry_no_data_type_id(service, sdk):
@@ -141,7 +145,7 @@ def test_create_bodies_carry_no_data_type_id(service, sdk):
     body = sdk.v3_create_analysis_data_types.call_args.kwargs[
         "create_analysis_data_types_input_body"
     ]
-    assert all("data_type_id" not in d for d in body.data_types)
+    assert all("data_type_id" not in d for d in _sent(body))
 
 
 def test_definitions_are_written_after_ids_exist(service, sdk):
@@ -163,10 +167,10 @@ def test_definitions_are_written_after_ids_exist(service, sdk):
     body = sdk.v3_update_analysis_data_types.call_args.kwargs[
         "update_analysis_data_types_input_body"
     ]
-    written = {d["name"]: d for d in body.data_types}
+    written = {d["name"]: d for d in _sent(body)}
     assert written["Node"]["definition"]["members"][0]["data_type_id"] == 1
     assert written["NodeRef"]["definition"]["target_data_type_id"] == 2
-    assert all("data_type_id" in d for d in body.data_types)
+    assert all("data_type_id" in d for d in _sent(body))
 
 
 def test_self_referential_struct_resolves_to_its_own_new_id(service, sdk):
@@ -185,7 +189,7 @@ def test_self_referential_struct_resolves_to_its_own_new_id(service, sdk):
     body = sdk.v3_update_analysis_data_types.call_args.kwargs[
         "update_analysis_data_types_input_body"
     ]
-    assert body.data_types[0]["definition"]["members"][0]["data_type_id"] == 5
+    assert _sent(body)[0]["definition"]["members"][0]["data_type_id"] == 5
 
 
 def test_unresolvable_member_type_is_left_unresolved(service, sdk):
@@ -204,7 +208,7 @@ def test_unresolvable_member_type_is_left_unresolved(service, sdk):
     body = sdk.v3_update_analysis_data_types.call_args.kwargs[
         "update_analysis_data_types_input_body"
     ]
-    assert body.data_types[0]["definition"]["members"][0]["data_type_id"] is None
+    assert "data_type_id" not in _sent(body)[0]["definition"]["members"][0]
 
 
 def test_enum_values_are_sent_as_strings(service, sdk):
@@ -219,7 +223,7 @@ def test_enum_values_are_sent_as_strings(service, sdk):
     body = sdk.v3_update_analysis_data_types.call_args.kwargs[
         "update_analysis_data_types_input_body"
     ]
-    values = body.data_types[0]["definition"]["values"]
+    values = _sent(body)[0]["definition"]["values"]
     assert {v["name"]: v["value"] for v in values} == {
         "RED": "0",
         "BIG": "18446744073709551615",
@@ -233,7 +237,7 @@ def test_writes_are_chunked(service, sdk):
         [
             _entry(i, d["name"])
             for i, d in enumerate(
-                kw["create_analysis_data_types_input_body"].data_types, start=1
+                _sent(kw["create_analysis_data_types_input_body"]), start=1
             )
         ]
     )
@@ -245,7 +249,7 @@ def test_writes_are_chunked(service, sdk):
     service.ensure(ANALYSIS, artifacts)
 
     sizes = [
-        len(c.kwargs["create_analysis_data_types_input_body"].data_types)
+        len(_sent(c.kwargs["create_analysis_data_types_input_body"]))
         for c in sdk.v3_create_analysis_data_types.call_args_list
     ]
     assert sizes == [WRITE_BATCH_SIZE, 10]

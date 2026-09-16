@@ -77,6 +77,11 @@ class BaseService:
 
     @staticmethod
     @execute_read
+    def current_function_name(ea: int) -> str:
+        return ida_name.get_name(ea) or ""
+
+    @staticmethod
+    @execute_read
     def is_protected_user_name(ea: int) -> bool:
         cur: str = ida_name.get_name(ea) or ""
         try:

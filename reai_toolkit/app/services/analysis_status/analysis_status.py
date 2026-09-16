@@ -1,10 +1,15 @@
-import re
 import threading
 import time
 from typing import Any, Callable
 
 from loguru import logger
-from revengai import AnalysesCoreApi, BaseResponseStatus, Configuration, Logs, StatusOutput
+from revengai import (
+    AnalysesCoreApi,
+    BaseResponseStatus,
+    Configuration,
+    GetAnalysisLogsOutputBody,
+    StatusOutput,
+)
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -47,11 +52,10 @@ class AnalysisStatusService(IThreadService):
 
             return analysis_status.data
 
-    def _api_get_logs(self, analysis_id: int) -> Logs | None:
+    def _api_get_logs(self, analysis_id: int) -> GetAnalysisLogsOutputBody | None:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
-            response = analyses_client.get_analysis_logs(analysis_id)
-            return response.data
+            return analyses_client.v3_get_analysis_logs(analysis_id)
 
     def _poll_analysis_status(self, stop_event: threading.Event, analysis_id: int) -> None:
         """
@@ -74,11 +78,10 @@ class AnalysisStatusService(IThreadService):
                     fn=lambda: self._api_get_logs(analysis_id)
                 )
 
-                logs: Logs | None
+                logs: GetAnalysisLogsOutputBody | None
                 if get_logs_response.success and (logs := get_logs_response.data):
-                    for line in logs.logs.splitlines():
-                        line_without_timestamp = re.sub(r"^[\d\-]+ [\d:]+ - ", "", line)
-                        logger.debug(f"RevEng.AI Remote Analysis - {line_without_timestamp}")
+                    for entry in (logs.entries or []):
+                        logger.debug(f"RevEng.AI Remote Analysis - {entry.text}")
 
                 if get_status_response.data and (status := get_status_response.data.analysis_status):
                     logger.info(f"RevEng.AI: Status - {status}")

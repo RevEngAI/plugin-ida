@@ -1,4 +1,5 @@
 from logging import Logger
+from typing import Optional
 
 import ida_funcs
 import ida_kernwin
@@ -207,7 +208,9 @@ class AiDecompCoordinator(BaseCoordinator):
             return
         self._current_summary = response.data
         if self._decomp_view is not None:
-            self._decomp_view.set_predicted_name(response.data.predicted_function_name)
+            self._decomp_view.set_predicted_name(
+                self._unapplied_predicted_name(ea, response.data.predicted_function_name)
+            )
         self._rerender()
 
     def _on_comments_complete(
@@ -317,6 +320,19 @@ class AiDecompCoordinator(BaseCoordinator):
             if self._decomp_view is not None:
                 self._decomp_view.set_rating(None)
 
+    def _unapplied_predicted_name(
+        self, ea: int, name: Optional[str]
+    ) -> Optional[str]:
+        if not name:
+            return None
+        if self.ai_decomp_service.current_function_name(ea) == name:
+            return None
+        return name
+
+    def _hide_predicted_name(self) -> None:
+        if self._decomp_view is not None:
+            self._decomp_view.set_predicted_name(None)
+
     def apply_predicted_name(self, name: str) -> None:
         ea = self._current_func_vaddr
         if ea is None or not name:
@@ -324,6 +340,7 @@ class AiDecompCoordinator(BaseCoordinator):
 
         if self.ai_decomp_service.update_function_name(ea, name):
             self.ai_decomp_service.tag_function_as_renamed(name)
+            self._hide_predicted_name()
             self.refresh_disassembly_view()
             return
 
@@ -332,6 +349,7 @@ class AiDecompCoordinator(BaseCoordinator):
             self.show_info_dialog(msg=f"Could not rename this function to '{name}'.")
             return
         self.ai_decomp_service.tag_function_as_renamed(final)
+        self._hide_predicted_name()
         self.refresh_disassembly_view()
 
     def request_rename(self, display_line: int, word: str) -> None:

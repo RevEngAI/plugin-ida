@@ -1,13 +1,15 @@
 from revengai import (
+    AnalysisBasicInfoOutputBody,
     BaseResponseAnalysisFunctionMapping,
-    BaseResponseBasic,
     FunctionMapping,
 )
 from revengai.models.analysis_function_mapping import AnalysisFunctionMapping
 
 
-def test_basic_response_envelope():
-    assert {"status", "data", "errors"} <= set(BaseResponseBasic.model_fields)
+def test_basic_info_carries_model_and_base_address():
+    assert {"model_id", "model_name", "base_address"} <= set(
+        AnalysisBasicInfoOutputBody.model_fields
+    )
 
 
 def test_function_mapping_envelope_carries_function_maps():

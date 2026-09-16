@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'analyse_panel_qt5.ui'
+# Form implementation generated from reading ui file 'reai_toolkit/app/components/forms/analyse/analyse_panel_qt5.ui'
 #
 # Created by: PyQt5 UI code generator 5.15.11
 #
@@ -14,9 +14,9 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_AuthPanel(object):
     def setupUi(self, AuthPanel):
         AuthPanel.setObjectName("AuthPanel")
-        AuthPanel.resize(520, 420)
-        AuthPanel.setMinimumSize(QtCore.QSize(520, 420))
-        AuthPanel.setMaximumSize(QtCore.QSize(520, 420))
+        AuthPanel.resize(520, 460)
+        AuthPanel.setMinimumSize(QtCore.QSize(520, 460))
+        AuthPanel.setMaximumSize(QtCore.QSize(520, 460))
         AuthPanel.setAutoFillBackground(False)
         AuthPanel.setStyleSheet("\n"
 "    QGroupBox{font-weight:600;margin-top:8px;}\n"
@@ -47,7 +47,7 @@ class Ui_AuthPanel(object):
         self.logoArea.setMaximumSize(QtCore.QSize(96, 96))
         self.logoArea.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.logoArea.setText("")
-        self.logoArea.setPixmap(QtGui.QPixmap("../../resources/reveng_ai_logo.jpg"))
+        self.logoArea.setPixmap(QtGui.QPixmap("reai_toolkit/app/components/forms/analyse/../../resources/reveng_ai_logo.jpg"))
         self.logoArea.setScaledContents(True)
         self.logoArea.setObjectName("logoArea")
         self.headerLayout.addWidget(self.logoArea)
@@ -65,8 +65,8 @@ class Ui_AuthPanel(object):
         self.headerLayout.addLayout(self.titleLayout)
         self.rootLayout.addWidget(self.header)
         self.groupEndpoints = QtWidgets.QGroupBox(AuthPanel)
-        self.groupEndpoints.setMinimumSize(QtCore.QSize(496, 200))
-        self.groupEndpoints.setMaximumSize(QtCore.QSize(496, 200))
+        self.groupEndpoints.setMinimumSize(QtCore.QSize(496, 240))
+        self.groupEndpoints.setMaximumSize(QtCore.QSize(496, 240))
         self.groupEndpoints.setObjectName("groupEndpoints")
         self.formLayout = QtWidgets.QFormLayout(self.groupEndpoints)
         self.formLayout.setLabelAlignment(QtCore.Qt.AlignRight)
@@ -137,15 +137,21 @@ class Ui_AuthPanel(object):
         self.radioButton.setObjectName("radioButton")
         self.horizontalLayout.addWidget(self.radioButton)
         self.formLayout.setLayout(4, QtWidgets.QFormLayout.FieldRole, self.horizontalLayout)
+        self.labelCache = QtWidgets.QLabel(self.groupEndpoints)
+        self.labelCache.setObjectName("labelCache")
+        self.formLayout.setWidget(5, QtWidgets.QFormLayout.LabelRole, self.labelCache)
+        self.noCacheCheckBox = QtWidgets.QCheckBox(self.groupEndpoints)
+        self.noCacheCheckBox.setObjectName("noCacheCheckBox")
+        self.formLayout.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.noCacheCheckBox)
         self.functionsLabel = QtWidgets.QLabel(self.groupEndpoints)
         self.functionsLabel.setObjectName("functionsLabel")
-        self.formLayout.setWidget(5, QtWidgets.QFormLayout.LabelRole, self.functionsLabel)
+        self.formLayout.setWidget(6, QtWidgets.QFormLayout.LabelRole, self.functionsLabel)
         self.selectFuncs = QtWidgets.QPushButton(self.groupEndpoints)
         self.selectFuncs.setMinimumSize(QtCore.QSize(296, 32))
         self.selectFuncs.setMaximumSize(QtCore.QSize(296, 32))
         self.selectFuncs.setAutoDefault(False)
         self.selectFuncs.setObjectName("selectFuncs")
-        self.formLayout.setWidget(5, QtWidgets.QFormLayout.FieldRole, self.selectFuncs)
+        self.formLayout.setWidget(6, QtWidgets.QFormLayout.FieldRole, self.selectFuncs)
         self.rootLayout.addWidget(self.groupEndpoints)
         self.linkRow = QtWidgets.QHBoxLayout()
         self.linkRow.setObjectName("linkRow")
@@ -189,6 +195,9 @@ class Ui_AuthPanel(object):
         self.labelScope.setText(_translate("AuthPanel", "Scope"))
         self.radioButton_2.setText(_translate("AuthPanel", "Public"))
         self.radioButton.setText(_translate("AuthPanel", "Private"))
+        self.labelCache.setText(_translate("AuthPanel", "Cache"))
+        self.noCacheCheckBox.setToolTip(_translate("AuthPanel", "Skip cached results and re-run every processing stage."))
+        self.noCacheCheckBox.setText(_translate("AuthPanel", "Disable cache"))
         self.functionsLabel.setText(_translate("AuthPanel", "Functions"))
         self.selectFuncs.setText(_translate("AuthPanel", "Select Functions to Upload"))
         self.cancelButton.setText(_translate("AuthPanel", "Cancel"))
