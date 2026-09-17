@@ -3,10 +3,12 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
-from revengai import BaseResponse
 from revengai.models.function_mapping import FunctionMapping
 
-from reai_toolkit.app.services.rename.rename_service import RenameService
+from reai_toolkit.app.services.rename.rename_service import (
+    RemoteRenameOutcome,
+    RenameService,
+)
 from reai_toolkit.app.services.rename.schema import RenameInput
 
 
@@ -29,7 +31,7 @@ def ida_calls(mocker):
     remote = mocker.patch.object(
         RenameService,
         "_rename_remote_function",
-        return_value=BaseResponse.model_construct(status=True),
+        return_value=RemoteRenameOutcome(status=True, renamed_count=1),
     )
     return update, remote
 
@@ -79,13 +81,35 @@ def test_rename_function_counts_local_failure_and_skips_remote(service, ida_call
 
 def test_rename_function_counts_remote_failure(service, ida_calls):
     _, remote = ida_calls
-    remote.return_value = BaseResponse.model_construct(status=False)
+    remote.return_value = RemoteRenameOutcome(status=False)
 
     errors = service._rename_function(
         [RenameInput(ea=0x10, new_name="foo", function_id=1)]
     )
 
     assert errors == 1
+
+
+def test_rename_function_counts_absent_remote_response(service, ida_calls):
+    _, remote = ida_calls
+    remote.return_value = None
+
+    errors = service._rename_function(
+        [RenameInput(ea=0x10, new_name="foo", function_id=1)]
+    )
+
+    assert errors == 1
+
+
+def test_push_remote_names_stops_on_server_error(service, ida_calls):
+    _, remote = ida_calls
+    renames = [RenameInput(ea=i, new_name=f"f{i}", function_id=i) for i in range(3)]
+    remote.side_effect = [RemoteRenameOutcome(status=False, server_error=True)]
+
+    pushed = service.push_remote_names(renames)
+
+    assert pushed == 0
+    assert remote.call_count == 1
 
 
 def test_rename_function_resolves_missing_function_id_from_mapping(
@@ -126,8 +150,8 @@ def test_push_remote_names_delegates_to_remote_rename(service, ida_calls):
 def test_push_remote_names_falls_back_to_per_item_on_batch_rejection(service, ida_calls):
     _, remote = ida_calls
     renames = [RenameInput(ea=i, new_name=f"f{i}", function_id=i) for i in range(3)]
-    ok = BaseResponse.model_construct(status=True)
-    bad = BaseResponse.model_construct(status=False)
+    ok = RemoteRenameOutcome(status=True, renamed_count=1)
+    bad = RemoteRenameOutcome(status=False)
     remote.side_effect = [bad, ok, bad, ok]
 
     pushed = service.push_remote_names(renames)

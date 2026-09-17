@@ -179,6 +179,7 @@ class AnalyseDialog(DialogBase):
             debug_file_path=self.debug_file_path,
             tags=self._parse_tags(),
             public=self.ui.radioButton_2.isChecked(),
+            no_cache=self.ui.noCacheCheckBox.isChecked(),
             thread_callback=self.callback,
         )
 

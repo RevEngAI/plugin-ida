@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from revengai import ApiException
-from revengai.models.logs import Logs
+from revengai.models.get_analysis_logs_output_body import GetAnalysisLogsOutputBody
 from revengai.models.status_output import StatusOutput
 
 from reai_toolkit.app.services.analysis_status import analysis_status as svc_mod
@@ -35,7 +35,9 @@ def sdk(mocker):
     api_class = mocker.patch.object(svc_mod, "AnalysesCoreApi")
     api_inst = MagicMock()
     api_class.return_value = api_inst
-    api_inst.get_analysis_logs.return_value = MagicMock(data=Logs.model_construct(logs=""))
+    api_inst.v3_get_analysis_logs.return_value = GetAnalysisLogsOutputBody.model_construct(
+        entries=[]
+    )
     return api_inst
 
 
@@ -81,7 +83,7 @@ def test_status_request_failure_surfaces_error(service, sdk):
 
     result = cb.call_args[0][0]
     assert result.success is False
-    sdk.get_analysis_logs.assert_not_called()
+    sdk.v3_get_analysis_logs.assert_not_called()
 
 
 def test_in_progress_status_keeps_polling_until_complete(service, sdk):

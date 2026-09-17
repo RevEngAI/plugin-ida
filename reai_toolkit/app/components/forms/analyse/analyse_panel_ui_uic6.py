@@ -15,18 +15,18 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QFormLayout, QFrame, QGroupBox,
-    QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QRadioButton, QSizePolicy, QSpacerItem, QVBoxLayout,
-    QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QFormLayout, QFrame,
+    QGroupBox, QHBoxLayout, QLabel, QLineEdit,
+    QPushButton, QRadioButton, QSizePolicy, QSpacerItem,
+    QVBoxLayout, QWidget)
 
 class Ui_AuthPanel(object):
     def setupUi(self, AuthPanel):
         if not AuthPanel.objectName():
             AuthPanel.setObjectName(u"AuthPanel")
-        AuthPanel.resize(520, 420)
-        AuthPanel.setMinimumSize(QSize(520, 420))
-        AuthPanel.setMaximumSize(QSize(520, 420))
+        AuthPanel.resize(520, 460)
+        AuthPanel.setMinimumSize(QSize(520, 460))
+        AuthPanel.setMaximumSize(QSize(520, 460))
         AuthPanel.setAutoFillBackground(False)
         AuthPanel.setStyleSheet(u"\n"
 "    QGroupBox{font-weight:600;margin-top:8px;}\n"
@@ -85,8 +85,8 @@ class Ui_AuthPanel(object):
 
         self.groupEndpoints = QGroupBox(AuthPanel)
         self.groupEndpoints.setObjectName(u"groupEndpoints")
-        self.groupEndpoints.setMinimumSize(QSize(496, 200))
-        self.groupEndpoints.setMaximumSize(QSize(496, 200))
+        self.groupEndpoints.setMinimumSize(QSize(496, 240))
+        self.groupEndpoints.setMaximumSize(QSize(496, 240))
         self.formLayout = QFormLayout(self.groupEndpoints)
         self.formLayout.setObjectName(u"formLayout")
         self.formLayout.setLabelAlignment(Qt.AlignRight)
@@ -174,10 +174,20 @@ class Ui_AuthPanel(object):
 
         self.formLayout.setLayout(4, QFormLayout.ItemRole.FieldRole, self.horizontalLayout)
 
+        self.labelCache = QLabel(self.groupEndpoints)
+        self.labelCache.setObjectName(u"labelCache")
+
+        self.formLayout.setWidget(5, QFormLayout.ItemRole.LabelRole, self.labelCache)
+
+        self.noCacheCheckBox = QCheckBox(self.groupEndpoints)
+        self.noCacheCheckBox.setObjectName(u"noCacheCheckBox")
+
+        self.formLayout.setWidget(5, QFormLayout.ItemRole.FieldRole, self.noCacheCheckBox)
+
         self.functionsLabel = QLabel(self.groupEndpoints)
         self.functionsLabel.setObjectName(u"functionsLabel")
 
-        self.formLayout.setWidget(5, QFormLayout.ItemRole.LabelRole, self.functionsLabel)
+        self.formLayout.setWidget(6, QFormLayout.ItemRole.LabelRole, self.functionsLabel)
 
         self.selectFuncs = QPushButton(self.groupEndpoints)
         self.selectFuncs.setObjectName(u"selectFuncs")
@@ -185,7 +195,7 @@ class Ui_AuthPanel(object):
         self.selectFuncs.setMaximumSize(QSize(296, 32))
         self.selectFuncs.setAutoDefault(False)
 
-        self.formLayout.setWidget(5, QFormLayout.ItemRole.FieldRole, self.selectFuncs)
+        self.formLayout.setWidget(6, QFormLayout.ItemRole.FieldRole, self.selectFuncs)
 
 
         self.rootLayout.addWidget(self.groupEndpoints)
@@ -254,6 +264,11 @@ class Ui_AuthPanel(object):
         self.labelScope.setText(QCoreApplication.translate("AuthPanel", u"Scope", None))
         self.radioButton_2.setText(QCoreApplication.translate("AuthPanel", u"Public", None))
         self.radioButton.setText(QCoreApplication.translate("AuthPanel", u"Private", None))
+        self.labelCache.setText(QCoreApplication.translate("AuthPanel", u"Cache", None))
+#if QT_CONFIG(tooltip)
+        self.noCacheCheckBox.setToolTip(QCoreApplication.translate("AuthPanel", u"Skip cached results and re-run every processing stage.", None))
+#endif // QT_CONFIG(tooltip)
+        self.noCacheCheckBox.setText(QCoreApplication.translate("AuthPanel", u"Disable cache", None))
         self.functionsLabel.setText(QCoreApplication.translate("AuthPanel", u"Functions", None))
         self.selectFuncs.setText(QCoreApplication.translate("AuthPanel", u"Select Functions to Upload", None))
         self.cancelButton.setText(QCoreApplication.translate("AuthPanel", u"Cancel", None))

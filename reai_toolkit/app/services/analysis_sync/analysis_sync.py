@@ -11,8 +11,8 @@ import ida_name
 from loguru import logger
 from revengai import (
     AnalysesCoreApi,
+    AnalysisBasicInfoOutputBody,
     BaseResponseAnalysisFunctionMapping,
-    BaseResponseBasic,
     Configuration,
 )
 
@@ -91,16 +91,18 @@ class AnalysisSyncService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            analysis_details: BaseResponseBasic = analyses_client.get_analysis_basic_info(analysis_id)
-            model_id = analysis_details.data.model_id
+            analysis_details: AnalysisBasicInfoOutputBody = (
+                analyses_client.get_analysis_basic_info_0(analysis_id)
+            )
+            model_id = analysis_details.model_id
             self.netstore_service.put_model_id(model_id)
-            model_name = analysis_details.data.model_name
+            model_name = analysis_details.model_name
             self.netstore_service.put_model_name(model_name)
 
             local_base_address: int = self._get_current_base_address()
 
-            if analysis_details.data and analysis_details.data.base_address is not None:
-                remote_base_address: int = analysis_details.data.base_address
+            if analysis_details.base_address is not None:
+                remote_base_address: int = analysis_details.base_address
 
                 if local_base_address != remote_base_address:
                     base_address_delta: int = remote_base_address - local_base_address

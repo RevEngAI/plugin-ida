@@ -7,6 +7,7 @@ from loguru import logger
 from revengai import AnalysesCoreApi, BaseResponseConfigResponse, Configuration, Symbols
 from revengai.api.config_api import ConfigApi
 
+from revengai.models.analysis_config import AnalysisConfig
 from revengai.models.analysis_create_request import AnalysisCreateRequest
 from revengai.models.analysis_create_response import AnalysisCreateResponse
 from revengai.models.analysis_scope import AnalysisScope
@@ -36,6 +37,7 @@ class UploadService(IThreadService):
         debug_file_path: str | None = None,
         tags: Optional[list[str]] = None,
         public: bool = True,
+        no_cache: bool = False,
         thread_callback: Optional[Callable[[GenericApiReturn], None]] = None
     ) -> None:
         """
@@ -51,6 +53,7 @@ class UploadService(IThreadService):
                 debug_file_path,
                 tags,
                 public,
+                no_cache,
             ),
         )
 
@@ -67,6 +70,7 @@ class UploadService(IThreadService):
         debug_file_path: str | None = None,
         tags: Optional[list[str]] = None,
         public: bool = True,
+        no_cache: bool = False,
     ) -> None:
         """
         Uploads the binary (and optional debug file) and starts an analysis.
@@ -119,7 +123,8 @@ class UploadService(IThreadService):
             debug_sha256=debug_sha256,
             tags=tags or [],
             public=public,
-            symbols=symbols
+            symbols=symbols,
+            no_cache=no_cache,
         )
         self.call_callback(generic_return=final_response)
 
@@ -197,6 +202,7 @@ class UploadService(IThreadService):
         debug_sha256: Optional[str] = None,
         tags: Optional[list[str]] = None,
         public: bool = True,
+        no_cache: bool = False,
     ) -> GenericApiReturn[AnalysisCreateResponse]:
         if symbols.function_boundaries is None:
             return GenericApiReturn(
@@ -216,6 +222,7 @@ class UploadService(IThreadService):
             tags=[Tag(name=tag) for tag in (tags or [])],
             analysis_scope=AnalysisScope.PUBLIC if public else AnalysisScope.PRIVATE,
             symbols=symbols,
+            analysis_config=AnalysisConfig(no_cache=no_cache),
         )
 
         response = self.api_request_returning(

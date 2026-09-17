@@ -19,6 +19,7 @@ import ida_name
 from libbs.decompilers.ida.compat import execute_read, execute_ui
 
 from reai_toolkit.app.app import App
+from reai_toolkit.app.components.tabs.chat_render import jump_href
 from reai_toolkit.app.components.tabs.chat_tab import ChatPanel, ChatStreamWorker
 from reai_toolkit.app.coordinators.base_coordinator import BaseCoordinator
 from reai_toolkit.app.factory import DialogFactory
@@ -97,6 +98,7 @@ class ChatCoordinator(BaseCoordinator):
         panel.on_select_conversation = self.load_conversation
         panel.on_request_history = self.request_history
         panel.on_jump = self.jump_to
+        panel.resolve_entity = self.entity_href
         panel.on_stream_event = self.on_stream_event
         panel.on_stream_conversation_created = self.on_stream_conversation_created
         panel.on_stream_error = self.on_stream_error
@@ -276,9 +278,7 @@ class ChatCoordinator(BaseCoordinator):
                 matches[fid] = ea
         if not matches:
             return
-        result = self.app.data_types_service.import_data_types(
-            matches, apply_stack_vars=True
-        )
+        result = self.app.data_types_service.import_data_types(matches)
         if result.error:
             self.log.warning(f"Failed to sync data types: {result.error}")
             return
@@ -315,6 +315,32 @@ class ChatCoordinator(BaseCoordinator):
                 self._ai_decomp_coord.follow_function(last_ea)
 
         threading.Thread(target=_work, daemon=True).start()
+
+    def entity_href(self, kind: str, entity_id: int) -> str | None:
+        """Where a `FUNCTION_<id>` token in the transcript should lead.
+
+        A function in this database is worth more as a local jump than as a
+        browser tab, so prefer that and fall back to the portal.
+        """
+        portal: str = (self.app.config_service.portal_url or "").rstrip("/")
+
+        if kind == "FUNCTION":
+            func_map = self.app.netstore_service.get_function_mapping()
+            ea = func_map.function_map.get(str(entity_id)) if func_map else None
+            if ea is not None:
+                return jump_href(int(ea))
+            analysis_id = self.app.netstore_service.get_analysis_id()
+            if portal and analysis_id is not None:
+                return f"{portal}/analyses/{analysis_id}?view=functions&fn={entity_id}"
+            return None
+
+        if not portal:
+            return None
+        if kind == "ANALYSIS":
+            return f"{portal}/analyses/{entity_id}"
+        if kind == "COLLECTION":
+            return f"{portal}/collections/{entity_id}"
+        return None
 
     @execute_ui
     def jump_to(self, ea: int) -> None:

@@ -12,6 +12,7 @@ from reai_toolkit.app.components.tabs.chat_render import (
     jump_href,
     parse_jump_href,
     render_transcript_markdown,
+    rewrite_entity_links,
     title_case,
 )
 from reai_toolkit.app.services.chat.reducer import build_initial_state
@@ -123,3 +124,65 @@ def test_find_pending_confirmation():
     pending = find_pending_confirmation(state)
     assert pending is not None and pending.id == "c2"
     assert find_pending_confirmation(ChatState()) is None
+
+
+def _resolver(kind, entity_id):
+    if kind == "FUNCTION" and entity_id == 1:
+        return jump_href(0x140001000)
+    if kind == "FUNCTION":
+        return f"https://portal.reveng.ai/analyses/9?view=functions&fn={entity_id}"
+    if kind == "ANALYSIS":
+        return f"https://portal.reveng.ai/analyses/{entity_id}"
+    return None
+
+
+def test_function_href_in_this_database_becomes_a_local_jump():
+    assert rewrite_entity_links("[foo](FUNCTION_1)", _resolver) == (
+        f"[foo]({jump_href(0x140001000)})"
+    )
+
+
+def test_function_href_elsewhere_falls_back_to_the_portal():
+    assert rewrite_entity_links("[foo](FUNCTION_42)", _resolver) == (
+        "[foo](https://portal.reveng.ai/analyses/9?view=functions&fn=42)"
+    )
+
+
+def test_bare_token_in_prose_becomes_a_link():
+    assert rewrite_entity_links("renamed FUNCTION_42 today", _resolver) == (
+        "renamed [FUNCTION_42]"
+        "(https://portal.reveng.ai/analyses/9?view=functions&fn=42) today"
+    )
+
+
+def test_analysis_token_points_at_the_portal():
+    assert rewrite_entity_links("[run](ANALYSIS_7)", _resolver) == (
+        "[run](https://portal.reveng.ai/analyses/7)"
+    )
+
+
+def test_unresolvable_token_is_left_alone_rather_than_linked_nowhere():
+    text = "see [c](COLLECTION_5) and COLLECTION_5"
+    assert rewrite_entity_links(text, _resolver) == text
+
+
+def test_tokens_inside_code_are_left_verbatim():
+    fenced = "```\nundefined8 FUNCTION_42(void)\n```"
+    assert rewrite_entity_links(fenced, _resolver) == fenced
+    assert rewrite_entity_links("`FUNCTION_42`", _resolver) == "`FUNCTION_42`"
+
+
+def test_a_token_used_as_link_text_is_not_double_wrapped():
+    text = f"[FUNCTION_42]({jump_href(16)})"
+    assert rewrite_entity_links(text, _resolver) == text
+
+
+def test_render_without_a_resolver_leaves_the_transcript_untouched():
+    state = ChatState(items=[AssistantMessage(id="m1", content="[foo](FUNCTION_1)", is_streaming=False)])
+    assert "FUNCTION_1" in render_transcript_markdown(state)
+
+
+def test_render_applies_the_resolver_to_assistant_text():
+    state = ChatState(items=[AssistantMessage(id="m1", content="[foo](FUNCTION_1)", is_streaming=False)])
+    out = render_transcript_markdown(state, _resolver)
+    assert jump_href(0x140001000) in out
