@@ -12,6 +12,7 @@ from reai_toolkit.app.services.ai_decomp.stream import (
     EVENT_RENAME_APPLIED,
     EVENT_SOURCE_DELTA,
     EVENT_SOURCE_RESET,
+    EVENT_TYPES_APPLIED,
     EVENT_TYPES_SUGGESTED,
     EVENT_WARNING,
     DecompEvent,
@@ -235,6 +236,28 @@ def test_renames_warnings_and_type_suggestions_are_collected():
     assert state.renames == [("v1", "count")]
     assert state.warnings == ["truncated output"]
     assert (state.types_suggested, state.members_suggested) == (2, 7)
+
+
+def test_types_applied_records_the_applied_and_skipped_counts():
+    state = reduce_stream(
+        [
+            _ev(EVENT_TYPES_SUGGESTED, types=3, members=9),
+            _ev(EVENT_TYPES_APPLIED, types=2, skipped=1),
+        ]
+    )
+
+    assert (state.types_applied, state.types_skipped) == (2, 1)
+    assert (state.types_suggested, state.members_suggested) == (3, 9)
+
+
+def test_types_applied_frames_survive_the_parser():
+    chunks = [_frame(EVENT_TYPES_APPLIED, types=2, skipped=1)]
+
+    events = list(iter_stream_events(chunks))
+
+    assert [(e.type, e.types, e.skipped) for e in events] == [
+        (EVENT_TYPES_APPLIED, 2, 1)
+    ]
 
 
 def test_a_warning_with_no_message_falls_back_to_its_kind():

@@ -3,8 +3,11 @@ from unittest.mock import MagicMock
 
 import pytest
 from revengai import ApiException
+from revengai.models.create_metadata import CreateMetadata
 from revengai.models.get_analysis_logs_output_body import GetAnalysisLogsOutputBody
-from revengai.models.status_output import StatusOutput
+from revengai.models.operation_create_metadata_create_result import (
+    OperationCreateMetadataCreateResult,
+)
 
 from reai_toolkit.app.services.analysis_status import analysis_status as svc_mod
 from reai_toolkit.app.services.analysis_status.analysis_status import (
@@ -12,6 +15,7 @@ from reai_toolkit.app.services.analysis_status.analysis_status import (
 )
 
 ANALYSIS_ID = 4242
+BINARY_ID = 77
 
 
 @pytest.fixture(autouse=True)
@@ -41,9 +45,21 @@ def sdk(mocker):
     return api_inst
 
 
-def _status(value: str):
-    return MagicMock(
-        data=StatusOutput.model_construct(analysis_id=ANALYSIS_ID, analysis_status=value)
+def _operation(status: str):
+    return OperationCreateMetadataCreateResult(
+        done=status in ("Complete", "Error"),
+        name=f"operations/analyses/{ANALYSIS_ID}",
+        metadata=CreateMetadata(
+            analysis_id=ANALYSIS_ID, binary_id=BINARY_ID, status=status
+        ),
+    )
+
+
+def _operation_without_metadata():
+    return OperationCreateMetadataCreateResult(
+        done=False,
+        name=f"operations/analyses/{ANALYSIS_ID}",
+        metadata=None,
     )
 
 
@@ -55,7 +71,7 @@ def _poll(service):
 
 
 def test_complete_status_reports_analysis_id(service, sdk, netstore):
-    sdk.get_analysis_status.return_value = _status("Complete")
+    sdk.v3_get_analysis_operation.return_value = _operation("Complete")
 
     cb = _poll(service)
 
@@ -66,8 +82,16 @@ def test_complete_status_reports_analysis_id(service, sdk, netstore):
     netstore.put_analysis_status.assert_called_with("Complete")
 
 
+def test_status_is_read_from_operation_metadata(service, sdk):
+    sdk.v3_get_analysis_operation.return_value = _operation("Complete")
+
+    _poll(service)
+
+    sdk.v3_get_analysis_operation.assert_called_with(analysis_id=ANALYSIS_ID)
+
+
 def test_error_status_reports_failure(service, sdk):
-    sdk.get_analysis_status.return_value = _status("Error")
+    sdk.v3_get_analysis_operation.return_value = _operation("Error")
 
     cb = _poll(service)
 
@@ -77,7 +101,7 @@ def test_error_status_reports_failure(service, sdk):
 
 
 def test_status_request_failure_surfaces_error(service, sdk):
-    sdk.get_analysis_status.side_effect = ApiException(status=500, reason="boom")
+    sdk.v3_get_analysis_operation.side_effect = ApiException(status=500, reason="boom")
 
     cb = _poll(service)
 
@@ -86,10 +110,30 @@ def test_status_request_failure_surfaces_error(service, sdk):
     sdk.v3_get_analysis_logs.assert_not_called()
 
 
-def test_in_progress_status_keeps_polling_until_complete(service, sdk):
-    sdk.get_analysis_status.side_effect = [_status("Processing"), _status("Complete")]
+def test_in_progress_status_keeps_polling_until_complete(service, sdk, netstore):
+    sdk.v3_get_analysis_operation.side_effect = [
+        _operation("Processing"),
+        _operation("Complete"),
+    ]
 
     cb = _poll(service)
 
-    assert sdk.get_analysis_status.call_count == 2
+    assert sdk.v3_get_analysis_operation.call_count == 2
     assert cb.call_args[0][0].success is True
+    assert [call.args[0] for call in netstore.put_analysis_status.call_args_list] == [
+        "Processing",
+        "Complete",
+    ]
+
+
+def test_missing_metadata_keeps_polling_without_recording_status(service, sdk, netstore):
+    sdk.v3_get_analysis_operation.side_effect = [
+        _operation_without_metadata(),
+        _operation("Complete"),
+    ]
+
+    cb = _poll(service)
+
+    assert sdk.v3_get_analysis_operation.call_count == 2
+    assert cb.call_args[0][0].success is True
+    netstore.put_analysis_status.assert_called_once_with("Complete")

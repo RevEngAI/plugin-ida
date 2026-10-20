@@ -1,9 +1,8 @@
 from revengai import (
     AnalysisBasicInfoOutputBody,
-    BaseResponseAnalysisFunctionMapping,
-    FunctionMapping,
+    FunctionsCoreApi,
+    GetFunctionMapsOutputBody,
 )
-from revengai.models.analysis_function_mapping import AnalysisFunctionMapping
 
 
 def test_basic_info_carries_model_and_base_address():
@@ -12,12 +11,13 @@ def test_basic_info_carries_model_and_base_address():
     )
 
 
-def test_function_mapping_envelope_carries_function_maps():
-    assert {"status", "data"} <= set(BaseResponseAnalysisFunctionMapping.model_fields)
-    assert "function_maps" in AnalysisFunctionMapping.model_fields
-
-
-def test_function_mapping_fields():
+def test_func_maps_output_is_flat():
     assert {"function_map", "inverse_function_map", "name_map"} <= set(
-        FunctionMapping.model_fields
+        GetFunctionMapsOutputBody.model_fields
     )
+    assert "data" not in GetFunctionMapsOutputBody.model_fields
+    assert "function_maps" not in GetFunctionMapsOutputBody.model_fields
+
+
+def test_func_maps_lives_on_functions_core_api():
+    assert hasattr(FunctionsCoreApi, "v3_get_analysis_func_maps")

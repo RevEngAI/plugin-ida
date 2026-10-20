@@ -4,7 +4,7 @@ from typing import List, Optional
 from loguru import logger
 
 from revengai.models import (
-    BinarySearchResult,
+    BinarySearchResultBody,
     CollectionListItemBody,
     FunctionMatch,
     MatchedFunction,
@@ -178,7 +178,7 @@ class MatchingDialog(DialogBase):
         self._initCollectionsHeader()
 
         # ----------------- Binaries state -----------------
-        self._selected_binaries: dict[str, BinarySearchResult] = {}
+        self._selected_binaries: dict[str, BinarySearchResultBody] = {}
         self._binariesDebounce = QtCore.QTimer(self)
         self._binariesDebounce.setSingleShot(True)
         self._binariesDebounce.timeout.connect(self._performBinariesSearch)
@@ -557,7 +557,7 @@ class MatchingDialog(DialogBase):
         text = getattr(self.ui, "editBinaries", None)
         query = text.text().strip() if text else ""
 
-        response: GenericApiReturn[List[BinarySearchResult]] = (
+        response: GenericApiReturn[List[BinarySearchResultBody]] = (
             self.matching_service.search_binaries(text_input=query)
         )
 
@@ -593,7 +593,7 @@ class MatchingDialog(DialogBase):
             else:
                 hdr.setSectionResizeMode(i, QtWidgets.QHeaderView.Stretch)
 
-    def _fillBinariesPopup(self, query: str, rows: list[BinarySearchResult]):
+    def _fillBinariesPopup(self, query: str, rows: list[BinarySearchResultBody]):
         if not hasattr(self.ui, "binariesPopupView"):
             return
         view = self.ui.binariesPopupView

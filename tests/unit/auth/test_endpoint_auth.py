@@ -83,7 +83,7 @@ def test_the_call_discovery_actually_finds_the_plugins_endpoints():
     calls = _api_calls()
 
     assert "get_me" in calls.get("IAMUsersApi", set())
-    assert "get_config" in calls.get("ConfigApi", set())
+    assert "v3_get_config" in calls.get("ConfigApi", set())
     assert sum(len(v) for v in calls.values()) > 40
 
 

@@ -19,10 +19,8 @@ from revengai.models.patch_comment_body import PatchCommentBody
 from revengai.models.summary_data import SummaryData
 from revengai.models.task_status import TaskStatus
 from revengai.models.token import Token
-from revengai.models.upsert_ai_decomplation_rating_request import (
-    UpsertAiDecomplationRatingRequest,
-)
 from revengai.models.upsert_overrides_input_body import UpsertOverridesInputBody
+from revengai.models.upsert_rating_input_body import UpsertRatingInputBody
 from revengai.models.workflow_progress import WorkflowProgress
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -239,9 +237,9 @@ class AiDecompService(IThreadService):
     ) -> None:
         try:
             with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-                FunctionsAIDecompilationApi(api_client).upsert_ai_decompilation_rating(
+                FunctionsAIDecompilationApi(api_client).v3_upsert_ai_decompilation_rating(
                     function_id=function_id,
-                    upsert_ai_decomplation_rating_request=UpsertAiDecomplationRatingRequest(
+                    upsert_rating_input_body=UpsertRatingInputBody(
                         rating=rating, reason=None
                     ),
                 )
