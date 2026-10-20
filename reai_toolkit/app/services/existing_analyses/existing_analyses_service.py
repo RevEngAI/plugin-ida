@@ -2,13 +2,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from revengai import AnalysesCoreApi, Configuration
-from revengai.models import (
-    AnalysisRecord,
-    AppApiRestV2AnalysesEnumsOrderBy,
-    Order,
-    StatusInput,
-    Workspace,
-)
+from revengai.models import AnalysisRecordBody
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -22,28 +16,28 @@ class ExistingAnalysesService(IThreadService):
     def __init__(self, netstore_service: SimpleNetStore, sdk_config: Configuration):
         super().__init__(netstore_service=netstore_service, sdk_config=sdk_config)
 
-    def _fetch_analysis_records(self, sha256_hash: str) -> List[AnalysisRecord]:
+    def _fetch_analysis_records(self, sha256_hash: str) -> List[AnalysisRecordBody]:
         """
         Helper method to fetch analysis records by SHA256 hash.
-        Returns a list of AnalysisRecord.
+        Returns a list of AnalysisRecordBody.
         """
 
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            result = analyses_client.list_analyses(
-                workspace=[Workspace.PERSONAL],
-                status=[StatusInput.COMPLETE],
+            result = analyses_client.v3_list_analyses(
+                analysis_scope=["PRIVATE"],
+                status=["Complete"],
                 sha256_hash=sha256_hash,
-                order_by=AppApiRestV2AnalysesEnumsOrderBy.CREATED,
-                order=Order.DESC,
+                order_by="created",
+                order="DESC",
             )
 
-            return result.data.results
+            return result.results or []
 
     def fetch_analyses_same_hash(
         self, file_path: str
-    ) -> GenericApiReturn[List[AnalysisRecord]]:
+    ) -> GenericApiReturn[List[AnalysisRecordBody]]:
         """
         Fetches analyses with the same hash as the given file.
         Returns a list of analysis summaries.
