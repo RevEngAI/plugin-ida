@@ -37,9 +37,9 @@ def service(netstore):
 
 
 @pytest.fixture
-def search_api(mocker):
+def binaries_api(mocker):
     mocker.patch.object(MatchingService, "yield_api_client")
-    api_class = mocker.patch.object(svc_mod, "SearchApi")
+    api_class = mocker.patch.object(svc_mod, "BinariesApi")
     api_inst = MagicMock()
     api_class.return_value = api_inst
     return api_inst
@@ -109,19 +109,19 @@ def test_search_collections_failure_returns_empty_success(service, collections_a
     assert out.data == []
 
 
-def test_search_binaries_queries_name_and_sha_excluding_current(service, search_api):
-    search_api.search_binaries.return_value = MagicMock(
-        data=MagicMock(results=[MagicMock()])
-    )
+def test_search_binaries_queries_name_and_sha_excluding_current(service, binaries_api):
+    binaries_api.v3_search_binaries.return_value = MagicMock(results=[MagicMock()])
 
     out = service.search_binaries("abc")
 
     assert out.success is True
     assert len(out.data) == 2  # one per call (name + sha)
-    assert search_api.search_binaries.call_count == 2
-    for call in search_api.search_binaries.call_args_list:
+    assert binaries_api.v3_search_binaries.call_count == 2
+    for call in binaries_api.v3_search_binaries.call_args_list:
         assert call.kwargs["exclude_binary_id"] == 7
         assert call.kwargs["model_name"] == "binnet-0.1"
+        assert call.kwargs["limit"] == 5
+        assert call.kwargs["offset"] == 0
 
 
 def test_perform_matching_emits_start_batch_summary_and_filters_results(service, core_api):

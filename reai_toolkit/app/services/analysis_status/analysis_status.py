@@ -5,10 +5,10 @@ from typing import Any, Callable
 from loguru import logger
 from revengai import (
     AnalysesCoreApi,
-    BaseResponseStatus,
     Configuration,
+    CreateMetadata,
     GetAnalysisLogsOutputBody,
-    StatusOutput,
+    OperationCreateMetadataCreateResult,
 )
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -37,7 +37,7 @@ class AnalysisStatusService(IThreadService):
             args=(analysis_id,),
         )
 
-    def _api_get_status(self, analysis_id: int) -> StatusOutput | None:
+    def _api_get_status(self, analysis_id: int) -> CreateMetadata | None:
         """
         Calls the API to get the analysis status.
         Returns GenericApiReturn with status string on success.
@@ -45,12 +45,14 @@ class AnalysisStatusService(IThreadService):
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
 
-            analysis_status: BaseResponseStatus = analyses_client.get_analysis_status(analysis_id=analysis_id)
-            status: StatusOutput | None = analysis_status.data
-            if status:
-                self.netstore_service.put_analysis_status(status.analysis_status)
+            operation: OperationCreateMetadataCreateResult = (
+                analyses_client.v3_get_analysis_operation(analysis_id=analysis_id)
+            )
+            metadata: CreateMetadata | None = operation.metadata
+            if metadata:
+                self.netstore_service.put_analysis_status(metadata.status)
 
-            return analysis_status.data
+            return metadata
 
     def _api_get_logs(self, analysis_id: int) -> GetAnalysisLogsOutputBody | None:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
@@ -83,7 +85,7 @@ class AnalysisStatusService(IThreadService):
                     for entry in (logs.entries or []):
                         logger.debug(f"RevEng.AI Remote Analysis - {entry.text}")
 
-                if get_status_response.data and (status := get_status_response.data.analysis_status):
+                if get_status_response.data and (status := get_status_response.data.status):
                     logger.info(f"RevEng.AI: Status - {status}")
                     if status == "Complete":
                         self.call_callback(

@@ -1,5 +1,5 @@
 from revengai import (
-    BinarySearchResult,
+    BinarySearchResultBody,
     CollectionListItemBody,
     FunctionMapping,
     FunctionMatch,
@@ -61,7 +61,7 @@ def test_matched_function_fields():
 
 def test_search_result_fields():
     assert {"binary_id", "binary_name", "sha_256_hash"} <= set(
-        BinarySearchResult.model_fields
+        BinarySearchResultBody.model_fields
     )
     assert {"collection_id", "collection_name"} <= set(
         CollectionListItemBody.model_fields

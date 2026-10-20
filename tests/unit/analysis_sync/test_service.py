@@ -5,6 +5,7 @@ from revengai.models.analysis_basic_info_output_body import (
     AnalysisBasicInfoOutputBody,
 )
 from revengai.models.function_mapping import FunctionMapping
+from revengai.models.get_function_maps_output_body import GetFunctionMapsOutputBody
 
 from reai_toolkit.app.services.analysis_sync import analysis_sync as svc_mod
 from reai_toolkit.app.services.analysis_sync.analysis_sync import AnalysisSyncService
@@ -266,3 +267,26 @@ def test_fetch_model_id_skips_rebase_when_base_address_unknown(
     service._fetch_model_id(1234)
 
     rebase.assert_not_called()
+
+
+@pytest.fixture
+def functions_api(mocker):
+    mocker.patch.object(AnalysisSyncService, "yield_api_client")
+    api_class = mocker.patch.object(svc_mod, "FunctionsCoreApi")
+    api = MagicMock()
+    api_class.return_value = api
+    return api
+
+
+def test_fetch_function_map_reads_v3_func_maps(service, functions_api, netstore):
+    body = GetFunctionMapsOutputBody.model_construct(
+        function_map={"1": 0x1000},
+        inverse_function_map={"4096": 1},
+        name_map={"4096": "fn"},
+    )
+    functions_api.v3_get_analysis_func_maps.return_value = body
+
+    assert service._fetch_function_map(1234) is body
+
+    functions_api.v3_get_analysis_func_maps.assert_called_once_with(analysis_id=1234)
+    netstore.put_function_mapping.assert_called_once_with(body)

@@ -630,7 +630,7 @@ def test_mutation_unknown_function_id_reports_failure(service, sdk, netstore):
 
 
 def test_rate_decomp_calls_upsert_rating(service, sdk):
-    sdk.upsert_ai_decompilation_rating.return_value = MagicMock()
+    sdk.v3_upsert_ai_decompilation_rating.return_value = None
 
     on_result = MagicMock()
     service.rate_decomp(
@@ -638,16 +638,17 @@ def test_rate_decomp_calls_upsert_rating(service, sdk):
     )
     _wait_mock(on_result)
 
-    _, kwargs = sdk.upsert_ai_decompilation_rating.call_args
+    _, kwargs = sdk.v3_upsert_ai_decompilation_rating.call_args
     assert kwargs["function_id"] == 42
-    body = kwargs["upsert_ai_decomplation_rating_request"]
+    body = kwargs["upsert_rating_input_body"]
     assert body.rating == AiDecompilationRating.POSITIVE
     assert body.reason is None
     assert on_result.call_args[0][0].success is True
+    assert on_result.call_args[0][0].data is True
 
 
 def test_rate_decomp_api_error_surfaces(service, sdk):
-    sdk.upsert_ai_decompilation_rating.side_effect = ApiException(status=422)
+    sdk.v3_upsert_ai_decompilation_rating.side_effect = ApiException(status=422)
 
     on_result = MagicMock()
     service.rate_decomp(
@@ -668,7 +669,7 @@ def test_rate_decomp_unknown_function_id_reports_failure(service, sdk, netstore)
 
     on_result.assert_called_once()
     assert on_result.call_args[0][0].success is False
-    sdk.upsert_ai_decompilation_rating.assert_not_called()
+    sdk.v3_upsert_ai_decompilation_rating.assert_not_called()
 
 
 def test_invalidate_clears_all_caches_and_inflight(service):

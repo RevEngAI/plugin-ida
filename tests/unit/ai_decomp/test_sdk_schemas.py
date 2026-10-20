@@ -5,9 +5,12 @@ Schema-shape assertions: fail loudly when the revengai SDK shape drifts.
 import inspect
 
 from revengai import FunctionsAIDecompilationApi, FunctionsCoreApi
+from revengai.models.ai_decompilation_rating import AiDecompilationRating
 from revengai.models.comments_data import CommentsData
 from revengai.models.create_ai_decomp_output_body import CreateAIDecompOutputBody
 from revengai.models.disassembly_output_body import DisassemblyOutputBody
+from revengai.models.event_types_applied import EventTypesApplied
+from revengai.models.event_types_suggested import EventTypesSuggested
 from revengai.models.line_attributions_data import LineAttributionsData
 from revengai.models.get_tokens_response import GetTokensResponse
 from revengai.models.inline_comment import InlineComment
@@ -18,7 +21,13 @@ from revengai.models.task_status import TaskStatus
 from revengai.models.token import Token
 from revengai.models.upsert_overrides_data import UpsertOverridesData
 from revengai.models.upsert_overrides_input_body import UpsertOverridesInputBody
+from revengai.models.upsert_rating_input_body import UpsertRatingInputBody
 from revengai.models.workflow_progress import WorkflowProgress
+
+from reai_toolkit.app.services.ai_decomp.stream import (
+    EVENT_TYPES_APPLIED,
+    EVENT_TYPES_SUGGESTED,
+)
 
 
 def test_ai_decomp_api_exposes_the_methods_the_plugin_calls():
@@ -34,7 +43,7 @@ def test_ai_decomp_api_exposes_the_methods_the_plugin_calls():
         "regenerate_ai_decompilation_inline_comments",
         "patch_ai_decompilation_inline_comment",
         "delete_ai_decompilation_inline_comment",
-        "upsert_ai_decompilation_rating",
+        "v3_upsert_ai_decompilation_rating",
         "v3_get_ai_decompilation_tokens",
         "v3_upsert_ai_decompilation_overrides",
         "v3_get_ai_decompilation_line_attributions",
@@ -77,6 +86,56 @@ def test_v3_token_methods_accept_plugin_kwargs():
         FunctionsAIDecompilationApi.v3_upsert_ai_decompilation_overrides
     ).parameters
     assert {"function_id", "upsert_overrides_input_body"} <= set(overrides)
+
+
+def test_v3_rating_method_accepts_plugin_kwargs():
+    rating = inspect.signature(
+        FunctionsAIDecompilationApi.v3_upsert_ai_decompilation_rating
+    ).parameters
+    assert {"function_id", "upsert_rating_input_body"} <= set(rating)
+
+    serialize = inspect.getsource(
+        FunctionsAIDecompilationApi._v3_upsert_ai_decompilation_rating_serialize
+    )
+    assert "/v3/functions/{function_id}/ai-decompilation/rating" in serialize
+
+
+def test_v3_rating_returns_nothing_so_success_is_the_absence_of_an_error():
+    assert (
+        inspect.signature(
+            FunctionsAIDecompilationApi.v3_upsert_ai_decompilation_rating
+        ).return_annotation
+        is None
+    )
+
+
+def test_upsert_rating_input_body_carries_rating_and_optional_reason():
+    assert {"rating", "reason"} <= set(UpsertRatingInputBody.model_fields)
+
+    body = UpsertRatingInputBody.from_json('{"rating": "POSITIVE"}')
+    assert body.rating == AiDecompilationRating.POSITIVE
+    assert body.reason is None
+
+
+def test_upsert_rating_input_body_takes_the_rating_enum_the_plugin_holds():
+    body = UpsertRatingInputBody(rating=AiDecompilationRating.NEGATIVE, reason=None)
+    assert body.to_dict() == {"rating": "NEGATIVE"}
+
+
+def test_the_sse_type_events_carry_the_names_the_stream_parser_keys_off():
+    suggested = EventTypesSuggested.from_json(
+        '{"event": "types_suggested", "data": {"attempt": 1, "seq": 4,'
+        ' "type": "types_suggested", "types": 2, "members": 7}}'
+    )
+    assert suggested.event == EVENT_TYPES_SUGGESTED
+    assert (suggested.data.types, suggested.data.members) == (2, 7)
+
+    applied = EventTypesApplied.from_json(
+        '{"event": "types_applied", "data": {"attempt": 1, "seq": 5,'
+        ' "type": "types_applied", "types": 2, "skipped": 1}}'
+    )
+    assert applied.event == EVENT_TYPES_APPLIED
+    assert (applied.data.types, applied.data.skipped) == (2, 1)
 
 
 def test_workflow_progress_has_expected_fields():
