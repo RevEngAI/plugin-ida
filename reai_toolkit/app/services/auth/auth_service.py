@@ -85,7 +85,7 @@ class AuthService:
             if hasattr(self.sdk_config, "user_agent"):
                 api_client.user_agent = self.sdk_config.user_agent
             try:
-                ConfigApi(api_client).get_config()
+                ConfigApi(api_client).v3_get_config()
                 logger.info("RevEng.AI: User authenticated successfully.")
                 self._is_authed = True
                 self.get_me(force_refresh=True)

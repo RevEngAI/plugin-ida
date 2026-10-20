@@ -15,6 +15,7 @@ EVENT_PROSE = "prose"
 EVENT_RENAME_APPLIED = "rename_applied"
 EVENT_SOURCE_DELTA = "source_delta"
 EVENT_SOURCE_RESET = "source_reset"
+EVENT_TYPES_APPLIED = "types_applied"
 EVENT_TYPES_SUGGESTED = "types_suggested"
 EVENT_WARNING = "warning"
 
@@ -41,6 +42,7 @@ class DecompEvent:
     applied: int = 0
     types: int = 0
     members: int = 0
+    skipped: int = 0
 
 
 def _as_int(value) -> int:
@@ -71,6 +73,7 @@ def normalize_event(event_name: Optional[str], payload: dict) -> Optional[Decomp
         applied=_as_int(payload.get("applied")),
         types=_as_int(payload.get("types")),
         members=_as_int(payload.get("members")),
+        skipped=_as_int(payload.get("skipped")),
     )
 
 
@@ -110,6 +113,8 @@ class StreamState:
     names_applied: int = 0
     types_suggested: int = 0
     members_suggested: int = 0
+    types_applied: int = 0
+    types_skipped: int = 0
 
     def reset_attempt(self, attempt: int) -> None:
         self.attempt = attempt
@@ -139,6 +144,9 @@ class StreamState:
         elif event.type == EVENT_TYPES_SUGGESTED:
             self.types_suggested = event.types
             self.members_suggested = event.members
+        elif event.type == EVENT_TYPES_APPLIED:
+            self.types_applied = event.types
+            self.types_skipped = event.skipped
         elif event.type == EVENT_DECOMP_FINISHED:
             self.decomp_finished = True
         elif event.type == EVENT_ATTEMPT_FAILED:

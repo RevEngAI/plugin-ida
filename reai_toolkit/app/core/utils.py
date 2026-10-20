@@ -2,6 +2,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from loguru import logger
+
 from libbs.decompilers.ida.compat import execute_read, execute_write
 
 import ida_funcs
@@ -12,6 +14,10 @@ import idc
 from revengai import ApiException, BaseResponse
 from revengai.models.function_boundary import FunctionBoundary
 from revengai.models.symbols import Symbols
+
+
+MAX_MANGLED_NAME_LENGTH = 4096
+MAX_FUNCTION_BOUNDARIES = 200000
 
 
 def parse_exception(exception: ApiException) -> BaseResponse | None:
@@ -67,10 +73,38 @@ def demangle(mangled_name: str, attr: int = idc.INF_SHORT_DN) -> str:
     return demangled_name if demangled_name else mangled_name
 
 
+def build_function_boundary(
+    mangled_name: str | None, start_address: int, end_address: int
+) -> FunctionBoundary | None:
+    if not mangled_name:
+        return None
+
+    if start_address < 0 or end_address < 0:
+        return None
+
+    return FunctionBoundary(
+        mangled_name=mangled_name[:MAX_MANGLED_NAME_LENGTH],
+        start_address=start_address,
+        end_address=end_address,
+    )
+
+
+def build_symbols(base_address: int, funcs: list[FunctionBoundary]) -> Symbols:
+    if len(funcs) > MAX_FUNCTION_BOUNDARIES:
+        logger.warning(
+            f"RevEng.AI: Truncating function boundaries from {len(funcs)} to "
+            f"{MAX_FUNCTION_BOUNDARIES}"
+        )
+        funcs = funcs[:MAX_FUNCTION_BOUNDARIES]
+
+    return Symbols(base_address=max(int(base_address), 0), function_boundaries=funcs)
+
+
 @execute_read
 def collect_symbols_from_ida(inclusive_end: bool = False) -> Symbols | None:
     base: int = idaapi.get_imagebase() or 0
     funcs: list[FunctionBoundary] = []
+    skipped: int = 0
 
     plt_section: idaapi.segment_t | None = idaapi.get_segm_by_name(".plt")
 
@@ -86,14 +120,19 @@ def collect_symbols_from_ida(inclusive_end: bool = False) -> Symbols | None:
         end_ea: int = f.end_ea - 1 if inclusive_end else f.end_ea
         mangled_name: str = idc.get_func_name(start_ea)
 
-        funcs.append(
-            FunctionBoundary(
-                mangled_name=mangled_name,
-                start_address=start_ea,
-                end_address=end_ea,
-            )
+        boundary: FunctionBoundary | None = build_function_boundary(
+            mangled_name, start_ea, end_ea
+        )
+        if boundary is None:
+            skipped += 1
+            continue
+
+        funcs.append(boundary)
+
+    if skipped:
+        logger.warning(
+            f"RevEng.AI: Skipped {skipped} function boundaries with an empty name "
+            "or a negative address"
         )
 
-    symbols = Symbols(base_address=int(base), function_boundaries=funcs)
-
-    return symbols
+    return build_symbols(base, funcs)
