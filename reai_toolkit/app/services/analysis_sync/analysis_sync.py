@@ -12,8 +12,9 @@ from loguru import logger
 from revengai import (
     AnalysesCoreApi,
     AnalysisBasicInfoOutputBody,
-    BaseResponseAnalysisFunctionMapping,
     Configuration,
+    FunctionsCoreApi,
+    GetFunctionMapsOutputBody,
 )
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -59,7 +60,7 @@ class AnalysisSyncService(IThreadService):
             args=(func_map, callback),
         )
 
-    def get_function_matches(self, callback: Callable[[FunctionMapping], None]) -> None:
+    def get_function_matches(self, callback: Callable[[GetFunctionMapsOutputBody], None]) -> None:
         analysis_id: int | None = self.netstore_service.get_analysis_id()
         if analysis_id is None:
             return
@@ -72,7 +73,7 @@ class AnalysisSyncService(IThreadService):
             logger.error("failed to retrieve model id")
             return
 
-        response: GenericApiReturn[FunctionMapping] = self.api_request_returning(
+        response: GenericApiReturn[GetFunctionMapsOutputBody] = self.api_request_returning(
             fn=lambda: self._fetch_function_map(analysis_id=analysis_id)
         )
 
@@ -118,17 +119,15 @@ class AnalysisSyncService(IThreadService):
     def _rebase_program(self, base_address_delta: int) -> None:
         idaapi.rebase_program(base_address_delta, idaapi.MSF_FIXONCE)
 
-    def _fetch_function_map(self, analysis_id: int) -> FunctionMapping:
+    def _fetch_function_map(self, analysis_id: int) -> GetFunctionMapsOutputBody:
         """
         Fetches the function map for the given analysis ID.
         """
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-            analyses_client = AnalysesCoreApi(api_client)
+            functions_client = FunctionsCoreApi(api_client)
 
-            function_map: BaseResponseAnalysisFunctionMapping = analyses_client.get_analysis_function_map(analysis_id=analysis_id)
-            if function_map.data:
-                func_map: FunctionMapping = function_map.data.function_maps
-                self.netstore_service.put_function_mapping(func_map)
+            func_map: GetFunctionMapsOutputBody = functions_client.v3_get_analysis_func_maps(analysis_id=analysis_id)
+            self.netstore_service.put_function_mapping(func_map)
 
             return func_map
 

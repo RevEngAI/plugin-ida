@@ -9,7 +9,8 @@ from libbs.decompilers.ida.compat import execute_read
 
 from loguru import logger
 from revengai import (
-    BinarySearchResult,
+    BinariesApi,
+    BinarySearchResultBody,
     CollectionListItemBody,
     CollectionsApi,
     Configuration,
@@ -20,7 +21,6 @@ from revengai import (
     GetMatchesStatusOutputBody,
     MatchFilters,
     ProgressMessage,
-    SearchApi,
     StartMatchingForFunctionsInputBody,
     TaskStatus,
 )
@@ -84,42 +84,42 @@ class MatchingService(IThreadService):
             )
         return response
 
-    def _search_binaries(self, text_input: str) -> List[BinarySearchResult]:
+    def _search_binaries(self, text_input: str) -> List[BinarySearchResultBody]:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-            search_client = SearchApi(api_client)
+            binaries_client = BinariesApi(api_client)
 
             model_name: str | None = self.netstore_service.get_model_name()
             current_binary_id: int | None = self.netstore_service.get_binary_id()
 
-            return_list: List[BinarySearchResult] = []
+            return_list: List[BinarySearchResultBody] = []
 
-            response = search_client.search_binaries(
+            response = binaries_client.v3_search_binaries(
                 partial_name=text_input,
                 partial_sha256=None,
-                page_size=5,
-                page=1,
+                limit=5,
+                offset=0,
                 model_name=model_name,
                 exclude_binary_id=current_binary_id,
             )
 
-            return_list.extend(response.data.results)
+            return_list.extend(response.results or [])
 
-            response = search_client.search_binaries(
+            response = binaries_client.v3_search_binaries(
                 partial_name=None,
                 partial_sha256=text_input,
-                page_size=5,
-                page=1,
+                limit=5,
+                offset=0,
                 model_name=model_name,
                 exclude_binary_id=current_binary_id,
             )
 
-            return_list.extend(response.data.results)
+            return_list.extend(response.results or [])
 
             return return_list
 
     def search_binaries(
         self, text_input: str
-    ) -> GenericApiReturn[List[BinarySearchResult]]:
+    ) -> GenericApiReturn[List[BinarySearchResultBody]]:
         response = self.api_request_returning(lambda: self._search_binaries(text_input))
         # If the search fails, return an empty list instead of an error
         if not response.success:

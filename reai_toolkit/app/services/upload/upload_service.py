@@ -4,7 +4,8 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from loguru import logger
-from revengai import AnalysesCoreApi, BaseResponseConfigResponse, Configuration, Symbols
+from revengai import AnalysesCoreApi, Configuration, GetConfigOutputBody, Symbols
+from revengai.api.binaries_api import BinariesApi
 from revengai.api.config_api import ConfigApi
 
 from revengai.models.analysis_config import AnalysisConfig
@@ -13,7 +14,7 @@ from revengai.models.analysis_create_response import AnalysisCreateResponse
 from revengai.models.analysis_scope import AnalysisScope
 from revengai.models.tag import Tag
 from revengai.models.upload_file_type import UploadFileType
-from revengai.models.base_response_upload_response import BaseResponseUploadResponse
+from revengai.models.upload_output_body import UploadOutputBody
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
@@ -90,7 +91,7 @@ class UploadService(IThreadService):
             debug_sha256 = sha256_file(dp)
 
         # First, upload the file
-        upload_response: GenericApiReturn[BaseResponseUploadResponse] = self.upload_user_file(
+        upload_response: GenericApiReturn[UploadOutputBody] = self.upload_user_file(
             file_path=file_path,
             upload_file_type=UploadFileType.BINARY,  # must match server UploadFileType
             force_overwrite=True,
@@ -131,9 +132,9 @@ class UploadService(IThreadService):
     def _get_max_upload_size(self) -> int:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             config_client: ConfigApi = ConfigApi(api_client)
-            response: BaseResponseConfigResponse = config_client.get_config()
-            if response.data:
-                return response.data.max_file_size_bytes
+            response: GetConfigOutputBody = config_client.v3_get_config()
+            if response.max_file_size_bytes:
+                return response.max_file_size_bytes
         
         return MAX_DEFAULT_FILE_SIZE_BYTES
 
@@ -141,15 +142,13 @@ class UploadService(IThreadService):
         self,
         upload_file_type: UploadFileType,
         file: Tuple[str, bytes],
-        packed_password: Optional[str] = None,
         force_overwrite: bool = False,
-    ) -> BaseResponseUploadResponse:
+    ) -> UploadOutputBody:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
-            analyses_client = AnalysesCoreApi(api_client)
-            return analyses_client.upload_file(
-                upload_file_type=UploadFileType(upload_file_type),
+            binaries_client = BinariesApi(api_client)
+            return binaries_client.v3_upload_file(
+                upload_file_type=UploadFileType(upload_file_type).value,
                 force_overwrite=force_overwrite,
-                packed_password=packed_password,
                 file=file,
             )
 
@@ -158,9 +157,8 @@ class UploadService(IThreadService):
         file_path: str,
         *,
         upload_file_type: UploadFileType,
-        packed_password: Optional[str] = None,
         force_overwrite: bool = False,
-    ) -> GenericApiReturn[BaseResponseUploadResponse]:
+    ) -> GenericApiReturn[UploadOutputBody]:
         p = Path(file_path)
         if not p.is_file():
             return GenericApiReturn(success=False, error_message="File does not exist.")
@@ -176,9 +174,9 @@ class UploadService(IThreadService):
             max_upload_size_mb: float = max_upload_size_bytes / (1024 * 1024)
             return GenericApiReturn(success=False, error_message=f"Failed to upload binary due to it exceeding maximum size limit of {max_upload_size_mb}MiB")
 
-        response: GenericApiReturn[BaseResponseUploadResponse] = self.api_request_returning(
+        response: GenericApiReturn[UploadOutputBody] = self.api_request_returning(
             lambda: self._upload_file_req(
-                upload_file_type, (p.name, blob), packed_password, force_overwrite
+                upload_file_type, (p.name, blob), force_overwrite
             )
         )
 

@@ -67,7 +67,7 @@ def test_get_sdk_config_builds_once_and_mutates_in_place(service):
 
 
 def test_verify_success(service, config_api):
-    config_api.get_config.return_value = MagicMock()
+    config_api.v3_get_config.return_value = MagicMock()
 
     ok, msg = service.verify()
 
@@ -77,7 +77,7 @@ def test_verify_success(service, config_api):
 
 
 def test_verify_api_exception_with_parsed_errors(service, config_api, mocker):
-    config_api.get_config.side_effect = ApiException(status=401)
+    config_api.v3_get_config.side_effect = ApiException(status=401)
     mocker.patch.object(
         svc_mod,
         "parse_exception",
@@ -92,7 +92,7 @@ def test_verify_api_exception_with_parsed_errors(service, config_api, mocker):
 
 
 def test_verify_api_exception_without_parsed_body(service, config_api, mocker):
-    config_api.get_config.side_effect = ApiException(status=500, reason="boom")
+    config_api.v3_get_config.side_effect = ApiException(status=500, reason="boom")
     mocker.patch.object(svc_mod, "parse_exception", return_value=None)
 
     ok, msg = service.verify()
@@ -103,7 +103,7 @@ def test_verify_api_exception_without_parsed_body(service, config_api, mocker):
 
 
 def test_verify_unexpected_exception(service, config_api):
-    config_api.get_config.side_effect = RuntimeError("network down")
+    config_api.v3_get_config.side_effect = RuntimeError("network down")
 
     ok, msg = service.verify()
 
@@ -163,7 +163,7 @@ def test_is_enthusiast_false_when_user_unavailable(service, iam_api):
 
 
 def test_verify_success_warms_user_cache(service, config_api, iam_api):
-    config_api.get_config.return_value = MagicMock()
+    config_api.v3_get_config.return_value = MagicMock()
     iam_api.get_me.return_value = _user("ENTHUSIAST")
 
     ok, _ = service.verify()
