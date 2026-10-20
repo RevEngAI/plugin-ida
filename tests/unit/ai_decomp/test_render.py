@@ -18,6 +18,7 @@ from reai_toolkit.app.coordinators.ai_decomp_render import (
     RENAME_NOT_ON_LINE,
     RENAME_UNRESOLVED,
     display_rows_for_source_lines,
+    own_function_placeholder,
     effective_values,
     find_token,
     index_of_identifier,
@@ -420,3 +421,25 @@ def test_render_stream_of_a_finished_run_keeps_the_source():
 def test_render_progress_without_steps_falls_back_to_status():
     text = render_progress(_wp(step="", step_index=0, steps_total=0, status="PENDING"))
     assert "// PENDING" in text.split("\n")
+
+
+def test_own_function_placeholder_finds_the_token_naming_the_function_itself():
+    tokens = _tokens(
+        rendered={
+            "@@V_v5@@": _rt("v5"),
+            "@@F_self@@": _rt("FUN_140004780", kind="own_function"),
+            "@@F_other@@": _rt("FUN_140001000", kind="function", function_id=9),
+        }
+    )
+
+    assert own_function_placeholder(tokens) == "@@F_self@@"
+
+
+def test_own_function_placeholder_is_none_when_no_own_function_token_exists():
+    tokens = _tokens(rendered={"@@V_v5@@": _rt("v5"), "@@P_a1@@": _rt("a1", kind="param")})
+
+    assert own_function_placeholder(tokens) is None
+
+
+def test_own_function_placeholder_is_none_when_there_are_no_tokens_yet():
+    assert own_function_placeholder(_tokens(rendered={})) is None

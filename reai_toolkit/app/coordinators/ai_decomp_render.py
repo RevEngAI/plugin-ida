@@ -20,6 +20,8 @@ if TYPE_CHECKING:
 
 _IDENT_RE = re.compile(r"[A-Za-z_]\w*")
 
+OWN_FUNCTION_KIND = "own_function"
+
 RENAME_NOT_READY = "The AI decompilation is still loading — try again once it finishes."
 RENAME_NOT_DECOMP_LINE = "This line is not part of the AI decompilation."
 RENAME_NOT_CODE_LINE = (
@@ -249,6 +251,14 @@ def effective_values(tokens: "GetTokensResponse") -> dict[str, str]:
         override = overrides.get(placeholder)
         values[placeholder] = override.value if override is not None else token.value
     return values
+
+
+def own_function_placeholder(tokens: "GetTokensResponse") -> Optional[str]:
+    rendered = tokens.placeholder_to_rendered_token or {}
+    for placeholder, token in rendered.items():
+        if token.kind == OWN_FUNCTION_KIND:
+            return placeholder
+    return None
 
 
 def names_token(ident: str, rendered_value: str) -> bool:

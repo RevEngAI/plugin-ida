@@ -17,6 +17,7 @@ from reai_toolkit.app.coordinators.ai_decomp_render import (
     RENAME_NOT_READY,
     RenderModel,
     display_rows_for_source_lines,
+    own_function_placeholder,
     render_progress,
     render_stream,
     render_view_with_map,
@@ -339,18 +340,35 @@ class AiDecompCoordinator(BaseCoordinator):
             return
 
         if self.ai_decomp_service.update_function_name(ea, name):
-            self.ai_decomp_service.tag_function_as_renamed(name)
-            self._hide_predicted_name()
-            self.refresh_disassembly_view()
+            self._after_function_renamed(ea, name)
             return
 
         final = self.ai_decomp_service.apply_deduped_name(ea, name)
         if final is None:
             self.show_info_dialog(msg=f"Could not rename this function to '{name}'.")
             return
-        self.ai_decomp_service.tag_function_as_renamed(final)
+        self._after_function_renamed(ea, final)
+
+    def _after_function_renamed(self, ea: int, name: str) -> None:
+        self.ai_decomp_service.tag_function_as_renamed(name)
         self._hide_predicted_name()
         self.refresh_disassembly_view()
+
+        placeholder = (
+            own_function_placeholder(self._current_tokenised)
+            if self._current_tokenised is not None
+            else None
+        )
+        if placeholder is None:
+            self.refresh_current()
+            return
+
+        self.ai_decomp_service.apply_overrides(
+            ea=ea,
+            overrides={placeholder: name},
+            on_decomp=lambda response: self._on_decomp_complete(ea, response),
+            on_tokenised=lambda response: self._on_tokenised_complete(ea, response),
+        )
 
     def request_rename(self, display_line: int, word: str) -> None:
         ea = self._current_func_vaddr
