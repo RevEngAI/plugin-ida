@@ -22,7 +22,7 @@ from packaging.version import Version
 PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
 PYPI_URL = "https://pypi.org/pypi/revengai/json"
 
-SDK_PIN_RE = re.compile(r'"revengai>=([\d.]+)"')
+SDK_PIN_RE = re.compile(r'"revengai>=([\w.]+)"')
 
 
 def fetch_latest_pypi_version() -> str:
