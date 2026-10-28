@@ -29,6 +29,14 @@ def test_update_function_name_idempotent_when_unchanged(add_func):
     assert BaseService.update_function_name(add_func, "reai_same") is True
 
 
+def test_update_function_name_rejects_non_identifier_names(add_func):
+    before = ida_name.get_name(add_func)
+
+    assert BaseService.update_function_name(add_func, "bad::name!!") is False
+    assert BaseService.update_function_name(add_func, "bad name") is False
+    assert ida_name.get_name(add_func) == before
+
+
 def test_update_function_name_respects_user_names(add_func):
     ida_name.set_name(add_func, "user_picked", ida_name.SN_CHECK)
 
