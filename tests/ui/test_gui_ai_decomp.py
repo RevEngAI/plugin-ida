@@ -113,6 +113,7 @@ def test_ai_decomp_editing_flow_in_gui(tmp_path):
 
     assert report["errors"] == [], (
         f"{report['errors']}"
+        f"\nreport: {report}"
         f"\nida log tail:\n{log_path.read_text()[-3000:] if log_path.is_file() else '(no log)'}"
     )
     assert report["ok"] is True
