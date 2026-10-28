@@ -105,7 +105,10 @@ def test_agent_chat_panel_in_gui(tmp_path):
 
     report = json.loads(report_path.read_text())
 
-    assert report["errors"] == [], report["errors"]
+    assert report["errors"] == [], (
+        f"{report['errors']}"
+        f"\nida log tail:\n{log_path.read_text()[-3000:] if log_path.is_file() else '(no log)'}"
+    )
     assert report["ok"] is True
     for check in CHECKS:
         assert report.get(check) is True, f"{check} failed: {report}"

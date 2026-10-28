@@ -80,7 +80,10 @@ def test_sync_never_opens_or_switches_pseudocode(tmp_path):
 
     report = json.loads(report_path.read_text())
 
-    assert report["errors"] == []
+    assert report["errors"] == [], (
+        f"{report['errors']}"
+        f"\nida log tail:\n{log_path.read_text()[-3000:] if log_path.is_file() else '(no log)'}"
+    )
     assert report["ok"] is True
     assert report["target_count"] > 0
     assert report["import_failed_ids"] == []

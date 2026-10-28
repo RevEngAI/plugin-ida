@@ -55,7 +55,7 @@ def _run(report: dict) -> None:
         return predicate()
 
     panel = ChatPanel(on_closed=lambda: None)
-    panel.Create(ChatPanel.TITLE)
+    report["create_returned"] = panel.Create(ChatPanel.TITLE)
     pump()
 
     if panel._transcript is None or panel._input is None:
