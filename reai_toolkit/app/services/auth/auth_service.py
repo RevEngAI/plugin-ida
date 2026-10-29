@@ -1,6 +1,8 @@
+import json
 from typing import Tuple
 
 from loguru import logger
+from pydantic import ValidationError
 from revengai import ApiClient, ApiException, ConfigApi, Configuration, IAMUsersApi, User
 
 from reai_toolkit.app.core.config_service import ConfigService
@@ -143,11 +145,27 @@ class AuthService:
                 api_client.user_agent = self.sdk_config.user_agent
             try:
                 self._user = IAMUsersApi(api_client).get_me()
+            except ValidationError:
+                self._user = self._get_me_unvalidated(api_client)
             except Exception as e:
                 logger.error(f"RevEng.AI: Failed to fetch current user: {e}")
                 self._user = None
 
         return self._user
+
+    @staticmethod
+    def _get_me_unvalidated(api_client: ApiClient) -> User | None:
+        try:
+            response = IAMUsersApi(api_client).get_me_without_preload_content()
+            if response.status != 200:
+                logger.error(
+                    f"RevEng.AI: Failed to fetch current user: HTTP {response.status}"
+                )
+                return None
+            return User.model_construct(**json.loads(response.data))
+        except Exception as e:
+            logger.error(f"RevEng.AI: Failed to fetch current user: {e}")
+            return None
 
     def is_enthusiast(self) -> bool:
         """

@@ -58,6 +58,32 @@ def _headless_env() -> dict[str, str]:
         return {"QT_QPA_PLATFORM": "offscreen"}
     return {}
 
+def _isolated_idausr(tmp_path) -> dict[str, str]:
+    # conftest points IDAUSR at one directory shared with the idalib session in
+    # this process. The GUI IDA spawned below must not share it: with the same
+    # IDAUSR it starts but never creates its windows, so OnCreate never runs.
+    usr = tmp_path / "idausr"
+    usr.mkdir(exist_ok=True)
+    reg = os.path.join(os.environ.get("IDADIR", ""), "ida.reg")
+    if os.path.isfile(reg):
+        shutil.copy(reg, usr / "ida.reg")
+    return {"IDAUSR": str(usr)}
+
+def _ida_path_without_venv(env: dict[str, str]) -> dict[str, str]:
+    # IDA's embedded Python resolves its site-packages from the first python3
+    # on PATH. Under `uv run` that is the project venv, which carries PySide6 as
+    # a dev dependency, so IDA 9.0/9.1 load Qt6 bindings into a Qt5 application
+    # and PluginForm never builds its widgets. Drop the venv so IDA uses the Qt
+    # binding it ships with.
+    venv = env.get("VIRTUAL_ENV")
+    if not venv:
+        return env
+    env = dict(env)
+    env["PATH"] = os.pathsep.join(
+        p for p in env.get("PATH", "").split(os.pathsep) if p and not p.startswith(venv)
+    )
+    return env
+
 
 @pytest.mark.skipif(
     os.environ.get("REAI_UI_TESTS") != "1",
@@ -76,12 +102,13 @@ def test_agent_chat_panel_in_gui(tmp_path):
     shutil.copy(HELLO_ELF, binary)
     report_path = tmp_path / "report.json"
     log_path = tmp_path / "ida.log"
-    env = dict(
+    env = _ida_path_without_venv(dict(
         os.environ,
         REAI_UI_REPORT=str(report_path),
         REAI_UI_ROOT=ROOT,
         **_headless_env(),
-    )
+        **_isolated_idausr(tmp_path),
+    ))
 
     proc = subprocess.run(
         [ida, "-A", f"-S{RUNNER}", f"-L{log_path}", str(binary)],
@@ -105,7 +132,11 @@ def test_agent_chat_panel_in_gui(tmp_path):
 
     report = json.loads(report_path.read_text())
 
-    assert report["errors"] == [], report["errors"]
+    assert report["errors"] == [], (
+        f"{report['errors']}"
+        f"\nreport: {report}"
+        f"\nida log tail:\n{log_path.read_text()[-3000:] if log_path.is_file() else '(no log)'}"
+    )
     assert report["ok"] is True
     for check in CHECKS:
         assert report.get(check) is True, f"{check} failed: {report}"

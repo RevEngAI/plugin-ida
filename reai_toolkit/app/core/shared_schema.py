@@ -1,3 +1,4 @@
+from enum import Enum
 from typing import Generic, List, Optional, TypeVar
 
 from pydantic import BaseModel
@@ -43,3 +44,12 @@ class FunctionBoundary(BaseModel):
 class Symbols(BaseModel):
     base_address: int
     function_boundaries: List[FunctionBoundary]
+
+
+class TaskStatus(str, Enum):
+    UNINITIALISED = "UNINITIALISED"
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    UNKNOWN_DEFAULT_OPEN_API = "unknown_default_open_api"

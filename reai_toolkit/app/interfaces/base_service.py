@@ -66,6 +66,13 @@ class BaseService:
                 # If is_uname isn't available/behaves oddly, treat unknown as not user
                 pass
 
+        # IDA 9.5 accepts non-identifier names through SN_CHECK where 9.3 and
+        # earlier rejected them, so validity is asserted here instead. Without
+        # this the caller never learns the name needs canonicalising and writes
+        # it into the IDB verbatim.
+        if not ida_name.is_ident(new_name):
+            return False
+
         # Prefer setting sync names as AUTO so users can easily override them later.
         # https://python.docs.hex-rays.com/ida_name/index.html#ida_name.set_name
         # SN_CHECK: check for validity
