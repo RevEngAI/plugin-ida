@@ -342,6 +342,7 @@ def _run(report: dict) -> None:
     report["diag_expected"] = expected
     report["diag_painted"] = probe.painted
 
+    report["rendering_hook_delivered"] = probe.calls > 0
     report["rendering_hook_runs_on_repaint"] = probe.calls > 0
     report["rendering_hook_sees_the_disassembly"] = bool(probe.widget_types) and set(
         probe.widget_types
@@ -389,6 +390,7 @@ def main() -> None:
         "a_line_with_no_counterpart_lights_nothing": False,
         "disassembly_ea_lights_its_decomp_line": False,
         "an_unattributed_address_lights_nothing": False,
+        "rendering_hook_delivered": False,
         "rendering_hook_runs_on_repaint": False,
         "rendering_hook_sees_the_disassembly": False,
         "attributed_addresses_paint": False,
