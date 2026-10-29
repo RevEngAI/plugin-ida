@@ -64,6 +64,17 @@ def _headless_env() -> dict[str, str]:
         return {"QT_QPA_PLATFORM": "offscreen"}
     return {}
 
+def _isolated_idausr(tmp_path) -> dict[str, str]:
+    # conftest points IDAUSR at one directory shared with the idalib session in
+    # this process. The GUI IDA spawned below must not share it: with the same
+    # IDAUSR it starts but never creates its windows, so OnCreate never runs.
+    usr = tmp_path / "idausr"
+    usr.mkdir(exist_ok=True)
+    reg = os.path.join(os.environ.get("IDADIR", ""), "ida.reg")
+    if os.path.isfile(reg):
+        shutil.copy(reg, usr / "ida.reg")
+    return {"IDAUSR": str(usr)}
+
 
 @pytest.mark.skipif(
     os.environ.get("REAI_UI_TESTS") != "1",
@@ -87,6 +98,7 @@ def test_ai_decomp_editing_flow_in_gui(tmp_path):
         REAI_UI_REPORT=str(report_path),
         REAI_UI_ROOT=ROOT,
         **_headless_env(),
+        **_isolated_idausr(tmp_path),
     )
 
     proc = subprocess.run(
