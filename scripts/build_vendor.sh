@@ -24,7 +24,7 @@ echo "==> Dropping the self-install so the checkout is not shadowed"
 rm -rf "$VENDOR/reai_toolkit" "$VENDOR"/reai_toolkit-*.dist-info
 
 echo "==> Verifying the vendor tree matches uv.lock"
-uv run python scripts/check_vendor.py
+uv run --no-dev python scripts/check_vendor.py
 
 echo "==> Vendored (this is what the plugin and the tests import)"
 for dist in "$VENDOR"/*.dist-info; do
