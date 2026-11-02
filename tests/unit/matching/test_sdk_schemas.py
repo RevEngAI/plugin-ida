@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from revengai import (
     BinarySearchResultBody,
     CollectionListItemBody,
@@ -8,9 +11,10 @@ from revengai import (
     MatchFilters,
     StartMatchingForFunctionsInputBody,
     StartMatchingOutputBody,
-    TaskStatus,
 )
 from revengai.models.matched_function import MatchedFunction
+
+from reai_toolkit.app.core.shared_schema import TaskStatus
 
 
 def test_function_match_fields():
@@ -47,10 +51,35 @@ def test_start_matching_output_fields():
     )
 
 
-def test_task_status_values():
-    assert {"UNINITIALISED", "PENDING", "RUNNING", "COMPLETED", "FAILED"} <= {
-        s.value for s in TaskStatus
-    }
+def test_every_task_status_the_plugin_holds_is_one_the_status_body_accepts():
+    for status in TaskStatus:
+        body = GetMatchesStatusOutputBody.model_validate(
+            {
+                "messages": [],
+                "percent": 0,
+                "status": status.value,
+                "step": "x",
+                "step_index": 0,
+                "step_share": 0,
+                "steps_total": 1,
+            }
+        )
+        assert body.status == status.value
+
+
+def test_the_status_body_still_rejects_a_status_the_plugin_does_not_know():
+    with pytest.raises(ValidationError):
+        GetMatchesStatusOutputBody.model_validate(
+            {
+                "messages": [],
+                "percent": 0,
+                "status": "HALTED",
+                "step": "x",
+                "step_index": 0,
+                "step_share": 0,
+                "steps_total": 1,
+            }
+        )
 
 
 def test_matched_function_fields():

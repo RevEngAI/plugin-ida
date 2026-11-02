@@ -219,6 +219,7 @@ def test_the_numeric_table_matches_the_persisted_backend_enum():
         17: "QUESTION_ASKED",
         18: "USER_ANSWERED",
         19: "TOOL_CALL_PROGRESS",
+        20: "AGENT_RUN_UPDATE",
     }
 
 

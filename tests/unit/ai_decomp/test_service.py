@@ -13,12 +13,12 @@ from revengai.models.comments_data import CommentsData
 from revengai.models.decompilation_data import DecompilationData
 from revengai.models.inline_comment import InlineComment
 from revengai.models.summary_data import SummaryData
-from revengai.models.task_status import TaskStatus
 from revengai.models.get_tokens_response import GetTokensResponse
 from revengai.models.rendered_token import RenderedToken
 from revengai.models.token import Token
 from revengai.models.workflow_progress import WorkflowProgress
 
+from reai_toolkit.app.core.shared_schema import TaskStatus
 from reai_toolkit.app.services.ai_decomp import ai_decomp_service as svc_mod
 from reai_toolkit.app.services.ai_decomp.ai_decomp_service import AiDecompService
 

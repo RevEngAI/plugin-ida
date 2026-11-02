@@ -1,6 +1,8 @@
+import json
 from unittest.mock import MagicMock
 
 import pytest
+from pydantic import ValidationError
 from revengai import ApiException
 
 from reai_toolkit.app.services.auth import auth_service as svc_mod
@@ -49,7 +51,6 @@ def test_build_sdk_config_sets_host_key_and_user_agent(service):
 
     assert cfg.host == "https://api.reveng.ai"
     assert cfg.api_key == {"APIKey": "secret-key"}
-    assert cfg.access_token == "secret-key"
     assert cfg.user_agent == "IDA/9.3 RevEng.AI_Plugin/1.2.3"
 
 
@@ -63,7 +64,6 @@ def test_get_sdk_config_builds_once_and_mutates_in_place(service):
     assert first is second
     assert second.host == "https://other.host"
     assert second.api_key == {"APIKey": "new-key"}
-    assert second.access_token == "new-key"
 
 
 def test_verify_success(service, config_api):
@@ -162,6 +162,64 @@ def test_is_enthusiast_false_when_user_unavailable(service, iam_api):
     assert service.is_enthusiast() is False
 
 
+def _deployment_payload(tier: str) -> dict:
+    return {
+        "user_id": 1,
+        "email": "a@b.c",
+        "role": "USER",
+        "tier": tier,
+        "created_at": "2026-10-28T09:00:00Z",
+        "profile": {"first_name": "A", "last_name": "B"},
+    }
+
+
+def _raw_response(payload: dict, status: int = 200) -> MagicMock:
+    response = MagicMock()
+    response.status = status
+    response.data = json.dumps(payload).encode()
+    return response
+
+
+def test_get_me_falls_back_when_the_model_wants_a_field_the_api_omits(
+    service, iam_api
+):
+    payload = _deployment_payload("ENTHUSIAST")
+    iam_api.get_me.side_effect = ValidationError.from_exception_data("User", [])
+    iam_api.get_me_without_preload_content.return_value = _raw_response(payload)
+
+    user = service.get_me()
+
+    assert user is not None
+    assert user.tier == "ENTHUSIAST"
+
+
+def test_the_tier_gate_still_applies_when_the_model_wants_a_field_the_api_omits(
+    service, iam_api
+):
+    iam_api.get_me.side_effect = ValidationError.from_exception_data("User", [])
+    iam_api.get_me_without_preload_content.return_value = _raw_response(
+        _deployment_payload("ENTHUSIAST")
+    )
+
+    assert service.is_enthusiast() is True
+
+
+def test_the_unvalidated_reread_still_reports_an_http_error_as_no_user(
+    service, iam_api
+):
+    iam_api.get_me.side_effect = ValidationError.from_exception_data("User", [])
+    iam_api.get_me_without_preload_content.return_value = _raw_response({}, status=401)
+
+    assert service.get_me() is None
+
+
+def test_a_real_user_payload_never_takes_the_unvalidated_path(service, iam_api):
+    iam_api.get_me.return_value = _user("REVERSER")
+
+    assert service.get_me().tier == "REVERSER"
+    iam_api.get_me_without_preload_content.assert_not_called()
+
+
 def test_verify_success_warms_user_cache(service, config_api, iam_api):
     config_api.v3_get_config.return_value = MagicMock()
     iam_api.get_me.return_value = _user("ENTHUSIAST")
@@ -173,22 +231,8 @@ def test_verify_success_warms_user_cache(service, config_api, iam_api):
     assert service.is_enthusiast() is True
 
 
-def test_both_auth_schemes_are_configured(service):
+def test_only_api_key_auth_is_configured(service):
     schemes = service.build_sdk_config().auth_settings()
 
-    assert set(schemes) == {"APIKey", "bearerAuth"}
+    assert set(schemes) == {"APIKey"}
 
-
-def test_bearer_only_endpoints_still_receive_an_authorization_header(service):
-    from revengai.api_client import ApiClient
-
-    client = ApiClient(configuration=service.build_sdk_config())
-    headers: dict = {}
-    client.update_params_for_auth(
-        headers, [], ["bearerAuth"], "/v2/iam/me", "GET", None
-    )
-
-    assert headers["Authorization"] == "Bearer secret-key", (
-        "/v2/iam/me accepts bearerAuth only; without access_token the request "
-        "goes out unauthenticated and the server answers 401"
-    )

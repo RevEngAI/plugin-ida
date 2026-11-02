@@ -17,14 +17,13 @@ from revengai.models.decompilation_data import DecompilationData
 from revengai.models.get_tokens_response import GetTokensResponse
 from revengai.models.patch_comment_body import PatchCommentBody
 from revengai.models.summary_data import SummaryData
-from revengai.models.task_status import TaskStatus
 from revengai.models.token import Token
 from revengai.models.upsert_overrides_input_body import UpsertOverridesInputBody
 from revengai.models.upsert_rating_input_body import UpsertRatingInputBody
 from revengai.models.workflow_progress import WorkflowProgress
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
-from reai_toolkit.app.core.shared_schema import GenericApiReturn
+from reai_toolkit.app.core.shared_schema import GenericApiReturn, TaskStatus
 from reai_toolkit.app.core.utils import parse_exception
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.ai_decomp.attribution import (

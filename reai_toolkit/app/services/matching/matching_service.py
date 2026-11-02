@@ -22,11 +22,10 @@ from revengai import (
     MatchFilters,
     ProgressMessage,
     StartMatchingForFunctionsInputBody,
-    TaskStatus,
 )
 
 from reai_toolkit.app.core import SimpleNetStore
-from reai_toolkit.app.core.shared_schema import GenericApiReturn
+from reai_toolkit.app.core.shared_schema import GenericApiReturn, TaskStatus
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.matching.schema import (
     BatchDoneEvent,

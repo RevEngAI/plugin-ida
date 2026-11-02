@@ -4,6 +4,9 @@ Schema-shape assertions: fail loudly when the revengai SDK shape drifts.
 
 import inspect
 
+import pytest
+from pydantic import ValidationError
+
 from revengai import FunctionsAIDecompilationApi, FunctionsCoreApi
 from revengai.models.ai_decompilation_rating import AiDecompilationRating
 from revengai.models.comments_data import CommentsData
@@ -17,13 +20,13 @@ from revengai.models.inline_comment import InlineComment
 from revengai.models.patch_comment_body import PatchCommentBody
 from revengai.models.rendered_token import RenderedToken
 from revengai.models.summary_data import SummaryData
-from revengai.models.task_status import TaskStatus
 from revengai.models.token import Token
 from revengai.models.upsert_overrides_data import UpsertOverridesData
 from revengai.models.upsert_overrides_input_body import UpsertOverridesInputBody
 from revengai.models.upsert_rating_input_body import UpsertRatingInputBody
 from revengai.models.workflow_progress import WorkflowProgress
 
+from reai_toolkit.app.core.shared_schema import TaskStatus
 from reai_toolkit.app.services.ai_decomp.stream import (
     EVENT_TYPES_APPLIED,
     EVENT_TYPES_SUGGESTED,
@@ -190,11 +193,28 @@ def test_task_status_enum_covers_state_machine():
     assert {"UNINITIALISED", "PENDING", "RUNNING", "COMPLETED", "FAILED"} <= members
 
 
-def test_workflow_progress_accepts_uppercase_status_values():
-    for status in ("UNINITIALISED", "PENDING", "RUNNING", "COMPLETED", "FAILED"):
-        WorkflowProgress.model_construct(
-            status=status, step="x", step_index=0, steps_total=1, messages=[]
+def _progress(status: str) -> dict:
+    return {
+        "messages": [],
+        "percent": 0,
+        "status": status,
+        "step": "x",
+        "step_index": 0,
+        "step_share": 0,
+        "steps_total": 1,
+    }
+
+
+def test_workflow_progress_accepts_every_status_the_plugin_holds():
+    for status in TaskStatus:
+        assert WorkflowProgress.model_validate(_progress(status.value)).status == (
+            status.value
         )
+
+
+def test_workflow_progress_still_rejects_a_status_the_plugin_does_not_know():
+    with pytest.raises(ValidationError):
+        WorkflowProgress.model_validate(_progress("HALTED"))
 
 
 def test_overrides_are_posted_as_token_objects_not_bare_strings():
