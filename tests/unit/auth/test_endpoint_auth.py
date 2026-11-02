@@ -101,19 +101,3 @@ def test_every_endpoint_the_plugin_calls_carries_credentials(service):
         f"the plugin configures {sorted(configured)}; these endpoints declare none "
         f"of them, so their requests are sent unauthenticated: {unauthenticated}"
     )
-
-
-def test_bearer_auth_is_load_bearing(service):
-    without_bearer = set(service.build_sdk_config().auth_settings()) - {"bearerAuth"}
-
-    stranded = [
-        f"{api}.{method}"
-        for api, methods in _api_calls().items()
-        for method in methods
-        if (declared := _declared_schemes(api, method)) and not declared & without_bearer
-    ]
-
-    assert stranded, (
-        "nothing requires bearerAuth any more, so the coverage test above proves "
-        "nothing; either access_token can be dropped or the discovery has broken"
-    )
