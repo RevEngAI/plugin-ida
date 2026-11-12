@@ -1,12 +1,45 @@
 {
+  "$schema": "https://hcli.docs.hex-rays.com/schemas/ida-plugin.json",
   "IDAMetadataDescriptorVersion": 1,
   "plugin": {
-    "name": "RevEng.AI",
+    "name": "reveng-ai",
+    "version": "3.4.0",
     "entryPoint": "reai_toolkit_entry.py",
-    "categories": ["decompilation", "integration-with-third-parties-interoperability", "malware-analysis", "other"],
-    "logoPath": "reai_toolkit/app/components/resources/reveng_ai_logo.jpg",
-    "idaVersions": ">=9.0",
     "description": "The RevEng.AI plugin integrates AI-powered code analysis and decompilation features into IDA Pro, enhancing reverse engineering workflows with advanced machine learning capabilities.",
-    "version": "3.0.0"
+    "license": "GPL-3.0",
+    "urls": {
+      "repository": "https://github.com/RevEngAI/plugin-ida",
+      "homepage": "https://reveng.ai"
+    },
+    "authors": [
+      {
+        "name": "RevEng.AI",
+        "email": "contact@reveng.ai"
+      }
+    ],
+    "categories": [
+      "decompilation",
+      "integration-with-third-parties-interoperability",
+      "malware-analysis",
+      "other"
+    ],
+    "keywords": [
+      "reveng.ai",
+      "ai",
+      "function-matching",
+      "binary-similarity",
+      "auto-unstrip",
+      "ai-decompiler"
+    ],
+    "logoPath": "reai_toolkit/app/components/resources/reveng_ai_logo.jpg",
+    "idaVersions": ["9.0", "9.0sp1", "9.1", "9.2", "9.3", "9.4", "9.5"],
+    "requiresPython": ">=3.10",
+    "pythonDependencies": [
+      "requests>=2.32",
+      "loguru>=0.7",
+      "pydantic",
+      "revengai>=4.75.0",
+      "libbs>=3.8.1"
+    ]
   }
 }
