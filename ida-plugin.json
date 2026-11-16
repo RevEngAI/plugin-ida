@@ -3,7 +3,7 @@
   "IDAMetadataDescriptorVersion": 1,
   "plugin": {
     "name": "revengai",
-    "version": "3.27.1",
+    "version": "3.28.0",
     "entryPoint": "reai_toolkit_entry.py",
     "description": "The RevEng.AI plugin integrates AI-powered code analysis and decompilation features into IDA Pro, enhancing reverse engineering workflows with advanced machine learning capabilities.",
     "license": "GPL-3.0",
