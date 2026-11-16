@@ -19,3 +19,6 @@ jobs:
 
       - name: Check .revengai/features.json is up to date
         run: python scripts/emit_features.py --check
+
+      - name: Check ida-plugin.json dependencies match uv.lock
+        run: python scripts/emit_plugin_deps.py --check
