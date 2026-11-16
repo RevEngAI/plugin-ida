@@ -2,7 +2,7 @@
   "$schema": "https://hcli.docs.hex-rays.com/schemas/ida-plugin.json",
   "IDAMetadataDescriptorVersion": 1,
   "plugin": {
-    "name": "reveng-ai",
+    "name": "revengai",
     "version": "3.27.1",
     "entryPoint": "reai_toolkit_entry.py",
     "description": "The RevEng.AI plugin integrates AI-powered code analysis and decompilation features into IDA Pro, enhancing reverse engineering workflows with advanced machine learning capabilities.",

@@ -60,12 +60,12 @@ The package `PyQt5` must be installed.
 If you have [HCLI](https://hcli.docs.hex-rays.com/) installed, this is all you need:
 
 ```bash
-hcli plugin install reveng-ai
+hcli plugin install revengai
 ```
 
 It drops the plugin into your IDA user plugin directory and installs the Python
-dependencies into the interpreter IDA uses. `hcli plugin upgrade reveng-ai` picks
-up new releases, `hcli plugin uninstall reveng-ai` removes it.
+dependencies into the interpreter IDA uses. `hcli plugin upgrade revengai` picks
+up new releases, `hcli plugin uninstall revengai` removes it.
 
 #### Manually
 
