@@ -1,9 +1,7 @@
 from enum import Enum
 from typing import Generic, List, Optional, TypeVar
 
-from pydantic import BaseModel
-
-from reai_toolkit.vendor.pydantic import Field
+from pydantic import BaseModel, Field
 
 T = TypeVar("T")
 

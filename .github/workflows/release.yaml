@@ -90,6 +90,15 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # hcli installs from the tag's source archive, so the version in
+          # there has to match the tag. The bump lives on the tagged commit
+          # only, main is left alone.
+          VERSION="${{ steps.version.outputs.version }}"
+          sed -i -E "s/(\"version\": *\")[^\"]+/\1${VERSION}/" ida-plugin.json
+          sed -i -E "s/^(__PLUGIN_VERSION__ = \")[^\"]+/\1${VERSION}/" reai_toolkit_entry.py
+          git diff --quiet || git commit -am "chore: release ${{ steps.version.outputs.tag }}"
+
           git tag "${{ steps.version.outputs.tag }}"
           git push origin "${{ steps.version.outputs.tag }}"
 
