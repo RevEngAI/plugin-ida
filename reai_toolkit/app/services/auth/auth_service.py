@@ -86,7 +86,7 @@ class AuthService:
                 api_client.user_agent = self.sdk_config.user_agent
             try:
                 ConfigApi(api_client).v3_get_config()
-                logger.info("RevEng.AI: User authenticated successfully.")
+                logger.debug("User authenticated successfully.")
                 self._is_authed = True
                 self.get_me(force_refresh=True)
                 return True, ""
@@ -114,7 +114,7 @@ class AuthService:
 
             except Exception as e:
                 self._is_authed = False
-                logger.error(f"RevEng.AI: Authentication failed. Unexpected Error: {e}")
+                logger.error(f"Authentication failed. Unexpected Error: {e}")
                 return False, f"Unexpected Error: {e}"
 
     def is_authenticated(self) -> bool:
@@ -146,7 +146,7 @@ class AuthService:
             except ValidationError:
                 self._user = self._get_me_unvalidated(api_client)
             except Exception as e:
-                logger.error(f"RevEng.AI: Failed to fetch current user: {e}")
+                logger.error(f"Failed to fetch current user: {e}")
                 self._user = None
 
         return self._user
@@ -162,7 +162,7 @@ class AuthService:
                 return None
             return User.model_construct(**json.loads(response.data))
         except Exception as e:
-            logger.error(f"RevEng.AI: Failed to fetch current user: {e}")
+            logger.error(f"Failed to fetch current user: {e}")
             return None
 
     def is_enthusiast(self) -> bool:

@@ -35,7 +35,7 @@ def _read_decompiler_function(deci, func_addr: int):
         else:
             func = read_ida_function(lowered, decompiler_available=False)
     except Exception as e:
-        logger.debug(f"RevEng.AI: could not read function at 0x{lowered:x}: {e}")
+        logger.debug(f"could not read function at 0x{lowered:x}: {e}")
         return None
 
     return deci.art_lifter.lift(func) if func is not None else None
@@ -79,9 +79,9 @@ class VariableSyncService(IThreadService):
         last = self._last_ts.get(key, 0.0)
         self._last_ts[key] = now
         if (now - last) * 1000.0 <= self._debounce_ms:
-            logger.debug(f"RevEng.AI: debounced data types change for function {function_id}")
+            logger.debug(f"debounced data types change for function {function_id}")
             return
-        logger.debug(f"RevEng.AI: queued data types change for function {function_id}")
+        logger.debug(f"queued data types change for function {function_id}")
         self._q.put((function_id, func_addr, artifact))
         self._start_worker_if_needed()
 
@@ -106,17 +106,17 @@ class VariableSyncService(IThreadService):
             try:
                 self._push_change(function_id, func_addr)
             except ApiException as e:
-                logger.error(f"RevEng.AI: failed to push data types: HTTP {e.status} {e.reason}")
+                logger.error(f"failed to push data types: HTTP {e.status} {e.reason}")
             except Exception as e:
-                logger.error(f"RevEng.AI: failed to push data types: {e}")
+                logger.error(f"failed to push data types: {e}")
             finally:
                 self._q.task_done()
 
     def _push_change(self, function_id: int, func_addr: int) -> None:
-        logger.debug(f"RevEng.AI: processing data types change for function {function_id}")
+        logger.debug(f"processing data types change for function {function_id}")
         analysis_id: int | None = self.netstore_service.get_analysis_id()
         if analysis_id is None:
-            logger.debug("RevEng.AI: no analysis id; skipping data types push")
+            logger.debug("no analysis id; skipping data types push")
             return
 
         signature = self._build_signature(analysis_id, func_addr)
@@ -127,7 +127,7 @@ class VariableSyncService(IThreadService):
             return
 
         if self._put_signature(analysis_id, function_id, signature):
-            logger.info(f"RevEng.AI: pushed data types for function {function_id}")
+            logger.info(f"pushed data types for function {function_id}")
 
     def _build_signature(self, analysis_id: int, func_addr: int) -> Optional[dict]:
         if self._deci is None:
@@ -231,7 +231,7 @@ class VariableSyncService(IThreadService):
 
                 self.attach_decompiler(DecompilerInterface.discover(force_decompiler="ida"))
             except Exception as e:
-                logger.error(f"RevEng.AI: could not attach decompiler for type push-back: {e}")
+                logger.error(f"could not attach decompiler for type push-back: {e}")
                 return 0
 
         base: int = self._deci.binary_base_addr
@@ -240,7 +240,7 @@ class VariableSyncService(IThreadService):
             try:
                 signature = self._build_signature(analysis_id, ea - base)
             except Exception as e:
-                logger.debug(f"RevEng.AI: could not build local types for function {function_id}: {e}")
+                logger.debug(f"could not build local types for function {function_id}: {e}")
                 continue
             if signature is None:
                 continue

@@ -36,7 +36,7 @@ class ImportDataTypesService(IThreadService):
     def _import_worker(self, _: threading.Event, matches: dict[int, int]) -> None:
         result: DataTypesImportResult = self.import_data_types(matches)
         if result.error:
-            logger.error(f"RevEng.AI: {result.error}")
+            logger.error(f"{result.error}")
 
     def import_data_types(self, matches: dict[int, int]) -> DataTypesImportResult:
         if len(matches) == 0:
@@ -51,10 +51,10 @@ class ImportDataTypesService(IThreadService):
             logger.warning(f"failed to apply data types for {len(matched_function_ids)} functions: {e}")
             return DataTypesImportResult(remote_absent_ids=set(matched_function_ids))
         except ApiException as e:
-            logger.error(f"RevEng.AI: failed to sync function data types: HTTP {e.status} {e.reason}")
+            logger.error(f"failed to sync function data types: HTTP {e.status} {e.reason}")
             return DataTypesImportResult(error=f"Failed to sync function data types: HTTP {e.status} {e.reason}")
         except Exception as e:
-            logger.error(f"RevEng.AI: failed to sync function data types: {e}")
+            logger.error(f"failed to sync function data types: {e}")
             return DataTypesImportResult(error=f"Failed to sync function data types: {e}")
 
         present_ids: set[int] = (

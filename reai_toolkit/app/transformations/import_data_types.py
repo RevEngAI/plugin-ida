@@ -224,7 +224,7 @@ class ImportDataTypes:
     def _install_primitives() -> None:
         declared = install_ghidra_primitives()
         if declared:
-            logger.info(f"RevEng.AI: declared {declared} Ghidra primitive type(s)")
+            logger.info(f"declared {declared} Ghidra primitive type(s)")
 
     @staticmethod
     def _prototype(item: dict, resolver: _TypeResolver) -> Optional[_Prototype]:
@@ -270,7 +270,7 @@ class ImportDataTypes:
             try:
                 self.apply_dependency(artifact)
             except Exception as e:
-                logger.warning(f"RevEng.AI: skipped dependency {name!r}: {e!r}")
+                logger.warning(f"skipped dependency {name!r}: {e!r}")
 
     def apply_dependency(self, artifact: Any) -> None:
         if self.deci is None:

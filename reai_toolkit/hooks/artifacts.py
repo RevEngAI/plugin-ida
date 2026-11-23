@@ -30,7 +30,7 @@ class ArtifactChangeHooks:
             return False
         self._deci = deci
         self.app.variable_sync_service.attach_decompiler(deci)
-        logger.info("[ArtifactChangeHooks] Hook registered.")
+        logger.debug("[ArtifactChangeHooks] Hook registered.")
         return True
 
     def stop(self) -> None:

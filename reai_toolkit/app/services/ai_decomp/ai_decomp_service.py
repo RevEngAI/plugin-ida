@@ -400,7 +400,7 @@ class AiDecompService(IThreadService):
             if on_attributions is not None:
                 self._run_attribution_phase(function_id, stop_event, on_attributions)
         except Exception as e:
-            logger.error(f"RevEng.AI: AI decompilation task crashed for {function_id}: {e}")
+            logger.error(f"AI decompilation task crashed for {function_id}: {e}")
         finally:
             with self._inflight_lock:
                 if self._inflight.get(function_id) is stop_event:

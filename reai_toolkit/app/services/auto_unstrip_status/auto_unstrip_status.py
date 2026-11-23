@@ -61,7 +61,7 @@ class AutoUnstripStatusService(IThreadService):
                 return
 
             status: str | None = status_response.data
-            logger.info(f"RevEng.AI: Auto-unstrip status - {status}")
+            logger.info(f"Auto-unstrip status - {status}")
 
             if status == STATUS_COMPLETED:
                 if first_poll and not resync_if_already_complete:

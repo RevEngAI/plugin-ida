@@ -139,12 +139,12 @@ class AnalysisDataTypesService(BaseService):
                 offset += len(items)
             else:
                 logger.warning(
-                    f"RevEng.AI: stopped paging analysis {analysis_id} data types at {MAX_PAGES} pages"
+                    f"stopped paging analysis {analysis_id} data types at {MAX_PAGES} pages"
                 )
 
         catalogue = Catalogue.of(entries)
         self._cache[analysis_id] = catalogue
-        logger.debug(f"RevEng.AI: analysis {analysis_id} holds {len(catalogue)} data types")
+        logger.debug(f"analysis {analysis_id} holds {len(catalogue)} data types")
         return catalogue
 
     def resolve(self, analysis_id: int, type_name: Optional[str]) -> Optional[int]:

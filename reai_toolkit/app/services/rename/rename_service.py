@@ -94,7 +94,7 @@ class RenameService(IThreadService):
                 try:
                     total_errors = self._rename_function(function_list=function_list)
                 except Exception as e:
-                    logger.error(f"RevEng.AI: failed to rename functions: {e}")
+                    logger.error(f"failed to rename functions: {e}")
                     total_errors = len(function_list)
                 if total_errors == 0:
                     break
@@ -190,7 +190,7 @@ class RenameService(IThreadService):
                     status=False, server_error=bool(e.status and e.status >= 500)
                 )
             except Exception as e:
-                logger.error(f"RevEng.AI: failed to rename functions remotely: {e}")
+                logger.error(f"failed to rename functions remotely: {e}")
                 return RemoteRenameOutcome(status=False)
 
             return RemoteRenameOutcome(
@@ -230,7 +230,7 @@ class RenameService(IThreadService):
                         canonicalize_names_input_body=CanonicalizeNamesInputBody(names=chunk)
                     )
             except Exception as e:
-                logger.error(f"RevEng.AI: failed to canonicalize names: {e}")
+                logger.error(f"failed to canonicalize names: {e}")
                 continue
 
             for result in (out.results or []):
