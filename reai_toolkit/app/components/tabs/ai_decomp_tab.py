@@ -346,6 +346,23 @@ class AIDecompView(kw.PluginForm):
 
         self._editor.setExtraSelections(selections)
 
+    @execute_ui
+    def reveal_line(self, line: int) -> None:
+        """Scroll ``line`` into view without moving the cursor."""
+        if not self._editor:
+            return
+        viewport = self._editor.viewport()
+        top = self._editor.cursorForPosition(QtCore.QPoint(0, 0)).blockNumber()
+        bottom = self._editor.cursorForPosition(
+            QtCore.QPoint(0, viewport.height() - 1)
+        ).blockNumber()
+        bar = self._editor.verticalScrollBar()
+        # Without wrapping, the scroll bar steps one line at a time.
+        if line < top:
+            bar.setValue(bar.value() - (top - line))
+        elif line > bottom:
+            bar.setValue(bar.value() + (line - bottom))
+
     # --- public API ------------------------------------------------
     @execute_ui
     def update_view_content(self, code: str, follow_tail: bool = False) -> None:

@@ -54,6 +54,9 @@ class AiDecompCoordinator(BaseCoordinator):
         self._attribution_hooks: LineAttributionHooks | None = None
         self._lit_addresses: frozenset[int] = frozenset()
         self._lit_rows: tuple[int, ...] = ()
+        self._focused_line: int | None = None
+        self._own_jumps: set[int] = set()
+        self._last_own_jump: int | None = None
         self._baseline: RenderModel | None = None
 
     def enable_function_tracking(self) -> None:
@@ -244,23 +247,57 @@ class AiDecompCoordinator(BaseCoordinator):
     def focus_decomp_line(self, display_line: int) -> None:
         if self._current_attributions is None or self._baseline is None:
             return
+        if display_line == self._focused_line:
+            return
+        self._focused_line = display_line
         source_line = source_line_at(self._baseline, display_line)
         addresses = (
             ()
             if source_line is None
             else self._current_attributions.addresses_for_decomp_line(source_line - 1)
         )
+        self._light_decomp(
+            display_rows_for_source_lines(self._baseline, [source_line])
+            if addresses
+            else ()
+        )
         self._light_disassembly(addresses)
+        if addresses:
+            self._reveal_disassembly(addresses[0])
+
+    def _reveal_disassembly(self, first: int) -> None:
+        # IDA keeps the cursor on screen, so scrolling means moving it. Visiting the
+        # function start first leaves it on top when the first instruction still fits.
+        func = ida_funcs.get_func(first)
+        cursor = ida_kernwin.get_screen_ea()
+        self._own_jumps = set()
+        self._last_own_jump = first
+        for ea in [func.start_ea, first] if func else [first]:
+            # A jump to where the cursor already is reports no move.
+            if ea != cursor:
+                self._own_jumps.add(ea)
+                ida_kernwin.jumpto(ea, -1, ida_kernwin.UIJMP_DONTPUSH)
+                cursor = ea
 
     def on_disassembly_ea(self, ea: int) -> None:
+        if ea in self._own_jumps:
+            if ea == self._last_own_jump:
+                self._own_jumps.clear()
+            else:
+                self._own_jumps.discard(ea)
+            return
+        self._own_jumps.clear()
         if self._current_attributions is None or self._baseline is None:
             return
+        self._focused_line = None
+        self._light_disassembly(())
         decomp_lines = self._current_attributions.decomp_lines_for_address(ea)
-        self._light_decomp(
-            display_rows_for_source_lines(
-                self._baseline, [line + 1 for line in decomp_lines]
-            )
+        rows = display_rows_for_source_lines(
+            self._baseline, [line + 1 for line in decomp_lines]
         )
+        self._light_decomp(rows)
+        if rows and self._decomp_view is not None:
+            self._decomp_view.reveal_line(rows[0])
 
     def _light_disassembly(self, addresses) -> None:
         wanted = frozenset(addresses)
@@ -454,6 +491,7 @@ class AiDecompCoordinator(BaseCoordinator):
         )
         self._decomp_view.update_view_content(rendered)
         self._lit_rows = ()
+        self._focused_line = None
 
     def _on_pane_closed(self) -> None:
         self._decomp_view = None
