@@ -141,7 +141,7 @@ class AnalysisSyncService(IThreadService):
             int(addr): int(fid) for fid, addr in func_map.function_map.items()
         }
 
-        logger.info(f"RevEng.AI: Retrieved {len(local_vaddr_to_matched_name)} functions from analysis")
+        logger.info(f"Retrieved {len(local_vaddr_to_matched_name)} functions from analysis")
 
         matched_function_count: int = 0
         unmatched_function_count: int = 0
@@ -186,9 +186,9 @@ class AnalysisSyncService(IThreadService):
 
             total_function_count += 1
 
-        logger.info(f"RevEng.AI: Matched {matched_function_count} functions")
-        logger.info(f"RevEng.AI: {unmatched_function_count} functions not matched")
-        logger.info(f"RevEng.AI: {missing_symbol_name_count} functions with missing symbol names")
+        logger.info(f"Matched {matched_function_count} functions")
+        logger.info(f"{unmatched_function_count} functions not matched")
+        logger.info(f"{missing_symbol_name_count} functions with missing symbol names")
 
         summary: MatchedFunctionSummary = MatchedFunctionSummary(
             matched_function_count=matched_function_count,
@@ -205,7 +205,7 @@ class AnalysisSyncService(IThreadService):
         try:
             return self._perform_function_sync(func_map=func_map)
         except Exception as e:
-            logger.error(f"RevEng.AI: Exception during function sync: {e}")
+            logger.error(f"Exception during function sync: {e}")
             return (
                 GenericApiReturn(success=False, error_message=f"Exception during function sync: {e}"),
                 [],

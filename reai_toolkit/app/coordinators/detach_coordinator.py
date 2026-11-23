@@ -43,7 +43,7 @@ class DetachCoordinator(BaseCoordinator):
         result = msg.exec_()
 
         if result == QtWidgets.QMessageBox.Ok:
-            self.log.info("RevEng.AI: Detaching analysis.")
+            self.log.info("Detaching analysis.")
             self._detach_analysis()
 
     def is_authed(self) -> bool:

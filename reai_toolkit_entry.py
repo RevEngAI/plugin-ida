@@ -32,8 +32,12 @@ _add_vendor_paths()
 # flake8: noqa: E402
 from loguru import logger
 
-from reai_toolkit.app.app import App
 from reai_toolkit.app.core.logging_setup import configure_logging
+
+# Must run before the imports below, which log at import time.
+configure_logging()
+
+from reai_toolkit.app.app import App
 from reai_toolkit.app.coordinator import Coordinator
 from reai_toolkit.app.factory import DialogFactory
 from reai_toolkit.hooks.artifacts import ArtifactChangeHooks
@@ -71,7 +75,6 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         self._setup_handled = False
 
     def init(self):
-        configure_logging()
         self.app = App(__IDA_VERSION__, __PLUGIN_VERSION__)
         self.factory = DialogFactory(self.app)
         self.coordinator = Coordinator(app=self.app, factory=self.factory, log=logger)
@@ -95,8 +98,6 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         self._ui_hooks.ready_to_run = self._on_ui_ready
         self._ui_hooks.hook()
 
-        # ida_kernwin.msg("[REAI] init() called, waiting for DB or UI ready...\n")
-
         # Fallback timer in case the events are missed
         idaapi.register_timer(1000, lambda: (self._show_setup_if_needed(), -1)[1])
         idaapi.register_timer(1500, self._artifact_hook_timer)
@@ -110,14 +111,12 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
         return -1 if self._artifact_start_attempts >= 30 else 1000
 
     def _on_idb_loaded(self, is_new_database, idc_script):
-        ida_kernwin.msg(
-            f"[REAI] _on_idb_loaded is_new={is_new_database} script={idc_script}\n"
-        )
+        logger.debug(f"idb loaded (is_new={is_new_database}, script={idc_script})")
         self._show_setup_if_needed()
         return 0
 
     def _on_ui_ready(self):
-        ida_kernwin.msg("[REAI] _on_ui_ready triggered\n")
+        logger.debug("UI ready")
         self._show_setup_if_needed()
         self.coordinator.refresh_disassembly_view()
         if self._artifact_hooks is not None:
@@ -128,10 +127,8 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
             return
         self._setup_handled = True
 
-        ida_kernwin.msg("[REAI] _show_setup_if_needed called\n")
         self.app.auth_service.verify()
         if self.app.auth_service.is_authenticated():
-            ida_kernwin.msg("[REAI] SDK config is valid, no dialog.\n")
             ida_kernwin.refresh_idaview_anyway()
             return
 
@@ -147,7 +144,7 @@ class ReaiToolkitPlugin(idaapi.plugin_t):
     def term(self):
         if self._artifact_hooks is not None:
             self._artifact_hooks.stop()
-        ida_kernwin.msg("[REAI] term.\n")
+        logger.debug("plugin terminated")
 
 
 def PLUGIN_ENTRY():

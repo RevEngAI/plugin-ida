@@ -86,7 +86,7 @@ class AnalysisStatusService(IThreadService):
                         logger.debug(f"RevEng.AI Remote Analysis - {entry.text}")
 
                 if get_status_response.data and (status := get_status_response.data.status):
-                    logger.info(f"RevEng.AI: Status - {status}")
+                    logger.info(f"Status - {status}")
                     if status == "Complete":
                         self.call_callback(
                             generic_return=GenericApiReturn(

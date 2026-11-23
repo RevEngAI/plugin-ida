@@ -98,7 +98,7 @@ class UploadService(IThreadService):
         )
 
         if upload_response.success:
-            logger.info("RevEng.AI: Uploaded binary file")
+            logger.info("Uploaded binary file")
         else:
             self.call_callback(generic_return=upload_response)
             return
@@ -111,7 +111,7 @@ class UploadService(IThreadService):
             )
 
             if upload_response.success:
-                logger.info("RevEng.AI: Uploaded debug file")
+                logger.info("Uploaded debug file")
             else:
                 logger.error(
                     f"RevEng.AI: Failed to upload binary file: {upload_response.error_message}"
@@ -211,7 +211,7 @@ class UploadService(IThreadService):
         logger.info(
             f"RevEng.AI: Collected {len(symbols.function_boundaries)} functions from IDA"
         )
-        logger.info(f"RevEng.AI: Base address: 0x{symbols.base_address:X}")
+        logger.info(f"Base address: 0x{symbols.base_address:X}")
 
         analysis_create_request = AnalysisCreateRequest(
             filename=file_name,
