@@ -38,7 +38,7 @@
       "requests==2.32.5",
       "loguru==0.7.3",
       "pydantic==2.12.3",
-      "revengai==4.75.0",
+      "revengai==4.77.1",
       "libbs==3.8.1"
     ]
   }
