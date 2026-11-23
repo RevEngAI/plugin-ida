@@ -228,6 +228,11 @@ class AIDecompView(kw.PluginForm):
         # Editor
         self._editor = _DecompEditor(self._parent_window)
         self._editor.setReadOnly(True)
+        # Read-only drops keyboard navigation; the caret drives attribution highlights.
+        self._editor.setTextInteractionFlags(
+            self._editor.textInteractionFlags()
+            | QtCore.Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
         self._editor.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         self._editor.renameRequested.connect(self._bridge.rename)
         self._editor.commentEditRequested.connect(self._bridge.edit_comment)
@@ -345,6 +350,23 @@ class AIDecompView(kw.PluginForm):
             selections.append(selection)
 
         self._editor.setExtraSelections(selections)
+
+    @execute_ui
+    def reveal_line(self, line: int) -> None:
+        """Scroll ``line`` into view without moving the cursor."""
+        if not self._editor:
+            return
+        viewport = self._editor.viewport()
+        top = self._editor.cursorForPosition(QtCore.QPoint(0, 0)).blockNumber()
+        bottom = self._editor.cursorForPosition(
+            QtCore.QPoint(0, viewport.height() - 1)
+        ).blockNumber()
+        bar = self._editor.verticalScrollBar()
+        # Without wrapping, the scroll bar steps one line at a time.
+        if line < top:
+            bar.setValue(bar.value() - (top - line))
+        elif line > bottom:
+            bar.setValue(bar.value() + (line - bottom))
 
     # --- public API ------------------------------------------------
     @execute_ui

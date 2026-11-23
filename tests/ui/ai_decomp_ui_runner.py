@@ -50,7 +50,7 @@ def _run(report: dict) -> None:
         RENAME_NOT_CODE_LINE,
         RENAME_UNRESOLVED,
     )
-    from reai_toolkit.app.core.qt_compat import QtWidgets
+    from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets
     from reai_toolkit.app.core.shared_schema import GenericApiReturn
     from reai_toolkit.app.services.ai_decomp.attribution import (
         AttributionMap,
@@ -165,6 +165,20 @@ def _run(report: dict) -> None:
     seed_plain()
     report["render_shows_code"] = CODE in view._editor.toPlainText()
 
+    row_before = view._editor.textCursor().blockNumber()
+    QtWidgets.QApplication.sendEvent(
+        view._editor,
+        QtGui.QKeyEvent(
+            QtCore.QEvent.Type.KeyPress,
+            QtCore.Qt.Key.Key_Down,
+            QtCore.Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    pump()
+    report["arrow_keys_move_the_cursor"] = (
+        view._editor.textCursor().blockNumber() == row_before + 1
+    )
+
     seed_plain()
     answers["str"] = "count"
     view._editor.renameRequested.emit(code_line_row("int v5"), "v5")
@@ -269,10 +283,14 @@ def _run(report: dict) -> None:
         set_addresses=lambda addrs: highlighted.append(sorted(addrs)),
         has_addresses=lambda: bool(highlighted and highlighted[-1]),
     )
+    # A real jump would move the shared IDA view under the rendering checks below.
+    revealed: list = []
+    coord._reveal_disassembly = revealed.append
 
     coord.focus_decomp_line(code_line_row("int v5"))
     pump()
     report["decomp_line_lights_its_disassembly"] = highlighted[-1:] == [[ea]]
+    report["decomp_line_reveals_its_disassembly"] = revealed == [ea]
 
     coord.focus_decomp_line(code_line_row("return v5"))
     pump()
@@ -386,7 +404,9 @@ def main() -> None:
         "comment_edit_empty_removes": False,
         "comment_remove_deletes": False,
         "comment_remove_args_correct": False,
+        "arrow_keys_move_the_cursor": False,
         "decomp_line_lights_its_disassembly": False,
+        "decomp_line_reveals_its_disassembly": False,
         "a_line_with_no_counterpart_lights_nothing": False,
         "disassembly_ea_lights_its_decomp_line": False,
         "an_unattributed_address_lights_nothing": False,
