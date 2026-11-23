@@ -228,6 +228,11 @@ class AIDecompView(kw.PluginForm):
         # Editor
         self._editor = _DecompEditor(self._parent_window)
         self._editor.setReadOnly(True)
+        # Read-only drops keyboard navigation; the caret drives attribution highlights.
+        self._editor.setTextInteractionFlags(
+            self._editor.textInteractionFlags()
+            | QtCore.Qt.TextInteractionFlag.TextSelectableByKeyboard
+        )
         self._editor.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
         self._editor.renameRequested.connect(self._bridge.rename)
         self._editor.commentEditRequested.connect(self._bridge.edit_comment)

@@ -50,7 +50,7 @@ def _run(report: dict) -> None:
         RENAME_NOT_CODE_LINE,
         RENAME_UNRESOLVED,
     )
-    from reai_toolkit.app.core.qt_compat import QtWidgets
+    from reai_toolkit.app.core.qt_compat import QtCore, QtGui, QtWidgets
     from reai_toolkit.app.core.shared_schema import GenericApiReturn
     from reai_toolkit.app.services.ai_decomp.attribution import (
         AttributionMap,
@@ -164,6 +164,20 @@ def _run(report: dict) -> None:
 
     seed_plain()
     report["render_shows_code"] = CODE in view._editor.toPlainText()
+
+    row_before = view._editor.textCursor().blockNumber()
+    QtWidgets.QApplication.sendEvent(
+        view._editor,
+        QtGui.QKeyEvent(
+            QtCore.QEvent.Type.KeyPress,
+            QtCore.Qt.Key.Key_Down,
+            QtCore.Qt.KeyboardModifier.NoModifier,
+        ),
+    )
+    pump()
+    report["arrow_keys_move_the_cursor"] = (
+        view._editor.textCursor().blockNumber() == row_before + 1
+    )
 
     seed_plain()
     answers["str"] = "count"
@@ -386,6 +400,7 @@ def main() -> None:
         "comment_edit_empty_removes": False,
         "comment_remove_deletes": False,
         "comment_remove_args_correct": False,
+        "arrow_keys_move_the_cursor": False,
         "decomp_line_lights_its_disassembly": False,
         "a_line_with_no_counterpart_lights_nothing": False,
         "disassembly_ea_lights_its_decomp_line": False,

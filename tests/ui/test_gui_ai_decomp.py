@@ -41,6 +41,7 @@ CHECKS = [
     "comment_edit_empty_removes",
     "comment_remove_deletes",
     "comment_remove_args_correct",
+    "arrow_keys_move_the_cursor",
     "decomp_line_lights_its_disassembly",
     "a_line_with_no_counterpart_lights_nothing",
     "disassembly_ea_lights_its_decomp_line",
