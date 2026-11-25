@@ -1,14 +1,20 @@
 from unittest.mock import MagicMock
 
 import pytest
-from revengai import GetConfigOutputBody, UploadOutputBody
+from revengai import (
+    CreateMetadata,
+    GetConfigOutputBody,
+    OperationCreateMetadataCreateResult,
+    UploadOutputBody,
+)
 from revengai.models.function_boundary import FunctionBoundary
 from revengai.models.symbols import Symbols
-from revengai.models.tag import Tag
 from revengai.models.upload_file_type import UploadFileType
 
 from reai_toolkit.app.services.upload import upload_service as svc_mod
 from reai_toolkit.app.services.upload.upload_service import UploadService
+
+SHA256 = "a" * 64
 
 
 @pytest.fixture
@@ -125,40 +131,72 @@ def test_upload_user_file_returns_flat_v3_body(service, binaries, mocker, tmp_pa
         (None, []),
     ],
 )
-def test_analyse_converts_tags_to_tag_models(service, sdk, symbols, tags, expected):
+def test_analyse_sends_tags_as_strings(service, sdk, symbols, tags, expected):
     service.analyse(
         file_name="binary.elf",
-        binary_sha256="deadbeef",
+        binary_sha256=SHA256,
         symbols=symbols,
         tags=tags,
     )
 
-    request = sdk.create_analysis.call_args.kwargs["analysis_create_request"]
-    assert request.tags == [Tag(name=name) for name in expected]
+    request = sdk.v3_create_analysis.call_args.kwargs["create_request"]
+    assert request.tags == expected
 
 
 @pytest.mark.parametrize("no_cache", [True, False])
 def test_analyse_sets_no_cache_on_analysis_config(service, sdk, symbols, no_cache):
     service.analyse(
         file_name="binary.elf",
-        binary_sha256="deadbeef",
+        binary_sha256=SHA256,
         symbols=symbols,
         no_cache=no_cache,
     )
 
-    request = sdk.create_analysis.call_args.kwargs["analysis_create_request"]
+    request = sdk.v3_create_analysis.call_args.kwargs["create_request"]
     assert request.analysis_config.no_cache is no_cache
 
 
 def test_analyse_defaults_no_cache_false(service, sdk, symbols):
     service.analyse(
         file_name="binary.elf",
-        binary_sha256="deadbeef",
+        binary_sha256=SHA256,
         symbols=symbols,
     )
 
-    request = sdk.create_analysis.call_args.kwargs["analysis_create_request"]
+    request = sdk.v3_create_analysis.call_args.kwargs["create_request"]
     assert request.analysis_config.no_cache is False
+
+
+@pytest.mark.parametrize("public, expected", [(True, "PUBLIC"), (False, "PRIVATE")])
+def test_analyse_sets_scope(service, sdk, symbols, public, expected):
+    service.analyse(
+        file_name="binary.elf",
+        binary_sha256=SHA256,
+        symbols=symbols,
+        public=public,
+    )
+
+    request = sdk.v3_create_analysis.call_args.kwargs["create_request"]
+    assert request.analysis_scope == expected
+
+
+def test_analyse_stores_ids_from_v3_operation(service, sdk, symbols):
+    sdk.v3_create_analysis.return_value = OperationCreateMetadataCreateResult(
+        done=False,
+        name="analyses/7/operation",
+        metadata=CreateMetadata(analysis_id=7, binary_id=9, status="Queued"),
+    )
+
+    response = service.analyse(
+        file_name="binary.elf",
+        binary_sha256=SHA256,
+        symbols=symbols,
+    )
+
+    assert response.success
+    assert response.data.analysis_id == 7
+    service.netstore_service.put_analysis_id.assert_called_once_with(7)
+    service.netstore_service.put_binary_id.assert_called_once_with(9)
 
 
 def test_max_upload_size_reads_flat_v3_config(service, config):

@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING
 
-from revengai import AnalysisCreateResponse
+from revengai import CreateMetadata
 from libbs.decompilers.ida.compat import execute_ui
 
 from reai_toolkit.app.components.dialogs.analyse_dialog import AnalyseDialog
@@ -41,11 +41,11 @@ class CreateAnalysisCoordinator(BaseCoordinator):
     
     def _on_complete(self, service_response: GenericApiReturn) -> None:
         """Handle completion of analysis creation."""
-        if service_response.success and isinstance(service_response.data, AnalysisCreateResponse):
+        if service_response.success and isinstance(service_response.data, CreateMetadata):
             self.show_info_dialog(
                 msg="Analysis created successfully, please wait while it is processed."
             )
-            data: AnalysisCreateResponse = service_response.data
+            data: CreateMetadata = service_response.data
 
             # Should have analysis id - refresh to update menu options
             self.refresh_disassembly_view()
