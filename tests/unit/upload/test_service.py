@@ -216,3 +216,41 @@ def test_max_upload_size_falls_back_to_default(service, config):
     )
 
     assert service._get_max_upload_size() == svc_mod.MAX_DEFAULT_FILE_SIZE_BYTES
+
+
+def test_analyse_omits_binary_config_by_default(service, sdk, symbols):
+    service.analyse(
+        file_name="binary.elf",
+        binary_sha256=SHA256,
+        symbols=symbols,
+    )
+
+    request = sdk.v3_create_analysis.call_args.kwargs["create_request"]
+    assert request.binary_config is None
+
+
+@pytest.mark.parametrize(
+    "file_format, isa, platform",
+    [
+        ("blob", "arm", "linux"),
+        ("pe", None, None),
+        (None, "x86_64", None),
+        (None, None, "android"),
+    ],
+)
+def test_analyse_sets_binary_config(
+    service, sdk, symbols, file_format, isa, platform
+):
+    service.analyse(
+        file_name="binary.elf",
+        binary_sha256=SHA256,
+        symbols=symbols,
+        file_format=file_format,
+        isa=isa,
+        platform=platform,
+    )
+
+    request = sdk.v3_create_analysis.call_args.kwargs["create_request"]
+    assert request.binary_config.file_format == file_format
+    assert request.binary_config.isa == isa
+    assert request.binary_config.platform == platform

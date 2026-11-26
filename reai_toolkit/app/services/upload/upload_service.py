@@ -16,6 +16,7 @@ from revengai import (
 from revengai.api.binaries_api import BinariesApi
 from revengai.api.config_api import ConfigApi
 
+from revengai.models.binary_config import BinaryConfig
 from revengai.models.upload_file_type import UploadFileType
 from revengai.models.upload_output_body import UploadOutputBody
 
@@ -42,6 +43,9 @@ class UploadService(IThreadService):
         tags: Optional[list[str]] = None,
         public: bool = True,
         no_cache: bool = False,
+        file_format: Optional[str] = None,
+        isa: Optional[str] = None,
+        platform: Optional[str] = None,
         thread_callback: Optional[Callable[[GenericApiReturn], None]] = None
     ) -> None:
         """
@@ -58,6 +62,9 @@ class UploadService(IThreadService):
                 tags,
                 public,
                 no_cache,
+                file_format,
+                isa,
+                platform,
             ),
         )
 
@@ -75,6 +82,9 @@ class UploadService(IThreadService):
         tags: Optional[list[str]] = None,
         public: bool = True,
         no_cache: bool = False,
+        file_format: Optional[str] = None,
+        isa: Optional[str] = None,
+        platform: Optional[str] = None,
     ) -> None:
         """
         Uploads the binary (and optional debug file) and starts an analysis.
@@ -129,6 +139,9 @@ class UploadService(IThreadService):
             public=public,
             symbols=symbols,
             no_cache=no_cache,
+            file_format=file_format,
+            isa=isa,
+            platform=platform,
         )
         self.call_callback(generic_return=final_response)
 
@@ -204,6 +217,9 @@ class UploadService(IThreadService):
         tags: Optional[list[str]] = None,
         public: bool = True,
         no_cache: bool = False,
+        file_format: Optional[str] = None,
+        isa: Optional[str] = None,
+        platform: Optional[str] = None,
     ) -> GenericApiReturn[CreateMetadata]:
         if symbols.function_boundaries is None:
             return GenericApiReturn(
@@ -224,6 +240,11 @@ class UploadService(IThreadService):
             analysis_scope="PUBLIC" if public else "PRIVATE",
             symbols=symbols,
             analysis_config=Config(no_cache=no_cache),
+            binary_config=(
+                BinaryConfig(file_format=file_format, isa=isa, platform=platform)
+                if file_format or isa or platform
+                else None
+            ),
         )
 
         response = self.api_request_returning(

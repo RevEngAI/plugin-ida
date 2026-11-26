@@ -15,18 +15,18 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QCheckBox, QFormLayout, QFrame,
-    QGroupBox, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QRadioButton, QSizePolicy, QSpacerItem,
-    QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QFormLayout,
+    QFrame, QGroupBox, QHBoxLayout, QLabel,
+    QLineEdit, QPushButton, QRadioButton, QSizePolicy,
+    QSpacerItem, QVBoxLayout, QWidget)
 
 class Ui_AuthPanel(object):
     def setupUi(self, AuthPanel):
         if not AuthPanel.objectName():
             AuthPanel.setObjectName(u"AuthPanel")
-        AuthPanel.resize(520, 460)
-        AuthPanel.setMinimumSize(QSize(520, 460))
-        AuthPanel.setMaximumSize(QSize(520, 460))
+        AuthPanel.resize(520, 580)
+        AuthPanel.setMinimumSize(QSize(520, 580))
+        AuthPanel.setMaximumSize(QSize(520, 580))
         AuthPanel.setAutoFillBackground(False)
         AuthPanel.setStyleSheet(u"\n"
 "    QGroupBox{font-weight:600;margin-top:8px;}\n"
@@ -85,8 +85,8 @@ class Ui_AuthPanel(object):
 
         self.groupEndpoints = QGroupBox(AuthPanel)
         self.groupEndpoints.setObjectName(u"groupEndpoints")
-        self.groupEndpoints.setMinimumSize(QSize(496, 240))
-        self.groupEndpoints.setMaximumSize(QSize(496, 240))
+        self.groupEndpoints.setMinimumSize(QSize(496, 360))
+        self.groupEndpoints.setMaximumSize(QSize(496, 360))
         self.formLayout = QFormLayout(self.groupEndpoints)
         self.formLayout.setObjectName(u"formLayout")
         self.formLayout.setLabelAlignment(Qt.AlignRight)
@@ -174,20 +174,56 @@ class Ui_AuthPanel(object):
 
         self.formLayout.setLayout(4, QFormLayout.ItemRole.FieldRole, self.horizontalLayout)
 
+        self.labelFileFormat = QLabel(self.groupEndpoints)
+        self.labelFileFormat.setObjectName(u"labelFileFormat")
+
+        self.formLayout.setWidget(5, QFormLayout.ItemRole.LabelRole, self.labelFileFormat)
+
+        self.fileFormatComboBox = QComboBox(self.groupEndpoints)
+        self.fileFormatComboBox.setObjectName(u"fileFormatComboBox")
+        self.fileFormatComboBox.setMinimumSize(QSize(296, 32))
+        self.fileFormatComboBox.setMaximumSize(QSize(296, 32))
+
+        self.formLayout.setWidget(5, QFormLayout.ItemRole.FieldRole, self.fileFormatComboBox)
+
+        self.labelIsa = QLabel(self.groupEndpoints)
+        self.labelIsa.setObjectName(u"labelIsa")
+
+        self.formLayout.setWidget(6, QFormLayout.ItemRole.LabelRole, self.labelIsa)
+
+        self.isaComboBox = QComboBox(self.groupEndpoints)
+        self.isaComboBox.setObjectName(u"isaComboBox")
+        self.isaComboBox.setMinimumSize(QSize(296, 32))
+        self.isaComboBox.setMaximumSize(QSize(296, 32))
+
+        self.formLayout.setWidget(6, QFormLayout.ItemRole.FieldRole, self.isaComboBox)
+
+        self.labelPlatform = QLabel(self.groupEndpoints)
+        self.labelPlatform.setObjectName(u"labelPlatform")
+
+        self.formLayout.setWidget(7, QFormLayout.ItemRole.LabelRole, self.labelPlatform)
+
+        self.platformComboBox = QComboBox(self.groupEndpoints)
+        self.platformComboBox.setObjectName(u"platformComboBox")
+        self.platformComboBox.setMinimumSize(QSize(296, 32))
+        self.platformComboBox.setMaximumSize(QSize(296, 32))
+
+        self.formLayout.setWidget(7, QFormLayout.ItemRole.FieldRole, self.platformComboBox)
+
         self.labelCache = QLabel(self.groupEndpoints)
         self.labelCache.setObjectName(u"labelCache")
 
-        self.formLayout.setWidget(5, QFormLayout.ItemRole.LabelRole, self.labelCache)
+        self.formLayout.setWidget(8, QFormLayout.ItemRole.LabelRole, self.labelCache)
 
         self.noCacheCheckBox = QCheckBox(self.groupEndpoints)
         self.noCacheCheckBox.setObjectName(u"noCacheCheckBox")
 
-        self.formLayout.setWidget(5, QFormLayout.ItemRole.FieldRole, self.noCacheCheckBox)
+        self.formLayout.setWidget(8, QFormLayout.ItemRole.FieldRole, self.noCacheCheckBox)
 
         self.functionsLabel = QLabel(self.groupEndpoints)
         self.functionsLabel.setObjectName(u"functionsLabel")
 
-        self.formLayout.setWidget(6, QFormLayout.ItemRole.LabelRole, self.functionsLabel)
+        self.formLayout.setWidget(9, QFormLayout.ItemRole.LabelRole, self.functionsLabel)
 
         self.selectFuncs = QPushButton(self.groupEndpoints)
         self.selectFuncs.setObjectName(u"selectFuncs")
@@ -195,7 +231,7 @@ class Ui_AuthPanel(object):
         self.selectFuncs.setMaximumSize(QSize(296, 32))
         self.selectFuncs.setAutoDefault(False)
 
-        self.formLayout.setWidget(6, QFormLayout.ItemRole.FieldRole, self.selectFuncs)
+        self.formLayout.setWidget(9, QFormLayout.ItemRole.FieldRole, self.selectFuncs)
 
 
         self.rootLayout.addWidget(self.groupEndpoints)
@@ -264,6 +300,9 @@ class Ui_AuthPanel(object):
         self.labelScope.setText(QCoreApplication.translate("AuthPanel", u"Scope", None))
         self.radioButton_2.setText(QCoreApplication.translate("AuthPanel", u"Public", None))
         self.radioButton.setText(QCoreApplication.translate("AuthPanel", u"Private", None))
+        self.labelFileFormat.setText(QCoreApplication.translate("AuthPanel", u"File Format", None))
+        self.labelIsa.setText(QCoreApplication.translate("AuthPanel", u"ISA", None))
+        self.labelPlatform.setText(QCoreApplication.translate("AuthPanel", u"Platform", None))
         self.labelCache.setText(QCoreApplication.translate("AuthPanel", u"Cache", None))
 #if QT_CONFIG(tooltip)
         self.noCacheCheckBox.setToolTip(QCoreApplication.translate("AuthPanel", u"Skip cached results and re-run every processing stage.", None))
