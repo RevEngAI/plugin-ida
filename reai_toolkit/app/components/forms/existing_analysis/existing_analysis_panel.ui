@@ -23,7 +23,7 @@
    </size>
   </property>
   <property name="windowTitle">
-   <string>RevEng.AI — Ann</string>
+   <string>RevEng.AI — Existing Analyses</string>
   </property>
   <property name="autoFillBackground">
    <bool>false</bool>

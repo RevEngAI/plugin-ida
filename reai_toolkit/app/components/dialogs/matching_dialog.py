@@ -211,7 +211,7 @@ class MatchingDialog(DialogBase):
         if app is not None:
             app.installEventFilter(self)
 
-        # ----------------- ANN Button -----------------
+        # ----------------- Function Matching Button -----------------
 
         if hasattr(self.ui, "okRunButton"):
             self.ui.okRunButton.clicked.connect(self.start_ann)
@@ -241,7 +241,7 @@ class MatchingDialog(DialogBase):
     # Update functions table
     # =====================================================================
     def _initFunctionTable(self):
-        """Set up the QTableWidget used for ANN function selection."""
+        """Set up the QTableWidget used for function matching selection."""
         if not hasattr(self.ui, "tableFunctions"):
             return
 
@@ -671,7 +671,7 @@ class MatchingDialog(DialogBase):
 
     def start_ann(self):
         """
-        Collect selected inputs and start the ANN generator in a worker thread.
+        Collect selected inputs and start the function matching generator in a worker thread.
         """
         function_ids = sorted(self._selected_functions) if self._selected_functions else []
         if self.single_function_id is not None and not function_ids:
@@ -679,7 +679,7 @@ class MatchingDialog(DialogBase):
 
         if not function_ids:
             self.error_dialog = ErrorDialog(
-                error_message="Select at least one function to run ANN.",
+                error_message="Select at least one function to run function matching.",
                 parent=self,
             )
             self.error_dialog.show()
@@ -705,7 +705,7 @@ class MatchingDialog(DialogBase):
             debug_all=True if self.ui.chkDebugSymbols.isChecked() else None,
         )
 
-        logger.debug(f"[AnnDialog] Starting ANN with args: {gen_kwargs}")
+        logger.debug(f"[AnnDialog] Starting function matching with args: {gen_kwargs}")
 
         self.stop_ann()  # ensure previous worker is cleaned up
 
@@ -732,7 +732,7 @@ class MatchingDialog(DialogBase):
         if self._progress_bar:
             self._progress_bar.setVisible(False)
         self.toggle_search_ui(pause=False)
-        logger.error(f"[AnnDialog] ANN worker error: {msg}")
+        logger.error(f"[AnnDialog] function matching worker error: {msg}")
         self.error_dialog = ErrorDialog(error_message=msg, parent=self)
         self.error_dialog.show()
 
@@ -746,7 +746,7 @@ class MatchingDialog(DialogBase):
             try:
                 self._matching_worker.stop()
             except Exception as e:
-                logger.debug(f"[AnnDialog] Failed to stop ANN worker: {e}")
+                logger.debug(f"[AnnDialog] Failed to stop function matching worker: {e}")
                 pass
         if self._matching_thread is not None:
             # Let it exit naturally; Qt handles cleanup via the signals we set
@@ -764,7 +764,7 @@ class MatchingDialog(DialogBase):
         etype: MatchEvent
 
         logger.debug(
-            f"[AnnDialog] ANN event: {etype}, completed: {getattr(ev, 'completed', None)}/{getattr(ev, 'total', None)}, ok: {getattr(ev, 'ok', None)}"
+            f"[AnnDialog] function matching event: {etype}, completed: {getattr(ev, 'completed', None)}/{getattr(ev, 'total', None)}, ok: {getattr(ev, 'ok', None)}"
         )
 
         # Start
@@ -787,7 +787,7 @@ class MatchingDialog(DialogBase):
 
             if not ev.ok:
                 self.error_dialog = ErrorDialog(
-                    error_message="One or more errors occurred during ANN processing:\n"
+                    error_message="One or more errors occurred during function matching:\n"
                     + "\n".join(ev.errors),
                     parent=self,
                 )
@@ -824,7 +824,7 @@ class MatchingDialog(DialogBase):
         self.show_select_page()
 
     # =====================================================================
-    # Display ANN Results
+    # Display Function Matching Results
     def display_matching_results(self):
         query = (
             self.ui.resultFunctionSearch.text().strip().lower()
@@ -842,7 +842,7 @@ class MatchingDialog(DialogBase):
             self.display_matching_results_multiple_functions(query=query)
 
     def display_matching_results_single_function(self, query: str = ""):
-        """Special handling for single-function ANN results. (Multiple results per function)"""
+        """Special handling for single-function matching results. (Multiple results per function)"""
         table: QtWidgets.QTableWidget = self.ui.tableResults
 
         # Columns
@@ -979,7 +979,7 @@ class MatchingDialog(DialogBase):
         table.resizeRowsToContents()
 
         logger.debug(
-            f"Single: Displayed {len(self.matching_results.results[0].matched_functions)} ANN results"
+            f"Single: Displayed {len(self.matching_results.results[0].matched_functions)} function matching results"
         )
 
         # --- make column-0 behave like a radio group ---
@@ -1012,7 +1012,7 @@ class MatchingDialog(DialogBase):
         table.setUpdatesEnabled(True)
 
     def display_matching_results_multiple_functions(self, query: str = "") -> None:
-        """Special handling for multi-function ANN results. (One result per function)"""
+        """Special handling for multi-function matching results. (One result per function)"""
         table: QtWidgets.QTableWidget = self.ui.tableResults # type: ignore
 
         if self.matching_results is None:
@@ -1202,7 +1202,7 @@ class MatchingDialog(DialogBase):
         self.ui.btnResultClearAll.clicked.connect(clear_all)
         self.ui.btnResultSelectAll.clicked.connect(select_all)
 
-        logger.debug(f"Multiple: Displayed {len(self.matching_results.results)} ANN results")
+        logger.debug(f"Multiple: Displayed {len(self.matching_results.results)} function matching results")
 
     def enqueue_renames(self):
         # Read checked rows from results table
