@@ -149,7 +149,7 @@ class Ui_ExistingAnalysesPanel(object):
     def retranslateUi(self, ExistingAnalysesPanel):
         _translate = QtCore.QCoreApplication.translate
         ExistingAnalysesPanel.setWindowTitle(
-            _translate("ExistingAnalysesPanel", "RevEng.AI — Ann")
+            _translate("ExistingAnalysesPanel", "RevEng.AI — Existing Analyses")
         )
         self.titleLabel.setText(
             _translate("ExistingAnalysesPanel", "RevEng.AI — Existing Analyses")
