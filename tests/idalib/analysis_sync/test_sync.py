@@ -89,6 +89,24 @@ def test_perform_function_sync_counts_missing_symbol_names(service, auto_func):
     assert needs_canonical == []
 
 
+@pytest.mark.parametrize("placeholder", ["FUN_00401020", "sub_DEADBEEF"])
+def test_perform_function_sync_skips_placeholder_names(service, auto_func, placeholder):
+    original = ida_name.get_name(auto_func)
+    func_map = FunctionMapping(
+        function_map={"7": auto_func},
+        inverse_function_map={},
+        name_map={str(auto_func): placeholder},
+    )
+
+    result, pushbacks, needs_canonical = service._perform_function_sync(func_map)
+
+    assert result.data.missing_symbol_name_count >= 1
+    assert result.data.matched_function_count == 0
+    assert ida_name.get_name(auto_func) == original
+    assert pushbacks == []
+    assert needs_canonical == []
+
+
 def test_perform_function_sync_classifies_invalid_name(service, auto_func):
     func_map = FunctionMapping(
         function_map={"7": auto_func},

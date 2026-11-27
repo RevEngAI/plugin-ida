@@ -41,7 +41,9 @@ CHECKS = [
     "comment_edit_empty_removes",
     "comment_remove_deletes",
     "comment_remove_args_correct",
+    "arrow_keys_move_the_cursor",
     "decomp_line_lights_its_disassembly",
+    "decomp_line_reveals_its_disassembly",
     "a_line_with_no_counterpart_lights_nothing",
     "disassembly_ea_lights_its_decomp_line",
     "an_unattributed_address_lights_nothing",
@@ -79,9 +81,13 @@ def _isolated_idausr(tmp_path) -> dict[str, str]:
     # IDAUSR it starts but never creates its windows, so OnCreate never runs.
     usr = tmp_path / "idausr"
     usr.mkdir(exist_ok=True)
-    reg = os.path.join(os.environ.get("IDADIR", ""), "ida.reg")
-    if os.path.isfile(reg):
-        shutil.copy(reg, usr / "ida.reg")
+    for reg in (
+        os.path.join(os.environ.get("IDADIR", ""), "ida.reg"),
+        os.path.expanduser("~/.idapro/ida.reg"),
+    ):
+        if os.path.isfile(reg):
+            shutil.copy(reg, usr / "ida.reg")
+            break
     return {"IDAUSR": str(usr)}
 
 def _ida_path_without_venv(env: dict[str, str]) -> dict[str, str]:

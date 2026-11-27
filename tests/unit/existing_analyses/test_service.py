@@ -24,6 +24,10 @@ def sdk(mocker):
     api_class = mocker.patch.object(svc_mod, "AnalysesCoreApi")
     api_inst = MagicMock()
     api_class.return_value = api_inst
+    config_class = mocker.patch.object(svc_mod, "ConfigApi")
+    config_class.return_value.v3_get_models.return_value = MagicMock(
+        models=["binnet-1.0"]
+    )
     return api_inst
 
 
@@ -47,6 +51,17 @@ def test_returns_records_and_passes_expected_filters(service, sdk):
     assert kwargs["status"] == ["Complete"]
     assert kwargs["order_by"] == "created"
     assert kwargs["order"] == "DESC"
+    assert kwargs["model_name"] == ["binnet-1.0"]
+
+
+def test_no_available_models_returns_empty_list(service, sdk):
+    svc_mod.ConfigApi.return_value.v3_get_models.return_value = MagicMock(models=None)
+
+    result = service.fetch_analyses_same_hash("/path/to/binary.elf")
+
+    assert result.success is True
+    assert result.data == []
+    sdk.v3_list_analyses.assert_not_called()
 
 
 def test_empty_page_returns_empty_list(service, sdk):

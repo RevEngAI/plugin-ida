@@ -197,7 +197,7 @@ class Ui_ExistingAnalysesPanel(object):
     def retranslateUi(self, ExistingAnalysesPanel):
         ExistingAnalysesPanel.setWindowTitle(
             QCoreApplication.translate(
-                "ExistingAnalysesPanel", "RevEng.AI \u2014 Ann", None
+                "ExistingAnalysesPanel", "RevEng.AI \u2014 Existing Analyses", None
             )
         )
         self.logoArea.setText("")

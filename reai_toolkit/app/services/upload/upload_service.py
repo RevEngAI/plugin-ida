@@ -4,15 +4,19 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from loguru import logger
-from revengai import AnalysesCoreApi, Configuration, GetConfigOutputBody, Symbols
+from revengai import (
+    AnalysesCoreApi,
+    Config,
+    Configuration,
+    CreateMetadata,
+    CreateRequest,
+    GetConfigOutputBody,
+    Symbols,
+)
 from revengai.api.binaries_api import BinariesApi
 from revengai.api.config_api import ConfigApi
 
-from revengai.models.analysis_config import AnalysisConfig
-from revengai.models.analysis_create_request import AnalysisCreateRequest
-from revengai.models.analysis_create_response import AnalysisCreateResponse
-from revengai.models.analysis_scope import AnalysisScope
-from revengai.models.tag import Tag
+from revengai.models.binary_config import BinaryConfig
 from revengai.models.upload_file_type import UploadFileType
 from revengai.models.upload_output_body import UploadOutputBody
 
@@ -39,6 +43,9 @@ class UploadService(IThreadService):
         tags: Optional[list[str]] = None,
         public: bool = True,
         no_cache: bool = False,
+        file_format: Optional[str] = None,
+        isa: Optional[str] = None,
+        platform: Optional[str] = None,
         thread_callback: Optional[Callable[[GenericApiReturn], None]] = None
     ) -> None:
         """
@@ -55,6 +62,9 @@ class UploadService(IThreadService):
                 tags,
                 public,
                 no_cache,
+                file_format,
+                isa,
+                platform,
             ),
         )
 
@@ -72,6 +82,9 @@ class UploadService(IThreadService):
         tags: Optional[list[str]] = None,
         public: bool = True,
         no_cache: bool = False,
+        file_format: Optional[str] = None,
+        isa: Optional[str] = None,
+        platform: Optional[str] = None,
     ) -> None:
         """
         Uploads the binary (and optional debug file) and starts an analysis.
@@ -126,6 +139,9 @@ class UploadService(IThreadService):
             public=public,
             symbols=symbols,
             no_cache=no_cache,
+            file_format=file_format,
+            isa=isa,
+            platform=platform,
         )
         self.call_callback(generic_return=final_response)
 
@@ -183,14 +199,14 @@ class UploadService(IThreadService):
         return response
 
     def _create_analysis_req(
-        self, analysis_request: AnalysisCreateRequest
-    ) -> AnalysisCreateResponse:
+        self, analysis_request: CreateRequest
+    ) -> CreateMetadata | None:
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
             analyses_client = AnalysesCoreApi(api_client)
-            analysis_result = analyses_client.create_analysis(
-                analysis_create_request=analysis_request
+            operation = analyses_client.v3_create_analysis(
+                create_request=analysis_request
             )
-            return analysis_result.data
+            return operation.metadata
 
     def analyse(
         self,
@@ -201,7 +217,10 @@ class UploadService(IThreadService):
         tags: Optional[list[str]] = None,
         public: bool = True,
         no_cache: bool = False,
-    ) -> GenericApiReturn[AnalysisCreateResponse]:
+        file_format: Optional[str] = None,
+        isa: Optional[str] = None,
+        platform: Optional[str] = None,
+    ) -> GenericApiReturn[CreateMetadata]:
         if symbols.function_boundaries is None:
             return GenericApiReturn(
                 success=False,
@@ -213,14 +232,19 @@ class UploadService(IThreadService):
         )
         logger.info(f"RevEng.AI: Base address: 0x{symbols.base_address:X}")
 
-        analysis_create_request = AnalysisCreateRequest(
+        analysis_create_request = CreateRequest(
             filename=file_name,
             sha_256_hash=binary_sha256,
             debug_hash=debug_sha256,
-            tags=[Tag(name=tag) for tag in (tags or [])],
-            analysis_scope=AnalysisScope.PUBLIC if public else AnalysisScope.PRIVATE,
+            tags=tags or [],
+            analysis_scope="PUBLIC" if public else "PRIVATE",
             symbols=symbols,
-            analysis_config=AnalysisConfig(no_cache=no_cache),
+            analysis_config=Config(no_cache=no_cache),
+            binary_config=(
+                BinaryConfig(file_format=file_format, isa=isa, platform=platform)
+                if file_format or isa or platform
+                else None
+            ),
         )
 
         response = self.api_request_returning(
@@ -228,7 +252,7 @@ class UploadService(IThreadService):
         )
 
         if response.success:
-            data: AnalysisCreateResponse | None = response.data
+            data: CreateMetadata | None = response.data
             if data:
                 self.netstore_service.put_analysis_id(data.analysis_id)
                 self.netstore_service.put_binary_id(data.binary_id)

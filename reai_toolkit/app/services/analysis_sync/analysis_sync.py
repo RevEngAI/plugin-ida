@@ -19,6 +19,7 @@ from revengai import (
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
 from reai_toolkit.app.core.shared_schema import GenericApiReturn
+from reai_toolkit.app.core.utils import is_placeholder_name
 from reai_toolkit.app.interfaces.thread_service import IThreadService
 from reai_toolkit.app.services.analysis_sync.schema import MatchedFunctionSummary
 from reai_toolkit.app.services.data_types.data_types_service import ImportDataTypesService
@@ -158,7 +159,7 @@ class AnalysisSyncService(IThreadService):
             new_name: str | None = local_vaddr_to_matched_name.get(local_vaddr_str)
             old_name: str | None = idc.get_func_name(local_vaddr)
 
-            if new_name:
+            if new_name and not is_placeholder_name(new_name):
                 matched_function_count += 1
                 if new_name != old_name:
                     fid: int | None = addr_to_function_id.get(local_vaddr)

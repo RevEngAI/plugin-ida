@@ -39,9 +39,13 @@ def _isolated_idausr(tmp_path) -> dict[str, str]:
     # IDAUSR it starts but never creates its windows, so OnCreate never runs.
     usr = tmp_path / "idausr"
     usr.mkdir(exist_ok=True)
-    reg = os.path.join(os.environ.get("IDADIR", ""), "ida.reg")
-    if os.path.isfile(reg):
-        shutil.copy(reg, usr / "ida.reg")
+    for reg in (
+        os.path.join(os.environ.get("IDADIR", ""), "ida.reg"),
+        os.path.expanduser("~/.idapro/ida.reg"),
+    ):
+        if os.path.isfile(reg):
+            shutil.copy(reg, usr / "ida.reg")
+            break
     return {"IDAUSR": str(usr)}
 
 def _ida_path_without_venv(env: dict[str, str]) -> dict[str, str]:

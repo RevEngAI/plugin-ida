@@ -32,6 +32,11 @@ ENTHUSIAST_PRIVATE_TOOLTIP = (
     "Upgrade your plan to create private analyses."
 )
 
+# Auto leaves the field unset so the server detects it.
+FILE_FORMAT_OPTIONS = ["Auto", "pe", "elf", "blob"]
+ISA_OPTIONS = ["Auto", "x86", "x86_64", "arm"]
+PLATFORM_OPTIONS = ["Auto", "linux", "windows", "android"]
+
 
 class AnalyseDialog(DialogBase):
     """
@@ -100,6 +105,10 @@ class AnalyseDialog(DialogBase):
         self.ui.horizontalLayout.addStretch(1)
 
         self._apply_tier_restrictions()
+
+        self.ui.fileFormatComboBox.addItems(FILE_FORMAT_OPTIONS)
+        self.ui.isaComboBox.addItems(ISA_OPTIONS)
+        self.ui.platformComboBox.addItems(PLATFORM_OPTIONS)
 
         # Hook up button to subset functions submitted for upload
         self.ui.selectFuncs.clicked.connect(self._on_functions_click)
@@ -180,10 +189,18 @@ class AnalyseDialog(DialogBase):
             tags=self._parse_tags(),
             public=self.ui.radioButton_2.isChecked(),
             no_cache=self.ui.noCacheCheckBox.isChecked(),
+            file_format=self._combo_value(self.ui.fileFormatComboBox),
+            isa=self._combo_value(self.ui.isaComboBox),
+            platform=self._combo_value(self.ui.platformComboBox),
             thread_callback=self.callback,
         )
 
         self.accept()
+
+    @staticmethod
+    def _combo_value(combo: QtWidgets.QComboBox) -> str | None:
+        value: str = combo.currentText()
+        return None if value == "Auto" else value
 
     def _parse_tags(self) -> list[str]:
         seen: set[str] = set()
