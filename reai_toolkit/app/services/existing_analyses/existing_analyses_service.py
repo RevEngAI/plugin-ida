@@ -1,7 +1,7 @@
 from pathlib import Path
 from typing import List, Optional
 
-from revengai import AnalysesCoreApi, Configuration
+from revengai import AnalysesCoreApi, ConfigApi, Configuration
 from revengai.models import AnalysisRecordBody
 
 from reai_toolkit.app.core.netstore_service import SimpleNetStore
@@ -23,11 +23,16 @@ class ExistingAnalysesService(IThreadService):
         """
 
         with self.yield_api_client(sdk_config=self.sdk_config) as api_client:
+            models = ConfigApi(api_client).v3_get_models().models
+            if not models:
+                return []
+
             analyses_client = AnalysesCoreApi(api_client)
 
             result = analyses_client.v3_list_analyses(
                 analysis_scope=["PRIVATE"],
                 status=["Complete"],
+                model_name=models,
                 sha256_hash=sha256_hash,
                 order_by="created",
                 order="DESC",
