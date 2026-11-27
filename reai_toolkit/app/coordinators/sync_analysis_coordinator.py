@@ -12,7 +12,7 @@ from reai_toolkit.app.components.dialogs.import_functions_dialog import (
     ImportFunctionsWindow,
     MatchedFunction,
 )
-from reai_toolkit.app.core.utils import collect_symbols_from_ida
+from reai_toolkit.app.core.utils import collect_symbols_from_ida, is_placeholder_name
 
 from revengai.models.function_mapping import FunctionMapping
 
@@ -139,7 +139,7 @@ class AnalysisSyncCoordinator(BaseCoordinator):
             old_name: str = func_boundary.mangled_name
             start_addr: str = str(func_boundary.start_address)
             new_name: str | None = remote_mapping.name_map.get(start_addr)
-            if new_name:
+            if new_name and not is_placeholder_name(new_name):
                 entry: MatchedFunction = MatchedFunction(
                     old_name=old_name,
                     new_name=new_name,

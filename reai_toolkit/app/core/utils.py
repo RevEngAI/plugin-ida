@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from loguru import logger
@@ -18,6 +19,12 @@ from revengai.models.symbols import Symbols
 
 MAX_MANGLED_NAME_LENGTH = 4096
 MAX_FUNCTION_BOUNDARIES = 200000
+
+_PLACEHOLDER_NAME_RE = re.compile(r"(FUN|sub)_[0-9A-Fa-f]+")
+
+
+def is_placeholder_name(name: str) -> bool:
+    return _PLACEHOLDER_NAME_RE.fullmatch(name) is not None
 
 
 def parse_exception(exception: ApiException) -> BaseResponse | None:
